@@ -62,17 +62,21 @@ def main() -> int:
     reports_dir = project_root() / "reports"
     daily_report = reports_dir / "daily_report.md"
     today_action = reports_dir / "today_action.md"
+    weekly_report = reports_dir / "weekly_report.md"
+    system_check_report = reports_dir / "system_check_report.md"
     print("")
-    if daily_report.exists():
-        print(f"日报路径：{daily_report}")
-    else:
-        print("日报未生成，请查看上方错误信息。")
-        return 1
-    if today_action.exists():
-        print(f"今日行动摘要：{today_action}")
-    else:
-        print("今日行动摘要未生成，请查看上方错误信息。")
-        return 1
+    expected_reports = [
+        ("今日行动摘要", today_action),
+        ("日报路径", daily_report),
+        ("周报路径", weekly_report),
+        ("系统检查报告", system_check_report),
+    ]
+    for label, path in expected_reports:
+        if path.exists():
+            print(f"{label}：{path}")
+        else:
+            print(f"{label}未生成，请查看上方错误信息。")
+            return 1
 
     print("提示：系统不会自动交易，所有内容仅供投资辅助，不构成投资建议。")
     return 0

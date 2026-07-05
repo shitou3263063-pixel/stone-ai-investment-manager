@@ -65,7 +65,7 @@ def build_system_check_report() -> str:
     all_wecom_configured = all(_mask_status(key, env_values) == "已配置" for key in WECOM_KEYS)
 
     lines = [
-        "# Stone AI Investment Manager Pro V11 系统检查报告",
+        "# Stone AI Investment Manager Pro V12 系统检查报告",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 总体状态：{health_result.get('status', 'UNKNOWN')}",

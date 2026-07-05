@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Stone AI Investment Manager Pro V11
+      - name: Run Stone AI Investment Manager Pro V12
         env:
           PYTHONIOENCODING: utf-8
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -33,11 +33,6 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          QYWX_WEBHOOK_URL: ${{ secrets.QYWX_WEBHOOK_URL }}
-          WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
-          WECHAT_WORK_WEBHOOK: ${{ secrets.WECHAT_WORK_WEBHOOK }}
           WECOM_CORP_ID: ${{ secrets.WECOM_CORP_ID }}
           WECOM_AGENT_ID: ${{ secrets.WECOM_AGENT_ID }}
           WECOM_SECRET: ${{ secrets.WECOM_SECRET }}

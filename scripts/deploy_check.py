@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 from typing import NamedTuple
@@ -23,7 +24,7 @@ README_REQUIRED_SNIPPETS = [
     "python scripts/final_check.py",
     "python scripts/deploy_check.py",
     "git init",
-    'git commit -m "Stone AI Investment Manager Pro V11"',
+    'git commit -m "Stone AI Investment Manager Pro V12"',
     "git remote add origin",
     "Run workflow",
     "WECOM_CORP_ID",
@@ -39,10 +40,35 @@ class CheckItem(NamedTuple):
     message: str
 
 
+def _git_executable() -> str | None:
+    path_git = shutil.which("git")
+    if path_git:
+        return path_git
+
+    bundled_git = (
+        Path.home()
+        / ".cache"
+        / "codex-runtimes"
+        / "codex-primary-runtime"
+        / "dependencies"
+        / "native"
+        / "git"
+        / "cmd"
+        / "git.exe"
+    )
+    if bundled_git.exists():
+        return str(bundled_git)
+    return None
+
+
 def _run_git(args: list[str], cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[str]:
+    git = _git_executable()
+    if not git:
+        return subprocess.CompletedProcess(["git", *args], 127, "", "git command not found")
+
     try:
         return subprocess.run(
-            ["git", *args],
+            [git, *args],
             cwd=cwd,
             text=True,
             capture_output=True,
@@ -173,7 +199,7 @@ def _overall_status(items: list[CheckItem]) -> str:
 
 def _build_report(items: list[CheckItem]) -> str:
     lines = [
-        "# Stone AI Investment Manager Pro V11 部署前检查报告",
+        "# Stone AI Investment Manager Pro V12 部署前检查报告",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 总体状态：{_overall_status(items)}",
@@ -228,13 +254,7 @@ def main() -> int:
     ]
 
     report = _build_report(items)
-    reports_dir = PROJECT_ROOT / "reports"
-    reports_dir.mkdir(exist_ok=True)
-    report_path = reports_dir / "deploy_check_report.md"
-    report_path.write_text(report, encoding="utf-8")
-
     print(report)
-    print(f"\n部署前检查报告已生成：{report_path}")
     return 0 if _overall_status(items) != "ERROR" else 1
 
 

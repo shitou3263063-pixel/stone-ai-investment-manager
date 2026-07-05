@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 
 class ReportAgent:
-    """Report Agent：整合四个 Agent 的结果，生成 V10 报告。"""
+    """Report Agent：整合分析结果，生成 V12 生产版报告。"""
 
     def __init__(
         self,
@@ -44,7 +43,7 @@ class ReportAgent:
         report_date = report_date or date.today()
         return "\n".join(
             [
-                "📅 Stone AI Investment Manager Pro V10 每日投资简报",
+                "📅 Stone AI Investment Manager Pro V12 每日投资简报",
                 "",
                 f"日期：{report_date.isoformat()}",
                 f"总资产：{self.portfolio['total_assets_wan']:.2f} 万元",
@@ -127,7 +126,7 @@ class ReportAgent:
         report_date = report_date or date.today()
         return "\n".join(
             [
-                f"# Stone AI Investment Manager Pro V10 每周投资报告 - {report_date.isoformat()}",
+                f"# Stone AI Investment Manager Pro V12 每周投资报告 - {report_date.isoformat()}",
                 "",
                 f"- 总资产：{self.portfolio['total_assets_wan']:.2f} 万元",
                 f"- 市场风险评分：{self.market['market_risk_score']} / 100",
@@ -157,90 +156,6 @@ class ReportAgent:
                 "",
             ]
         )
-
-    def generate_monthly_rebalance(self, report_date: date | None = None) -> str:
-        report_date = report_date or date.today()
-        lines = [
-            f"# Stone AI Investment Manager Pro V10 月度再平衡报告 - {report_date.isoformat()}",
-            "",
-            f"- 总资产：{self.portfolio['total_assets_wan']:.2f} 万元",
-            f"- 今日是否调仓：{'是' if self.decision['today_rebalance'] else '否'}",
-            f"- 操作等级：{self.decision['operation_level']}",
-            f"- 置信度：{self.decision['confidence']}%",
-            "",
-            "## 资产类别偏离",
-            "",
-            "| 资产类别 | 金额(万元) | 当前占比 | 目标占比 | 偏离比例 | 偏离金额(万元) |",
-            "| --- | ---: | ---: | ---: | ---: | ---: |",
-        ]
-        for item in self.portfolio["categories"]:
-            lines.append(
-                "| "
-                f"{item['category']} | "
-                f"{item['amount_wan']:.2f} | "
-                f"{item['current_ratio'] * 100:.2f}% | "
-                f"{item['target_ratio'] * 100:.2f}% | "
-                f"{item['deviation_ratio'] * 100:.2f}% | "
-                f"{item['deviation_amount_wan']:.2f} |"
-            )
-        lines.extend(
-            [
-                "",
-                "## 月度调仓建议",
-                "",
-                f"- 买：{self._orders_text(self.decision['buy_orders'])}",
-                f"- 卖：{self._orders_text(self.decision['sell_orders'])}",
-                f"- 等待：{self._wait_text()}",
-                f"- 模型估算收益变化：{self.decision['expected_incremental_return_wan']:.2f} 万元/年（不构成收益承诺）",
-                "",
-            ]
-        )
-        return "\n".join(lines)
-
-    def generate_emergency_alert(
-        self,
-        event: str,
-        report_date: date | None = None,
-        why_important: str | None = None,
-    ) -> str:
-        report_date = report_date or date.today()
-        return "\n".join(
-            [
-                "🚨 AI紧急提醒",
-                "",
-                f"日期：{report_date.isoformat()}",
-                "",
-                "事件：",
-                event,
-                "",
-                "为什么重要：",
-                why_important or self.decision["one_sentence_conclusion"],
-                "",
-                "对我的资产影响：",
-                self._portfolio_impact_text(),
-                "",
-                "需要操作吗？",
-                "是" if self.decision["need_action"] else "否",
-                "",
-                "如果需要：",
-                "",
-                "买什么？",
-                self._orders_text(self.decision["buy_orders"]),
-                "",
-                "卖什么？",
-                self._orders_text(self.decision["sell_orders"]),
-                "",
-                "建议金额：",
-                self._amount_text(),
-                "",
-                "为什么这样做？",
-                self._why_text(),
-                "",
-            ]
-        )
-
-    def save(self, content: str, path: str | Path) -> None:
-        Path(path).write_text(content, encoding="utf-8")
 
     def _asset_change_text(self) -> str:
         categories = {item["category"]: item for item in self.portfolio["categories"]}
@@ -627,7 +542,7 @@ class ReportAgent:
             f"QQQ {float(monthly.get('QQQ', 0.0)):.2f}万元、"
             f"沪深300ETF {float(monthly.get('沪深300ETF', 0.0)):.2f}万元、"
             f"现金保留 {float(monthly.get('现金保留', 0.0)):.2f}万元。"
-            "V10 建议定投继续，但大额调仓按市场风险分批执行。"
+            "V12 建议定投继续，但大额调仓按市场风险分批执行。"
         )
 
     def _next_7_days_text(self) -> str:
@@ -658,14 +573,3 @@ class ReportAgent:
                 f"一句话结论：{self.decision['one_sentence_conclusion']}",
             ]
         )
-
-    def _amount_text(self) -> str:
-        buy_total = sum(item["amount_wan"] for item in self.decision["buy_orders"])
-        sell_total = sum(item["amount_wan"] for item in self.decision["sell_orders"])
-        return (
-            f"买入合计{buy_total:.2f}万元；卖出合计{sell_total:.2f}万元；"
-            f"动用现金{self.decision['cash_to_use_wan']:.2f}万元。"
-        )
-
-    def _why_text(self) -> str:
-        return "；".join(self.decision.get("why", [])) or "当前没有足够强的操作理由。"

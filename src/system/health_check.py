@@ -74,11 +74,6 @@ SMTP_USER=你的QQ邮箱
 SMTP_PASSWORD=你的QQ邮箱SMTP授权码
 EMAIL_TO=shili3263063@qq.com
 OPENAI_API_KEY=你的OpenAI API Key
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-QYWX_WEBHOOK_URL=
-WECHAT_WEBHOOK_URL=
-WECHAT_WORK_WEBHOOK=你的企业微信群机器人Webhook地址
 WECOM_CORP_ID=你的企业ID
 WECOM_AGENT_ID=1000002
 WECOM_SECRET=你的应用Secret
@@ -156,7 +151,7 @@ def _status_summary(items: Iterable[HealthItem]) -> str:
 def run_health_check(auto_fix: bool = True) -> dict[str, object]:
     """执行系统自检；可修复项会自动创建模板或文件夹。"""
     root = project_root()
-    repo_root = root.parent
+    repo_root = root
     items: list[HealthItem] = []
 
     py_version = sys.version_info
@@ -283,7 +278,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
             HealthItem(
                 "旧版密码配置",
                 "WARN",
-                "data/config.yaml 中存在旧版 password 字段；当前 V11 不需要把真实密码保存在配置文件里。",
+                "data/config.yaml 中存在旧版 password 字段；当前 V12 不需要把真实密码保存在配置文件里。",
                 "建议把授权码迁移到 .env 或 GitHub Secrets，然后清空 data/config.yaml 中的 password。",
             )
         )
@@ -336,7 +331,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
 def format_health_report(result: dict[str, object]) -> str:
     items = result.get("items", [])
     lines = [
-        "Stone AI Investment Manager Pro V11 系统自检",
+        "Stone AI Investment Manager Pro V12 系统自检",
         f"总体状态：{result.get('status', 'UNKNOWN')}",
         "",
     ]

@@ -1,1 +1,1 @@
-"""Stone AI Investment Manager Pro V11."""
+"""Stone AI Investment Manager Pro V12."""
