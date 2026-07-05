@@ -1,0 +1,32 @@
+macro_events:
+  - name: FOMC利率决议
+    date: 2026-07-29
+    level: high
+  - name: CPI数据
+    date: 2026-07-15
+    level: high
+  - name: 非农就业数据
+    date: 2026-08-07
+    level: high
+
+dca_plan:
+  enabled: true
+  monthly_budget: 10000
+  targets:
+    - symbol: VOO
+      name: 标普500ETF
+      base_amount: 4000
+    - symbol: 510300.SS
+      name: 沪深300ETF
+      base_amount: 3000
+    - symbol: 3067.HK
+      name: 恒生科技ETF
+      base_amount: 3000
+
+target_allocation:
+  us_stock: 18
+  hk_stock: 10
+  cn_stock: 8
+  bond: 38
+  gold: 18
+  cash: 8

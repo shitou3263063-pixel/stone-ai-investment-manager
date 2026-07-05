@@ -1,0 +1,57 @@
+﻿portfolio:
+  base_currency: CNY
+  amount_unit: 万元
+
+investor_profile:
+  horizon_years: 5
+  trading_frequency: low
+  drawdown_control_first: true
+  core_method: ETF_and_multi_asset
+  objective: steady_growth
+  avoid_frequent_rebalance: true
+
+target_allocation:
+  美股: 0.35
+  A股: 0.12
+  港股: 0.08
+  债券: 0.28
+  黄金: 0.12
+  现金: 0.05
+
+rules:
+  deviation_threshold: 0.03
+  max_sell_ratio_per_category: 0.20
+  gold_reduce_only_threshold: 0.15
+  hong_kong_buy_threshold: 0.06
+  nvidia_stop_buy_threshold: 0.05
+  cash_minimum_ratio: 0.05
+  nasdaq_drawdown_threshold: -0.10
+  high_market_risk_score: 55
+  high_market_risk_buy_ratio: 0.60
+
+expected_annual_returns:
+  美股: 0.07
+  A股: 0.06
+  港股: 0.06
+  债券: 0.025
+  黄金: 0.02
+  现金: 0.015
+
+monthly_investment:
+  total_wan: 2.0
+  VOO: 0.8
+  QQQ: 0.6
+  沪深300ETF: 0.4
+  现金保留: 0.2
+
+email:
+  enabled: true
+  smtp_server: smtp.gmail.com
+  smtp_port: 465
+  sender: shitou3263063@gmail.com
+  password:
+  receiver: shitou3263063@gmail.com
+
+wechat:
+  enabled: false
+  webhook_url:
