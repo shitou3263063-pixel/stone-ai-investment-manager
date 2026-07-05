@@ -42,6 +42,12 @@ reports/system_check_report.md
 python run.py
 ```
 
+兼容入口：
+
+```bash
+python main.py
+```
+
 企业微信测试：
 
 ```bash
@@ -83,6 +89,15 @@ category,name,amount_wan,currency,note
 ```
 
 金额单位为万元。
+
+兼容表头：
+
+- 持仓名称：`Asset`、`asset`、`标的`、`名称`、`name`
+- 代码：`Symbol`、`symbol`、`代码`
+- 资产类别：`Category`、`category`、`类型`、`资产类别`
+- 金额：`Amount`、`amount`、`市值`、`金额`、`amount_wan`
+
+如果 `portfolio.csv` 缺失，系统会自动生成模板；如果表头格式错误，系统会提示缺少的列，并生成 `portfolio_template.csv` 作为参考。
 
 ## 更新市场数据
 
@@ -159,7 +174,7 @@ OPENAI_API_KEY=你的OpenAI API Key
 - cron：`30 0 * * *`
 - 支持 `workflow_dispatch`
 - 使用 Python 3.11
-- 执行 `python run.py`
+- 执行 `python main.py`
 - 上传 `reports/` 为 artifact
 
 必填 Secrets：

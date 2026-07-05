@@ -4,6 +4,8 @@ import csv
 from pathlib import Path
 from typing import Any
 
+from src.portfolio import load_portfolio as _load_portfolio
+
 
 def _to_number_or_text(value: str) -> Any:
     """把配置里的文本转成布尔值、数字或普通字符串。"""
@@ -74,20 +76,7 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 def load_portfolio(path: str | Path) -> list[dict[str, Any]]:
     """读取持仓 CSV。金额单位为万元。"""
-
-    rows: list[dict[str, Any]] = []
-    with Path(path).open("r", encoding="utf-8-sig", newline="") as file:
-        for row in csv.DictReader(file):
-            rows.append(
-                {
-                    "category": row["category"].strip(),
-                    "name": row["name"].strip(),
-                    "amount_wan": float(row["amount_wan"]),
-                    "currency": row.get("currency", "CNY").strip(),
-                    "note": row.get("note", "").strip(),
-                }
-            )
-    return rows
+    return _load_portfolio(path)
 
 
 def load_market_data(path: str | Path) -> dict[str, dict[str, Any]]:

@@ -4,7 +4,7 @@ Stone AI Investment Manager Pro V12 系统自检
 [OK] Python版本：当前 Python 3.12.13。
 [WARN] requirements依赖：部分依赖未安装：yfinance>=0.2.40、openai
     修复建议：可运行：python -m pip install -r requirements.txt
-[OK] 持仓文件：data/portfolio.csv 存在。
+[OK] 持仓文件：data/portfolio.csv 存在且格式可读取。
 [OK] 策略配置：config/settings.yaml 存在。
 [OK] 报告目录：reports 文件夹存在。
 [OK] .env.example：.env.example 存在。

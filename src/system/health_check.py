@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 from typing import Iterable
 
+from src.portfolio import PortfolioFormatError, load_portfolio
 from utils.data_loader import project_root
 
 
@@ -186,11 +187,22 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
     portfolio_path = root / "data" / "portfolio.csv"
     created = _ensure_file(portfolio_path, DEFAULT_PORTFOLIO) if auto_fix else False
     if portfolio_path.exists():
+        try:
+            load_portfolio(portfolio_path)
+            portfolio_status = "OK" if not created else "WARN"
+            portfolio_message = (
+                "data/portfolio.csv 存在且格式可读取。"
+                if not created
+                else "data/portfolio.csv 缺失，已创建模板，请填写真实持仓。"
+            )
+        except PortfolioFormatError as exc:
+            portfolio_status = "WARN"
+            portfolio_message = f"data/portfolio.csv 格式需要修复：{exc}"
         items.append(
             HealthItem(
                 "持仓文件",
-                "OK" if not created else "WARN",
-                "data/portfolio.csv 存在。" if not created else "data/portfolio.csv 缺失，已创建模板，请填写真实持仓。",
+                portfolio_status,
+                portfolio_message,
             )
         )
     else:

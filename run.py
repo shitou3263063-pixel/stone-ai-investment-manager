@@ -5,6 +5,7 @@ import os
 import sys
 
 from src.main import run as run_main
+from src.portfolio import PortfolioFormatError
 from src.system.health_check import format_health_report, run_health_check
 from utils.data_loader import project_root
 
@@ -57,7 +58,11 @@ def main() -> int:
         return 1
 
     print("开始生成投资日报...")
-    print(run_main())
+    try:
+        print(run_main())
+    except PortfolioFormatError as exc:
+        print(f"持仓文件错误：{exc}")
+        return 1
 
     reports_dir = project_root() / "reports"
     daily_report = reports_dir / "daily_report.md"
