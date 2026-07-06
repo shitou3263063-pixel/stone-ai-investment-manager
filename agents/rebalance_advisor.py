@@ -23,6 +23,9 @@ class RebalanceAdvisor:
 
         warnings: list[str] = []
         suggestions: list[str] = []
+        if self.portfolio.get("has_unvalued_assets"):
+            unvalued_text = "、".join(self.portfolio.get("unvalued_assets", []))
+            warnings.append(f"存在未估值资产：{unvalued_text}；当前总资产和资产占比不完整，今天不做比例调仓。")
 
         if stock_ratio > 0.70:
             warnings.append("股票类资产占比过高，组合波动可能明显上升，建议降低进攻风险。")

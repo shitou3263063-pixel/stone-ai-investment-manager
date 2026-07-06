@@ -11,10 +11,10 @@ REPO_ROOT = PROJECT_ROOT
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.system.health_check import HealthItem, format_health_report, run_health_check  # noqa: E402
+from src.system.health_check import format_health_report, run_health_check  # noqa: E402
 
 
-WECOM_KEYS = ["WECOM_CORP_ID", "WECOM_AGENT_ID", "WECOM_SECRET", "WECOM_USER_ID"]
+SMTP_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"]
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -40,29 +40,20 @@ def _mask_status(key: str, env_values: dict[str, str]) -> str:
     return "已配置" if value else "未配置"
 
 
-def _workflow_has_wecom_keys() -> dict[str, bool]:
+def _workflow_has_keys(keys: list[str]) -> dict[str, bool]:
     workflow_path = REPO_ROOT / ".github" / "workflows" / "daily.yml"
     if not workflow_path.exists():
-        return {key: False for key in WECOM_KEYS}
+        return {key: False for key in keys}
 
     content = workflow_path.read_text(encoding="utf-8")
-    return {key: key in content for key in WECOM_KEYS}
-
-
-def _find_item(items: list[object], name: str) -> HealthItem | None:
-    for item in items:
-        if isinstance(item, HealthItem) and item.name == name:
-            return item
-    return None
+    return {key: key in content for key in keys}
 
 
 def build_system_check_report() -> str:
     env_values = _load_env(PROJECT_ROOT / ".env")
     health_result = run_health_check(auto_fix=True)
-    health_items = list(health_result.get("items", []))
-    wecom_item = _find_item(health_items, "企业微信应用推送")
-    workflow_status = _workflow_has_wecom_keys()
-    all_wecom_configured = all(_mask_status(key, env_values) == "已配置" for key in WECOM_KEYS)
+    workflow_status = _workflow_has_keys(SMTP_KEYS)
+    all_smtp_configured = all(_mask_status(key, env_values) == "已配置" for key in SMTP_KEYS)
 
     lines = [
         "# Stone AI Investment Manager Pro V12 系统检查报告",
@@ -75,26 +66,19 @@ def build_system_check_report() -> str:
         "",
         format_health_report(health_result),
         "",
-        "## 企业微信点对点推送状态",
+        "## Gmail 邮件推送状态",
         "",
-        f"- 状态：{wecom_item.status if wecom_item else 'WARN'}",
-        f"- 说明：{wecom_item.message if wecom_item else '企业微信点对点推送未启用，不影响本地日报生成。'}",
-        f"- 是否已配置 WECOM 四项参数：{'是' if all_wecom_configured else '否'}",
+        f"- 是否已配置 SMTP 五项参数：{'是' if all_smtp_configured else '否'}",
+        "- 测试命令：`python scripts/test_email.py`",
         "",
-        "## WECOM 参数检查",
+        "## SMTP 参数检查",
         "",
     ]
 
-    for key in WECOM_KEYS:
+    for key in SMTP_KEYS:
         lines.append(f"- {key}：{_mask_status(key, env_values)}")
 
-    lines.extend(
-        [
-            "",
-            "## GitHub Actions Secrets 映射检查",
-            "",
-        ]
-    )
+    lines.extend(["", "## GitHub Actions Secrets 映射检查", ""])
     for key, present in workflow_status.items():
         lines.append(f"- {key}：{'daily.yml 已映射' if present else 'daily.yml 未映射'}")
 
@@ -104,24 +88,22 @@ def build_system_check_report() -> str:
             "## 测试命令",
             "",
             "```bash",
-            "python scripts/test_wecom.py",
+            "python scripts/test_email.py",
             "python run.py",
             "```",
             "",
-            "## 企业微信发送失败常见原因",
+            "## 邮件发送失败常见原因",
             "",
-            "- Secret 错误。",
-            "- UserID 错误。",
-            "- 应用可见范围没有包含该用户。",
-            "- 企业微信未登录或账号不可用。",
-            "- GitHub Secrets 没配置。",
-            "- 当前运行环境网络受限，无法连接企业微信 API。",
+            "- Gmail 未开启两步验证。",
+            "- SMTP_PASSWORD 不是 Gmail 应用专用密码。",
+            "- GitHub Secrets 没配置或变量名写错。",
+            "- 当前运行环境网络受限，无法连接 Gmail SMTP。",
             "",
             "## 安全说明",
             "",
-            "- 本报告只显示是否配置，不输出 WECOM_SECRET 的具体值。",
+            "- 本报告只显示是否配置，不输出 SMTP_PASSWORD 的具体值。",
             "- 不要把 `.env` 提交到 GitHub。",
-            "- 企业微信未配置或发送失败不会影响日报生成。",
+            "- 邮件未配置或发送失败不会影响日报生成。",
             "- 系统只提醒，不自动交易；所有内容仅供投资辅助，不构成投资建议。",
             "",
         ]

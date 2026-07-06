@@ -38,9 +38,14 @@ class PortfolioAgent:
                     "category": item["category"],
                     "name": item["name"],
                     "amount_wan": item["amount_wan"],
-                    "portfolio_ratio": item["amount_wan"] / total_assets,
-                    "category_ratio": item["amount_wan"] / category_total,
+                    "portfolio_ratio": item["amount_wan"] / total_assets if total_assets else 0.0,
+                    "category_ratio": item["amount_wan"] / category_total if category_total else 0.0,
+                    "quantity": item.get("quantity"),
+                    "unit": item.get("unit", ""),
                     "note": item.get("note", ""),
+                    "valuation_status": item.get("valuation_status", "manual"),
+                    "valuation_note": item.get("valuation_note", ""),
+                    "price_cny_per_gram": item.get("price_cny_per_gram"),
                     "recognized_category": item["category"],
                 }
             )
@@ -70,6 +75,8 @@ class PortfolioAgent:
             "category_amounts": category_amounts,
             "recognized_categories": recognized_categories,
             "data_warnings": self._build_data_warnings(normalized_portfolio),
+            "unvalued_assets": self._unvalued_assets(normalized_portfolio),
+            "has_unvalued_assets": any(item.get("valuation_status") == "unvalued" for item in normalized_portfolio),
         }
 
     def _normalize_portfolio(self) -> list[dict[str, Any]]:
@@ -101,7 +108,20 @@ class PortfolioAgent:
         )
         if unknown_categories:
             warnings.append(f"发现未识别资产类别：{', '.join(unknown_categories)}。")
+        for item in portfolio:
+            valuation_note = str(item.get("valuation_note", "") or "").strip()
+            if item.get("valuation_status") == "unvalued" and valuation_note:
+                warnings.append(f"未估值资产：{valuation_note}；当前总资产与黄金占比暂未包含该资产。")
+            elif item.get("valuation_status") == "estimated" and valuation_note:
+                warnings.append(f"金条估值：{valuation_note}")
         return warnings
+
+    def _unvalued_assets(self, portfolio: list[dict[str, Any]]) -> list[str]:
+        assets = []
+        for item in portfolio:
+            if item.get("valuation_status") == "unvalued":
+                assets.append(str(item.get("valuation_note") or item.get("name") or "未估值资产"))
+        return assets
 
     def _category_sort_key(self, category: str) -> tuple[int, str]:
         if category in CANONICAL_CATEGORIES:

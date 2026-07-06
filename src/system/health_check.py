@@ -12,7 +12,7 @@ from utils.data_loader import project_root
 
 
 STATUS_ORDER = {"OK": 0, "WARN": 1, "ERROR": 2}
-DEFAULT_EMAIL_TO = "shili3263063@qq.com"
+DEFAULT_EMAIL_TO = "shitou3263063@gmail.com"
 IMPORT_NAME_MAP = {
     "PyYAML": "yaml",
 }
@@ -26,13 +26,14 @@ class HealthItem:
     fix: str = ""
 
 
-DEFAULT_PORTFOLIO = """category,name,amount_wan,currency,note
-美股,VOO,0,CNY,标普500ETF
-港股,恒生科技ETF,0,CNY,港股科技ETF
-A股,沪深300ETF,0,CNY,A股宽基ETF
-债券,中国债券,0,CNY,中国债券资产
-黄金,黄金,0,CNY,黄金资产
-现金,现金,0,CNY,现金与货币资金
+DEFAULT_PORTFOLIO = """category,name,amount_wan,currency,quantity,unit,note
+美股,VOO,0,CNY,,,标普500ETF
+港股,恒生科技ETF,0,CNY,,,港股科技ETF
+A股,沪深300ETF,0,CNY,,,A股宽基ETF
+债券,中国债券,0,CNY,,,中国债券资产
+黄金,实物金条,,CNY,565,克,每日按黄金价格自动估值
+黄金,黄金ETF,0,CNY,,,黄金ETF
+现金,现金,0,CNY,,,现金与货币资金
 """
 
 DEFAULT_SETTINGS = """macro_events:
@@ -69,19 +70,15 @@ target_allocation:
   cash: 8
 """
 
-DEFAULT_ENV_EXAMPLE = """SMTP_HOST=smtp.qq.com
+DEFAULT_ENV_EXAMPLE = """SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-SMTP_USER=你的QQ邮箱
-SMTP_PASSWORD=你的QQ邮箱SMTP授权码
-EMAIL_TO=shili3263063@qq.com
+SMTP_USER=你的Gmail邮箱
+SMTP_PASSWORD=你的Gmail应用专用密码
+EMAIL_TO=shitou3263063@gmail.com
 OPENAI_API_KEY=你的OpenAI API Key
-WECOM_CORP_ID=你的企业ID
-WECOM_AGENT_ID=1000002
-WECOM_SECRET=你的应用Secret
-WECOM_USER_ID=你的企业微信UserID
 """
 
-DEFAULT_ENV = """EMAIL_TO=shili3263063@qq.com
+DEFAULT_ENV = """EMAIL_TO=shitou3263063@gmail.com
 """
 
 
@@ -304,30 +301,6 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
                 "WARN",
                 "未配置 OPENAI_API_KEY，AI 深度分析会跳过，基础日报可运行。",
                 "需要 AI 深度分析时，在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。",
-            )
-        )
-
-    wecom_keys = ["WECOM_CORP_ID", "WECOM_AGENT_ID", "WECOM_SECRET", "WECOM_USER_ID"]
-    configured_wecom = [key for key in wecom_keys if env_values.get(key) or os.getenv(key)]
-    missing_wecom = [key for key in wecom_keys if not env_values.get(key) and not os.getenv(key)]
-    if configured_wecom and not missing_wecom:
-        items.append(HealthItem("企业微信应用推送", "OK", "企业微信应用点对点推送配置完整。"))
-    elif configured_wecom:
-        items.append(
-            HealthItem(
-                "企业微信应用推送",
-                "WARN",
-                "企业微信点对点推送未启用，不影响本地日报生成。缺失：" + "、".join(missing_wecom),
-                "需要点对点推送时，在 .env 或 GitHub Secrets 中补齐 WECOM 配置。",
-            )
-        )
-    else:
-        items.append(
-            HealthItem(
-                "企业微信应用推送",
-                "WARN",
-                "企业微信点对点推送未启用，不影响本地日报生成。",
-                "可选功能；需要时配置 WECOM_CORP_ID、WECOM_AGENT_ID、WECOM_SECRET、WECOM_USER_ID。",
             )
         )
 

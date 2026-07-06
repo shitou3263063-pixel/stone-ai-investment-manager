@@ -16,7 +16,6 @@ from src.journal.investment_journal import build_log_row, upsert_investment_log
 from src.journal.review_engine import build_history_review
 from src.macro.macro_calendar import analyze_macro_calendar
 from src.notifier.email_notifier import send_daily_reports
-from src.notifier.wecom_app_notifier import send_wecom_app_summary
 from src.risk.vix_risk import analyze_vix_risk
 from src.strategy.dca_engine import build_dca_plan
 from src.strategy.rebalance_engine import build_rebalance_plan
@@ -177,7 +176,6 @@ def run() -> str:
     )
     (reports_dir / "system_check_report.md").write_text(_system_check_report(), encoding="utf-8")
 
-    wecom_app_result = send_wecom_app_summary(reports_dir=reports_dir)
     email_result = send_daily_reports(reports_dir=reports_dir, subject_date=today)
 
     return "\n".join(
@@ -186,8 +184,7 @@ def run() -> str:
             f"总资产：{portfolio_result['total_assets_wan']:.2f} 万元",
             f"操作等级：{decision_result['operation_level']}",
             f"今日是否调仓：{'是' if decision_result['today_rebalance'] else '否'}",
-            f"企业微信点对点推送：{wecom_app_result['message']}",
-            f"QQ邮箱备用通知：{email_result['message']}",
+            f"邮件通知：{email_result['message']}",
             "已生成：",
             "- reports/today_action.md",
             "- reports/daily_report.md",

@@ -52,6 +52,3 @@ email:
   password:
   receiver: shitou3263063@gmail.com
 
-wechat:
-  enabled: false
-  webhook_url:

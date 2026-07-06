@@ -17,20 +17,21 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.main import run as run_main  # noqa: E402
 
 
-WECOM_KEYS = ["WECOM_CORP_ID", "WECOM_AGENT_ID", "WECOM_SECRET", "WECOM_USER_ID"]
+SMTP_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"]
 README_REQUIRED_SNIPPETS = [
     "python run.py",
-    "python scripts/test_wecom.py",
+    "python scripts/test_email.py",
     "python scripts/final_check.py",
     "python scripts/deploy_check.py",
     "git init",
     'git commit -m "Stone AI Investment Manager Pro V12"',
     "git remote add origin",
     "Run workflow",
-    "WECOM_CORP_ID",
-    "WECOM_AGENT_ID",
-    "WECOM_SECRET",
-    "WECOM_USER_ID",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
+    "EMAIL_TO",
 ]
 
 
@@ -121,7 +122,7 @@ def _workflow_exists() -> CheckItem:
 def _env_not_tracked() -> CheckItem:
     git_check = _run_git(["rev-parse", "--is-inside-work-tree"])
     if git_check.returncode != 0:
-        return CheckItem(".env 跟踪状态", "WARN", "当前不是 Git 仓库，暂时无法确认 .env 是否被跟踪；初始化后请重新运行本检查。")
+        return CheckItem(".env 跟踪状态", "WARN", "当前不是 Git 仓库，暂时无法确认 .env 是否被跟踪。")
 
     tracked: list[str] = []
     for path in ["investment_ai_manager/.env", ".env"]:
@@ -130,7 +131,7 @@ def _env_not_tracked() -> CheckItem:
             tracked.append(path)
 
     if tracked:
-        return CheckItem(".env 跟踪状态", "ERROR", ".env 已被 Git 跟踪，请先从暂存区/索引移除：" + "、".join(tracked))
+        return CheckItem(".env 跟踪状态", "ERROR", ".env 已被 Git 跟踪，请先从索引移除：" + "、".join(tracked))
     return CheckItem(".env 跟踪状态", "OK", ".env 未被 Git 跟踪。")
 
 
@@ -158,23 +159,23 @@ def _reports_can_generate() -> tuple[CheckItem, CheckItem]:
     return daily_item, today_item
 
 
-def _wecom_config_complete(env_values: dict[str, str]) -> CheckItem:
-    missing = [key for key in WECOM_KEYS if not os.getenv(key, env_values.get(key, "")).strip()]
+def _gmail_config_complete(env_values: dict[str, str]) -> CheckItem:
+    missing = [key for key in SMTP_KEYS if not os.getenv(key, env_values.get(key, "")).strip()]
     if missing:
-        return CheckItem("企业微信配置", "WARN", "企业微信点对点推送未启用，不影响本地日报生成。缺失：" + "、".join(missing))
-    return CheckItem("企业微信配置", "OK", "WECOM 四项参数已配置；如网络和应用权限正常，可点对点推送。")
+        return CheckItem("Gmail SMTP 配置", "WARN", "邮件推送未启用，不影响日报生成。缺失：" + "、".join(missing))
+    return CheckItem("Gmail SMTP 配置", "OK", "SMTP 五项参数已配置；如 Gmail 应用专用密码正确，可发送日报。")
 
 
-def _workflow_has_wecom_env() -> CheckItem:
+def _workflow_has_smtp_env() -> CheckItem:
     workflow_path = REPO_ROOT / ".github" / "workflows" / "daily.yml"
     if not workflow_path.exists():
-        return CheckItem("Actions WECOM 环境变量", "ERROR", "daily.yml 不存在，无法检查 WECOM env。")
+        return CheckItem("Actions SMTP 环境变量", "ERROR", "daily.yml 不存在，无法检查 SMTP env。")
 
     content = workflow_path.read_text(encoding="utf-8")
-    missing = [key for key in WECOM_KEYS if key not in content]
+    missing = [key for key in SMTP_KEYS if key not in content]
     if missing:
-        return CheckItem("Actions WECOM 环境变量", "ERROR", "daily.yml 缺少：" + "、".join(missing))
-    return CheckItem("Actions WECOM 环境变量", "OK", "daily.yml 已映射 WECOM 四项 Secrets。")
+        return CheckItem("Actions SMTP 环境变量", "ERROR", "daily.yml 缺少：" + "、".join(missing))
+    return CheckItem("Actions SMTP 环境变量", "OK", "daily.yml 已映射 SMTP/EMAIL_TO Secrets。")
 
 
 def _readme_has_deploy_docs() -> CheckItem:
@@ -186,7 +187,7 @@ def _readme_has_deploy_docs() -> CheckItem:
     missing = [snippet for snippet in README_REQUIRED_SNIPPETS if snippet not in content]
     if missing:
         return CheckItem("README 部署说明", "WARN", "README 部署教程不完整，缺少：" + "、".join(missing))
-    return CheckItem("README 部署说明", "OK", "README 已包含本地运行、部署前检查、GitHub 推送和 WECOM Secrets 说明。")
+    return CheckItem("README 部署说明", "OK", "README 已包含 Gmail、GitHub Actions 和部署说明。")
 
 
 def _overall_status(items: list[CheckItem]) -> str:
@@ -216,16 +217,15 @@ def _build_report(items: list[CheckItem]) -> str:
             "## 部署安全提醒",
             "",
             "- 不要提交 `.env`。",
-            "- 不要提交 `WECOM_SECRET`。",
-            "- 不要提交 `OPENAI_API_KEY`。",
             "- 不要提交 `SMTP_PASSWORD`。",
+            "- 不要提交 `OPENAI_API_KEY`。",
             "- GitHub Actions 请使用仓库 Secrets 保存密钥。",
             "",
             "## 常用命令",
             "",
             "```bash",
             "python run.py",
-            "python scripts/test_wecom.py",
+            "python scripts/test_email.py",
             "python scripts/final_check.py",
             "python scripts/deploy_check.py",
             "```",
@@ -248,8 +248,8 @@ def main() -> int:
         _env_not_tracked(),
         daily_item,
         today_item,
-        _wecom_config_complete(env_values),
-        _workflow_has_wecom_env(),
+        _gmail_config_complete(env_values),
+        _workflow_has_smtp_env(),
         _readme_has_deploy_docs(),
     ]
 

@@ -26,6 +26,8 @@ class DecisionAgent:
 
         if special["cash_below_5"]:
             return self._cash_protection_decision(holdings)
+        if self.portfolio.get("has_unvalued_assets"):
+            return self._data_incomplete_decision(holdings)
 
         max_deviation = max(abs(item["deviation_ratio"]) for item in categories.values())
         operation_level = self._operation_level(max_deviation)
@@ -78,6 +80,33 @@ class DecisionAgent:
             "expected_incremental_return_wan": 0.0,
             "max_risk": "最大风险是流动性不足。",
             "one_sentence_conclusion": "现金不足时先保流动性，今天不要加仓风险资产。",
+        }
+
+    def _data_incomplete_decision(self, holdings: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        unvalued = "、".join(self.portfolio.get("unvalued_assets", [])) or "存在未估值资产"
+        return {
+            "operation_level": "C级：继续观察",
+            "today_rebalance": False,
+            "need_action": False,
+            "buy_orders": [],
+            "sell_orders": [],
+            "hold_list": list(holdings.keys()),
+            "wait_orders": [
+                {
+                    "name": "比例驱动调仓",
+                    "action": "等待",
+                    "confidence": 90,
+                    "reason": f"{unvalued}，当前总资产和黄金占比不完整，先等金价估值成功。",
+                }
+            ],
+            "cash_to_use_wan": 0.0,
+            "confidence": 90,
+            "why": [f"{unvalued}，暂停根据当前占比做调仓决策。"],
+            "exception_notes": [f"数据例外：{unvalued}；是否立即执行调仓：否。"],
+            "risk_notes": ["未估值资产会扭曲总资产、黄金占比和其他资产占比。"],
+            "expected_incremental_return_wan": 0.0,
+            "max_risk": "最大风险是金条未估值导致资产占比失真，进而误判再平衡方向。",
+            "one_sentence_conclusion": "金条暂未估值时不做比例调仓，先继续定投并等待金价估值恢复。",
         }
 
     def _operation_level(self, max_deviation: float) -> str:

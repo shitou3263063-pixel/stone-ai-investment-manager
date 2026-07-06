@@ -49,6 +49,7 @@ def build_rebalance_plan(
     target_allocation = settings.get("target_allocation", {}) or {}
     total_assets = float(portfolio_result.get("total_assets_wan", 0.0) or 0.0)
     category_amounts = portfolio_result.get("category_amounts", {}) or {}
+    unvalued_assets = portfolio_result.get("unvalued_assets", []) or []
 
     if not target_allocation or total_assets <= 0:
         return {
@@ -67,7 +68,7 @@ def build_rebalance_plan(
         target_ratio = _to_ratio(target_value)
         deviation = current_ratio - target_ratio
         abs_deviation = abs(deviation)
-        status = _status_for_deviation(abs_deviation)
+        status = "数据不完整" if unvalued_assets else _status_for_deviation(abs_deviation)
         items.append(
             {
                 "category": category,
@@ -77,11 +78,29 @@ def build_rebalance_plan(
                 "deviation_ratio": deviation,
                 "deviation_amount_wan": round(total_assets * deviation, 2),
                 "status": status,
-                "direction": _direction(category, deviation, status),
+                "direction": (
+                    "存在未估值资产，暂不根据当前比例做再平衡。"
+                    if unvalued_assets
+                    else _direction(category, deviation, status)
+                ),
             }
         )
 
     items.sort(key=lambda item: abs(item["deviation_ratio"]), reverse=True)
+    if unvalued_assets:
+        unvalued_text = "、".join(str(item) for item in unvalued_assets)
+        return {
+            "need_rebalance": False,
+            "items": items,
+            "directions": [
+                f"存在未估值资产：{unvalued_text}；当前总资产和黄金占比不完整，暂不执行比例再平衡。"
+            ],
+            "summary": "金条未估值，先等待每日黄金价格获取成功后再判断再平衡。",
+            "rule": "存在未估值资产时，暂停比例驱动调仓。",
+            "priority": "先补齐估值，再做再平衡；定投可按纪律继续。",
+            "disclaimer": "仅供投资辅助，不构成投资建议；系统不会自动交易，也不承诺收益。",
+        }
+
     need_rebalance = any(item["status"] == "提示再平衡" for item in items)
     watch_items = [item for item in items if item["status"] == "观察"]
     rebalance_items = [item for item in items if item["status"] == "提示再平衡"]
@@ -110,4 +129,3 @@ def build_rebalance_plan(
         "priority": "优先用新增资金再平衡，不建议频繁卖出长期资产。",
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不会自动交易，也不承诺收益。",
     }
-

@@ -10,7 +10,7 @@ from src.system.health_check import format_health_report, run_health_check
 from utils.data_loader import project_root
 
 
-DEFAULT_EMAIL_TO = "shili3263063@qq.com"
+DEFAULT_EMAIL_TO = "shitou3263063@gmail.com"
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -39,7 +39,7 @@ def _print_email_startup_hints() -> None:
     if email_to != DEFAULT_EMAIL_TO:
         print(f"邮件收件人当前为 {email_to}，默认收件人是 {DEFAULT_EMAIL_TO}，请确认是否正确。")
     if not smtp_password:
-        print("邮件未启用：请在 .env 填写 QQ邮箱SMTP授权码")
+        print("邮件未启用：请在 .env 或 GitHub Secrets 填写 SMTP_PASSWORD（Gmail 应用专用密码）")
     print("")
 
 

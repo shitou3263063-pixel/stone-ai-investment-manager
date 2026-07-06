@@ -1,16 +1,17 @@
-category,name,amount_wan,currency,note
-美股,VOO,13.0,CNY,标普500ETF
-美股,英伟达,6.7,CNY,NVIDIA
-美股,谷歌,2.0,CNY,Alphabet
-美股,TLT,5.6,CNY,美国长期国债ETF
-美股,IBKR,4.0,CNY,盈透证券
-美股,XLF,4.0,CNY,美国金融行业ETF
-美股,阿里巴巴,2.8,CNY,Alibaba
-港股,恒生科技ETF,13.5,CNY,港股科技ETF
-港股,恒生医疗ETF,9.5,CNY,港股医疗ETF
-港股,香港证券ETF,3.0,CNY,香港券商与交易所方向
-A股,沪深300ETF,20.6,CNY,A股宽基ETF
-A股,巨人网络,4.0,CNY,A股个股
-债券,中国债券,113.0,CNY,中国债券资产
-黄金,黄金,56.0,CNY,黄金资产
-现金,现金,23.0,CNY,现金与货币资金
+category,name,amount_wan,currency,quantity,unit,note
+美股,VOO,13.0,CNY,28,股,标普500ETF
+美股,NVDA,6.8,CNY,51,股,英伟达
+美股,GOOG,2.2,CNY,9,股,谷歌-C
+美股,TLT,5.5,CNY,95,股,美国长期国债ETF
+美股,IBKR,4.0,CNY,64,股,盈透证券
+美股,XLF,4.2,CNY,112,股,美国金融ETF
+美股,BABA,2.8,CNY,44,股,阿里巴巴
+港股,南方恒生科技ETF 03033,13.6,CNY,,,南方恒生科技ETF
+港股,恒生医疗ETF 513060,9.6,CNY,,,恒生医疗ETF
+港股,香港证券ETF 513090,3.2,CNY,,,香港证券ETF
+A股,沪深300ETF 510300,20.6,CNY,,,沪深300ETF
+A股,巨人网络 002558,4.1,CNY,,,巨人网络
+债券,中国债券组合,113.0,CNY,,,短债、中债、长债组合
+黄金,实物金条,,CNY,565,克,每日按黄金价格自动估值；无法获取实时金价时暂未估值
+黄金,黄金ETF 518880,3.5,CNY,,,黄金ETF
+现金,现金,26.5,CNY,,,现金与货币资金

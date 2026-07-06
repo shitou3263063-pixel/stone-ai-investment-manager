@@ -33,10 +33,6 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          WECOM_CORP_ID: ${{ secrets.WECOM_CORP_ID }}
-          WECOM_AGENT_ID: ${{ secrets.WECOM_AGENT_ID }}
-          WECOM_SECRET: ${{ secrets.WECOM_SECRET }}
-          WECOM_USER_ID: ${{ secrets.WECOM_USER_ID }}
         run: python main.py
 
       - name: Upload reports artifact

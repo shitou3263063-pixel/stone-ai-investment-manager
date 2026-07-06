@@ -172,6 +172,11 @@ class ReportAgent:
                 f"- {category}：{item['amount_wan']:.2f}万元，占比{item['current_ratio'] * 100:.2f}%，"
                 f"{direction}{abs(item['deviation_ratio']) * 100:.2f}%。"
             )
+        data_warnings = self.portfolio.get("data_warnings", [])
+        if data_warnings:
+            lines.extend(["", "未估值/估值提示："])
+            for warning in data_warnings:
+                lines.append(f"- {warning}")
         return "\n".join(lines)
 
     def _asset_allocation_text(self) -> str:

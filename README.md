@@ -1,12 +1,22 @@
 # Stone AI Investment Manager Pro V12
 
-Stone AI Investment Manager Pro V12 是最终生产版：每天北京时间 8:30 自动运行，生成核心报告，并通过企业微信应用点对点推送 `reports/today_action.md` 给用户。
+Stone AI Investment Manager 是个人投资管理系统，只做资产读取、市场分析、日报生成和 Gmail 邮件提醒。系统不自动交易，不接券商下单权限，不承诺收益；所有内容仅供投资辅助，不构成投资建议。
 
-系统只做投资辅助提醒，不接入真实交易，不接券商下单权限，不承诺收益。所有内容仅供投资辅助，不构成投资建议。
+## 当前稳定目标
+
+优先保证这条主链路每天稳定运行：
+
+1. GitHub Actions 每天北京时间 8:30 自动运行成功。
+2. Gmail SMTP 邮件推送可用。
+3. 自动读取 `data/portfolio.csv`。
+4. 自动获取市场数据，失败时回退到 `data/market_data.csv`。
+5. 自动生成 `reports/daily_report.md`。
+6. 自动输出定投、再平衡和风险评分。
+7. 不开发视频、头条、内容工厂等无关功能。
 
 ## 核心产物
 
-每日运行生成：
+每天生成：
 
 ```text
 reports/today_action.md
@@ -15,28 +25,15 @@ reports/weekly_report.md
 reports/system_check_report.md
 ```
 
-## 保留能力
+## 本地运行
 
-- 持仓读取：`data/portfolio.csv`
-- 手动市场数据：`data/market_data.csv`
-- yfinance 行情获取，失败不影响主程序
-- 宏观事件监控：`config/settings.yaml`
-- VIX 风险判断
-- Stone Score 与风险评分
-- 定投建议
-- 再平衡建议
-- 跨资产联动分析
-- OpenAI 深度总结，可选
-- 企业微信应用点对点推送
-- QQ 邮箱备用通知，可选
-- 投资日志：`data/investment_log.csv`
-- GitHub Actions 每日自动运行
-- 最终验收：`scripts/final_check.py`
-- 部署检查：`scripts/deploy_check.py`
+安装依赖：
 
-## 本地命令
+```bash
+pip install -r requirements.txt
+```
 
-本地运行：
+正式运行：
 
 ```bash
 python run.py
@@ -48,10 +45,10 @@ python run.py
 python main.py
 ```
 
-企业微信测试：
+测试 Gmail/SMTP 邮件：
 
 ```bash
-python scripts/test_wecom.py
+python scripts/test_email.py
 ```
 
 最终验收：
@@ -60,21 +57,13 @@ python scripts/test_wecom.py
 python scripts/final_check.py
 ```
 
-部署检查：
+部署前检查：
 
 ```bash
 python scripts/deploy_check.py
 ```
 
-## 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-如果没有安装 `yfinance` 或 `openai`，系统会 WARN，但基础日报仍可生成。
-
-## 更新持仓
+## 持仓数据
 
 编辑：
 
@@ -82,83 +71,69 @@ pip install -r requirements.txt
 data/portfolio.csv
 ```
 
-字段：
+推荐字段：
 
 ```text
-category,name,amount_wan,currency,note
+category,name,amount_wan,currency,quantity,unit,note
 ```
 
-金额单位为万元。
+说明：
 
-兼容表头：
+- `amount_wan` 单位为万元人民币。
+- 实物金条可填写 `quantity=565`、`unit=克`，系统会尝试按每日黄金价格自动估值。
+- 如果无法获取实时金价，日报会单独列出 `565克金条，暂未估值`，程序不会报错。
+- 如果存在未估值资产，系统会暂停比例驱动调仓，避免错误再平衡。
 
-- 持仓名称：`Asset`、`asset`、`标的`、`名称`、`name`
-- 代码：`Symbol`、`symbol`、`代码`
-- 资产类别：`Category`、`category`、`类型`、`资产类别`
-- 金额：`Amount`、`amount`、`市值`、`金额`、`amount_wan`
+兼容字段名：
 
-如果 `portfolio.csv` 缺失，系统会自动生成模板；如果表头格式错误，系统会提示缺少的列，并生成 `portfolio_template.csv` 作为参考。
+- 名称：`Asset`、`asset`、`标的`、`名称`、`name`
+- 代码：`Symbol`、`symbol`、`ticker`、`代码`
+- 类别：`Category`、`category`、`类型`、`资产类别`
+- 金额：`Amount`、`amount`、`amount_wan`、`amount_cny`、`市值`、`金额`
 
-## 更新市场数据
+## 市场数据
 
-编辑：
+系统优先使用 `yfinance` 获取市场数据。如果获取失败，会继续使用手动数据：
 
 ```text
 data/market_data.csv
 ```
 
-如果实时行情获取失败，系统会使用该文件继续分析，不会崩溃。
+行情失败不会中断日报生成。
 
-## 企业微信点对点推送
+## Gmail 邮件推送
 
-本地 `.env` 填写：
+GitHub Actions 必须使用 GitHub Secrets，不要提交 `.env`。本地测试可创建 `.env`。
+
+本地 `.env` 示例：
 
 ```text
-WECOM_CORP_ID=你的企业ID
-WECOM_AGENT_ID=1000002
-WECOM_SECRET=你的应用Secret
-WECOM_USER_ID=你的企业微信UserID
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=你的Gmail邮箱
+SMTP_PASSWORD=你的Gmail应用专用密码
+EMAIL_TO=你的Gmail邮箱
 ```
 
-查找方式：
-
-1. 企业微信管理后台 -> `我的企业 -> 企业信息`，复制企业 ID。
-2. `应用管理` 中打开自建应用，复制 `AgentId`。
-3. 在同一应用详情页查看或发送 `Secret`。
-4. `通讯录` 中打开你的成员资料，复制 `UserID`。
-5. 确认自建应用可见范围包含该用户。
+Gmail 需要开启两步验证，然后创建“应用专用密码”。`SMTP_PASSWORD` 填应用专用密码，不是 Gmail 登录密码。
 
 测试：
 
 ```bash
-python scripts/test_wecom.py
+python scripts/test_email.py
 ```
 
-如果失败，常见原因是 Secret 错误、UserID 错误、应用可见范围没有包含该用户、企业微信账号不可用、GitHub Secrets 未配置，或当前环境网络受限。
-
-## QQ 邮箱备用通知
-
-本地 `.env` 可选填写：
-
-```text
-SMTP_HOST=smtp.qq.com
-SMTP_PORT=465
-SMTP_USER=你的QQ邮箱
-SMTP_PASSWORD=你的QQ邮箱SMTP授权码
-EMAIL_TO=shili3263063@qq.com
-```
-
-`SMTP_PASSWORD` 是 QQ 邮箱 SMTP 授权码，不是登录密码。未配置时只 WARN，不影响日报生成。
+未配置邮件时，系统只会 WARN 并跳过发送，不影响日报生成。
 
 ## OpenAI 深度总结
 
-本地 `.env` 可选填写：
+可选配置：
 
 ```text
 OPENAI_API_KEY=你的OpenAI API Key
 ```
 
-未配置时只 WARN，并在日报中显示 AI 深度分析未启用。
+未配置时日报会显示 AI 深度分析未启用，基础分析仍可运行。
 
 ## GitHub Actions
 
@@ -168,33 +143,30 @@ OPENAI_API_KEY=你的OpenAI API Key
 .github/workflows/daily.yml
 ```
 
-规则：
+要求：
 
-- 每天北京时间 8:30 自动运行
+- 每天北京时间 8:30 自动运行。
 - cron：`30 0 * * *`
-- 支持 `workflow_dispatch`
-- 使用 Python 3.11
-- 执行 `python main.py`
-- 上传 `reports/` 为 artifact
+- 支持 `workflow_dispatch` 手动运行。
+- 使用 Python 3.11。
+- 执行 `python main.py`。
+- 上传 `reports/` 作为 artifact。
+- 自动发送 `daily_report.md` 到 Gmail。
 
-必填 Secrets：
+必须配置的 GitHub Secrets：
 
 ```text
-WECOM_CORP_ID
-WECOM_AGENT_ID
-WECOM_SECRET
-WECOM_USER_ID
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=你的Gmail邮箱
+SMTP_PASSWORD=你的Gmail应用专用密码
+EMAIL_TO=你的Gmail邮箱
 ```
 
 可选 Secrets：
 
 ```text
 OPENAI_API_KEY
-SMTP_HOST
-SMTP_PORT
-SMTP_USER
-SMTP_PASSWORD
-EMAIL_TO
 ```
 
 手动运行：
@@ -203,8 +175,8 @@ EMAIL_TO
 2. 点击 `Actions`。
 3. 选择 `Daily Stone AI Investment Report`。
 4. 点击 `Run workflow`。
-5. 运行完成后下载 artifact：`stone-ai-investment-reports`。
-6. 检查企业微信是否收到 `today_action.md`。
+5. 运行完成后查看 artifact：`stone-ai-investment-reports`。
+6. 检查 Gmail 是否收到日报。
 
 ## 部署
 
@@ -225,11 +197,11 @@ python scripts/deploy_check.py
 
 ## 安全要求
 
-- 不提交 `.env`
-- 不提交 `WECOM_SECRET`
-- 不提交 `OPENAI_API_KEY`
-- 不提交 `SMTP_PASSWORD`
-- 不自动交易
-- 不接券商下单权限
-- 不承诺收益
-- 所有报告均写明：仅供投资辅助，不构成投资建议
+- 不提交 `.env`。
+- 不提交 `SMTP_PASSWORD`。
+- 不提交 `OPENAI_API_KEY`。
+- 密钥全部使用 GitHub Secrets。
+- 不自动交易。
+- 不接券商下单权限。
+- 不承诺收益。
+- 所有建议仅供投资辅助，不构成投资建议。
