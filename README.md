@@ -91,15 +91,48 @@ category,name,amount_wan,currency,quantity,unit,note
 - 类别：`Category`、`category`、`类型`、`资产类别`
 - 金额：`Amount`、`amount`、`amount_wan`、`amount_cny`、`市值`、`金额`
 
-## 市场数据
+## 市场数据与权威数据源
 
-系统优先使用 `yfinance` 获取市场数据。如果获取失败，会继续使用手动数据：
+系统采用分层数据源，不依赖单一平台：
+
+1. FRED：美国10年国债收益率、CPI、PPI、PCE、失业率、GDP 等权威宏观数据。
+2. Alpha Vantage：美股、ETF、外汇和技术数据。
+3. Finnhub：全球股票、ETF、新闻和财报数据。
+4. CBOE：VIX 官方延迟行情。
+5. yfinance：免费兜底行情源。
+6. 本地缓存和 `data/market_data.csv`：所有在线数据失败时兜底。
+
+如果没有配置 API Key，系统会自动降级到 yfinance、缓存或手动数据，并在日报的“数据来源与质量”里标记，不会中断运行。
 
 ```text
 data/market_data.csv
 ```
 
-行情失败不会中断日报生成。
+行情失败不会中断日报生成，但会降低置信度，并禁止激进买入建议。
+
+可选本地 `.env`：
+
+```text
+FRED_API_KEY=你的FRED Key
+ALPHA_VANTAGE_API_KEY=你的Alpha Vantage Key
+FINNHUB_API_KEY=你的Finnhub Key
+```
+
+GitHub Actions 中也可添加同名 Secrets。
+
+## 报告质量升级
+
+日报和邮件摘要会直接结合你的资产配置给出动作，不只输出市场描述：
+
+- 今日买多少、买什么、分几笔。
+- 本周计划买入金额和标的。
+- 本月计划买入金额和标的。
+- 债券转权益路径：本周、本月、未来三个月建议转出金额。
+- 黄金金条每日估值：按实时或缓存金价估算，失败时保留手动估值或提示暂未估值。
+- 暂停加仓清单：债券、黄金、TLT、NVDA 单股追高等。
+- 数据质量说明：权威数据、专业数据、yfinance、缓存、缺失项都会写明。
+
+系统仍然不自动交易，所有动作都需要你人工确认。
 
 ## Gmail 邮件推送
 
@@ -167,6 +200,9 @@ EMAIL_TO=你的Gmail邮箱
 
 ```text
 OPENAI_API_KEY
+FRED_API_KEY
+ALPHA_VANTAGE_API_KEY
+FINNHUB_API_KEY
 ```
 
 手动运行：

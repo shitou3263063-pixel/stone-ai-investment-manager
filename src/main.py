@@ -18,6 +18,7 @@ from src.macro.macro_calendar import analyze_macro_calendar
 from src.notifier.email_notifier import send_daily_reports
 from src.risk.vix_risk import analyze_vix_risk
 from src.strategy.dca_engine import build_dca_plan
+from src.strategy.execution_plan import build_execution_plan
 from src.strategy.rebalance_engine import build_rebalance_plan
 from src.system.health_check import format_health_report, run_health_check
 from utils.data_loader import load_config, load_market_data, load_portfolio, project_root
@@ -101,6 +102,7 @@ def _build_context() -> tuple[
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
+    dict[str, Any],
 ]:
     root = project_root()
     config = load_config(root / "data" / "config.yaml")
@@ -118,6 +120,16 @@ def _build_context() -> tuple[
     rebalance_result = RebalanceAdvisor(portfolio_result, decision_result).analyze()
     dca_result = build_dca_plan(market_data, vix_result, macro_result)
     allocation_rebalance_result = build_rebalance_plan(portfolio_result)
+    execution_plan_result = build_execution_plan(
+        portfolio_result,
+        market_result,
+        live_market_result,
+        vix_result,
+        macro_result,
+        dca_result,
+        allocation_rebalance_result,
+        config,
+    )
     cross_asset_result = analyze_cross_asset(live_market_result, market_data, portfolio_result)
     ai_context = build_ai_context(
         portfolio_result,
@@ -154,6 +166,7 @@ def _build_context() -> tuple[
         vix_result,
         dca_result,
         allocation_rebalance_result,
+        execution_plan_result,
         cross_asset_result,
         ai_advice_result,
         history_review_result,
@@ -164,15 +177,30 @@ def _write_today_action(
     decision_result: dict[str, Any],
     dca_result: dict[str, Any],
     allocation_rebalance_result: dict[str, Any],
+    execution_plan_result: dict[str, Any],
 ) -> str:
-    trade_text = "是，需人工确认" if decision_result.get("today_rebalance") else "否，系统只提醒不下单"
+    today_buy_wan = float(execution_plan_result.get("today_buy_wan", 0.0) or 0.0)
+    trade_text = "是，需人工确认" if decision_result.get("today_rebalance") or today_buy_wan > 0 else "否，系统只提醒不下单"
     dca_text = "是，按定投计划执行" if dca_result.get("today_continue") else "否，今日不继续定投"
     rebalance_text = "是，需人工确认" if allocation_rebalance_result.get("need_rebalance") else "否，暂不需要再平衡"
+    today_orders = execution_plan_result.get("today_orders", [])
+    today_buy_text = (
+        "；".join(f"{item['name']} {item['amount_yuan']}元" for item in today_orders)
+        if today_orders
+        else "今日不建议买入"
+    )
+    pause_text = "、".join(execution_plan_result.get("pause_list", [])) or "无"
     return "\n".join(
         [
             f"今日是否交易：{trade_text}",
             f"今日是否定投：{dca_text}",
             f"今日是否再平衡：{rebalance_text}",
+            f"今日买多少：{today_buy_wan * 10000:.0f}元",
+            f"今日买什么：{today_buy_text}",
+            f"本周计划买入：{execution_plan_result.get('week_buy_wan', 0.0) * 10000:.0f}元",
+            f"本月计划买入：{execution_plan_result.get('month_buy_wan', 0.0) * 10000:.0f}元",
+            f"债券转权益：本周转出{execution_plan_result.get('bond_to_equity_path', {}).get('this_week_transfer_wan', 0.0):.2f}万元，本月转出{execution_plan_result.get('bond_to_equity_path', {}).get('this_month_transfer_wan', 0.0):.2f}万元",
+            f"暂停加仓：{pause_text}",
             f"今日最大风险：{decision_result.get('max_risk', '暂无')}",
             f"一句话结论：{decision_result.get('one_sentence_conclusion', '暂无')}（仅供投资辅助，不构成投资建议；最终由你自己执行）",
         ]
@@ -201,6 +229,7 @@ def run() -> str:
         vix_result,
         dca_result,
         allocation_rebalance_result,
+        execution_plan_result,
         cross_asset_result,
         ai_advice_result,
         history_review_result,
@@ -217,13 +246,14 @@ def run() -> str:
         vix_result,
         dca_result,
         allocation_rebalance_result,
+        execution_plan_result,
         cross_asset_result,
         ai_advice_result,
         history_review_result,
     )
 
     (reports_dir / "today_action.md").write_text(
-        _write_today_action(decision_result, dca_result, allocation_rebalance_result),
+        _write_today_action(decision_result, dca_result, allocation_rebalance_result, execution_plan_result),
         encoding="utf-8",
     )
     (reports_dir / "daily_report.md").write_text(
@@ -244,6 +274,10 @@ def run() -> str:
             f"总资产：{portfolio_result['total_assets_wan']:.2f} 万元",
             f"操作等级：{decision_result['operation_level']}",
             f"今日是否调仓：{'是' if decision_result['today_rebalance'] else '否'}",
+            f"今日计划买入：{execution_plan_result.get('today_buy_wan', 0.0) * 10000:.0f} 元",
+            f"本周计划买入：{execution_plan_result.get('week_buy_wan', 0.0) * 10000:.0f} 元",
+            f"本月计划买入：{execution_plan_result.get('month_buy_wan', 0.0) * 10000:.0f} 元",
+            f"债券转权益：本周 {execution_plan_result.get('bond_to_equity_path', {}).get('this_week_transfer_wan', 0.0):.2f} 万元，本月 {execution_plan_result.get('bond_to_equity_path', {}).get('this_month_transfer_wan', 0.0):.2f} 万元",
             f"邮件通知：{email_result['message']}",
             "已生成：",
             "- reports/today_action.md",

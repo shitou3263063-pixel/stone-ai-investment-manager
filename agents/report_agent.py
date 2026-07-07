@@ -32,6 +32,7 @@ class ReportAgent:
         vix_result: dict[str, Any] | None = None,
         dca_result: dict[str, Any] | None = None,
         allocation_rebalance_result: dict[str, Any] | None = None,
+        execution_plan_result: dict[str, Any] | None = None,
         cross_asset_result: dict[str, Any] | None = None,
         ai_advice_result: dict[str, Any] | None = None,
         history_review_result: dict[str, Any] | None = None,
@@ -47,6 +48,7 @@ class ReportAgent:
         self.vix = vix_result or {}
         self.dca = dca_result or {}
         self.allocation_rebalance = allocation_rebalance_result or {}
+        self.execution_plan = execution_plan_result or {}
         self.cross_asset = cross_asset_result or {}
         self.ai_advice = ai_advice_result or {}
         self.history_review = history_review_result or {}
@@ -56,6 +58,18 @@ class ReportAgent:
         return "\n".join(
             [
                 self._stone_cio_decision_text(),
+                "",
+                "【今日/本周/本月执行计划】",
+                "",
+                self._execution_plan_text(),
+                "",
+                "【债券转权益路径】",
+                "",
+                self._bond_to_equity_text(),
+                "",
+                "【黄金金条每日估值】",
+                "",
+                self._gold_bar_text(),
                 "",
                 f"日期：{report_date.isoformat()}",
                 "系统定位：进取型长期增长组合",
@@ -271,11 +285,15 @@ class ReportAgent:
     def _stone_cio_decision_text(self) -> str:
         paused = self._paused_asset_names()
         paused_text = "、".join(paused) if paused else "无明确暂停项，但高估值资产不追高"
+        if self.execution_plan:
+            plan_paused = "、".join(self.execution_plan.get("pause_list", []))
+            if plan_paused:
+                paused_text = plan_paused
         return "\n".join(
             [
                 "【Stone CIO 今日决策】",
                 "",
-                f"1. 今天是否需要操作？{self._today_operation_text()}",
+                f"1. 今天是否需要操作？{self._today_operation_text()} 今日计划买入{self.execution_plan.get('today_buy_wan', 0.0) * 10000:.0f}元。",
                 f"2. 今天是否继续定投？{self._dca_answer_text()}",
                 f"3. 今天是否需要调仓？{self._rebalance_path_text()}",
                 f"4. 今日最大风险是什么？{self.decision.get('max_risk', '暂无')}",
@@ -284,6 +302,67 @@ class ReportAgent:
                 f"7. 一句话结论。{self._one_sentence_cio_text()}",
                 "",
                 "仅供投资辅助，不构成投资建议。",
+            ]
+        )
+
+    def _format_orders(self, orders: list[dict[str, Any]]) -> str:
+        if not orders:
+            return "无"
+        return "；".join(
+            f"{item['name']} {float(item.get('amount_yuan', 0.0)):.0f}元，分{int(item.get('parts', 1))}笔"
+            for item in orders
+        )
+
+    def _execution_plan_text(self) -> str:
+        if not self.execution_plan:
+            return "执行计划模块暂不可用。"
+
+        lines = [
+            f"- 操作等级：{self.execution_plan.get('action_level', self.decision.get('operation_level', '暂无'))}",
+            f"- 今日买多少：{self.execution_plan.get('today_buy_wan', 0.0) * 10000:.0f}元",
+            f"- 今日买什么：{self._format_orders(self.execution_plan.get('today_orders', []))}",
+            f"- 本周计划买入：{self.execution_plan.get('week_buy_wan', 0.0) * 10000:.0f}元",
+            f"- 本周买什么：{self._format_orders(self.execution_plan.get('week_orders', []))}",
+            f"- 本月计划买入：{self.execution_plan.get('month_buy_wan', 0.0) * 10000:.0f}元",
+            f"- 本月买什么：{self._format_orders(self.execution_plan.get('month_orders', []))}",
+            f"- 现金纪律：{self.execution_plan.get('cash_policy', '暂无')}",
+            f"- 权益路径：{self.execution_plan.get('equity_path', '暂无')}",
+            f"- 数据纪律：{self.execution_plan.get('data_policy', '暂无')}",
+            "- 为什么这样执行：",
+        ]
+        for reason in self.execution_plan.get("risk_reasons", []):
+            lines.append(f"  - {reason}")
+        lines.extend(
+            [
+                f"- 暂停加仓：{'、'.join(self.execution_plan.get('pause_list', [])) or '无'}",
+                f"- 声明：{self.execution_plan.get('disclaimer', '仅供投资辅助，不构成投资建议。')}",
+            ]
+        )
+        return "\n".join(lines)
+
+    def _bond_to_equity_text(self) -> str:
+        path = self.execution_plan.get("bond_to_equity_path", {}) if self.execution_plan else {}
+        if not path:
+            return "债券转权益路径暂不可用。"
+        return "\n".join(
+            [
+                f"- 本周从债券转出：{float(path.get('this_week_transfer_wan', 0.0)):.2f}万元，先进入现金/权益定投池。",
+                f"- 本月从债券转出：{float(path.get('this_month_transfer_wan', 0.0)):.2f}万元，分批转向VOO、QQQ、沪深300ETF和恒生科技ETF。",
+                f"- 未来三个月计划转出上限：{float(path.get('three_month_transfer_wan', 0.0)):.2f}万元。",
+                f"- 原因：{path.get('reason', '暂无')}",
+                "- 原则：优先用到期、赎回和新增资金修正，不一次性大幅卖出长期资产。",
+            ]
+        )
+
+    def _gold_bar_text(self) -> str:
+        gold_bar = self.execution_plan.get("gold_bar", {}) if self.execution_plan else {}
+        if not gold_bar:
+            return "金条估值模块暂不可用。"
+        return "\n".join(
+            [
+                f"- 估值状态：{gold_bar.get('status', 'unknown')}",
+                f"- 金条说明：{gold_bar.get('text', '暂无')}",
+                "- 操作建议：黄金仓位达到或超过目标时暂停新增；金条不建议因单日价格波动频繁买卖。",
             ]
         )
 
@@ -822,6 +901,23 @@ class ReportAgent:
         )
 
     def _monthly_investment_text(self) -> str:
+        if self.execution_plan:
+            return "\n".join(
+                [
+                    f"本月计划买入：{self.execution_plan.get('month_buy_wan', 0.0) * 10000:.0f}元。",
+                    f"本周计划买入：{self.execution_plan.get('week_buy_wan', 0.0) * 10000:.0f}元。",
+                    f"今日计划买入：{self.execution_plan.get('today_buy_wan', 0.0) * 10000:.0f}元。",
+                    f"本月买入拆分：{self._format_orders(self.execution_plan.get('month_orders', []))}",
+                    f"本周买入拆分：{self._format_orders(self.execution_plan.get('week_orders', []))}",
+                    f"今日买入拆分：{self._format_orders(self.execution_plan.get('today_orders', []))}",
+                    f"债券转权益：本月从债券转出{self.execution_plan.get('bond_to_equity_path', {}).get('this_month_transfer_wan', 0.0):.2f}万元，先放入现金/权益定投池。",
+                    f"现金纪律：{self.execution_plan.get('cash_policy', '暂无')}",
+                    f"暂停新增：{'、'.join(self.execution_plan.get('pause_list', [])) or '无'}",
+                    "执行纪律：不自动交易，不满仓，不借钱投资；所有买入都需要人工确认。",
+                    "声明：仅供投资辅助，不构成投资建议；不承诺收益。",
+                ]
+            )
+
         if self.dca:
             lines = [
                 f"本月定投计划：预算{float(self.dca.get('monthly_budget', 0.0)):.2f}元，"
@@ -882,15 +978,23 @@ class ReportAgent:
         return "\n".join(items)
 
     def _final_decision_text(self) -> str:
+        planned_buy = self._format_orders(self.execution_plan.get("today_orders", [])) if self.execution_plan else self._orders_text(self.decision["buy_orders"])
+        planned_wait = self._wait_text()
+        if self.execution_plan and self.execution_plan.get("risk_reasons"):
+            planned_wait = planned_wait + "；" + "；".join(self.execution_plan.get("risk_reasons", []))
         return "\n".join(
             [
                 f"操作等级：{self.decision['operation_level']}",
                 f"今日是否调仓：{'是' if self.decision['today_rebalance'] else '否'}",
                 f"再平衡模块结论：{'需要再平衡' if self.allocation_rebalance.get('need_rebalance') else '暂不需要再平衡'}",
-                f"建议买入：{self._orders_text(self.decision['buy_orders'])}",
+                f"建议买入：{planned_buy}",
+                f"今日买入金额：{self.execution_plan.get('today_buy_wan', 0.0) * 10000:.0f}元" if self.execution_plan else "今日买入金额：详见买入清单",
+                f"本周买入金额：{self.execution_plan.get('week_buy_wan', 0.0) * 10000:.0f}元" if self.execution_plan else "本周买入金额：暂无",
+                f"本月买入金额：{self.execution_plan.get('month_buy_wan', 0.0) * 10000:.0f}元" if self.execution_plan else "本月买入金额：暂无",
+                f"债券转权益：本周{self.execution_plan.get('bond_to_equity_path', {}).get('this_week_transfer_wan', 0.0):.2f}万元，本月{self.execution_plan.get('bond_to_equity_path', {}).get('this_month_transfer_wan', 0.0):.2f}万元" if self.execution_plan else "债券转权益：暂无",
                 f"建议卖出：{self._orders_text(self.decision['sell_orders'])}",
                 f"建议继续持有：{self._hold_text()}",
-                f"建议等待：{self._wait_text()}",
+                f"建议等待：{planned_wait}",
                 f"最大风险：{self.decision['max_risk']}",
                 f"一句话结论：{self.decision['one_sentence_conclusion']}",
             ]

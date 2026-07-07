@@ -2,14 +2,14 @@
   "namespace": "quote",
   "key": "^VIX",
   "source": "cboe_official",
-  "fetched_at": "2026-07-07T20:58:38",
+  "fetched_at": "2026-07-08T00:15:02",
   "data": {
-    "close": 15.8,
+    "close": 16.12,
     "previous_close": 15.57,
-    "change_pct": 1.48,
+    "change_pct": 3.53,
     "status": "ok",
     "source": "cboe_official",
-    "fetched_at": "2026-07-07 12:58:25",
+    "fetched_at": "2026-07-07 16:14:33",
     "is_realtime": false,
     "cache_used": false,
     "cache_stale": false
