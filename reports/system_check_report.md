@@ -10,8 +10,6 @@ Stone AI Investment Manager Pro V12 系统自检
 [OK] .env.example：.env.example 存在。
 [OK] .env文件：.env 存在。
 [OK] GitHub Actions：.github/workflows/daily.yml 存在。
-[WARN] 邮件配置：邮件配置不完整，将跳过发送：SMTP_USER、SMTP_PASSWORD
-    修复建议：需要邮件时，在 .env 或 GitHub Secrets 中补齐 SMTP 配置。
+[OK] 邮件配置：邮件配置完整。
 [WARN] OpenAI API Key：未配置 OPENAI_API_KEY，AI 深度分析会跳过，基础日报可运行。
     修复建议：需要 AI 深度分析时，在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。
-[OK] 企业微信应用推送：企业微信应用点对点推送配置完整。

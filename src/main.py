@@ -27,6 +27,65 @@ from utils.market_data_provider import fetch_yfinance_market_data
 VERSION_NAME = "Stone AI Investment Manager Pro V12"
 
 
+def _apply_data_quality_guardrails(
+    decision_result: dict[str, Any],
+    live_market_result: dict[str, Any],
+) -> dict[str, Any]:
+    quality = live_market_result.get("data_quality", {}) or {}
+    guarded = {**decision_result}
+    notes = list(guarded.get("exception_notes", []))
+    wait_orders = list(guarded.get("wait_orders", []))
+    buy_orders = [dict(item) for item in guarded.get("buy_orders", [])]
+
+    critical_missing = bool(quality.get("critical_missing"))
+    only_yfinance = bool(quality.get("only_yfinance"))
+    macro_available = bool(quality.get("macro_available"))
+    market_available = bool(quality.get("market_available"))
+
+    if critical_missing:
+        if buy_orders:
+            wait_orders.append(
+                {
+                    "name": "激进买入",
+                    "action": "等待",
+                    "confidence": 90,
+                    "reason": "关键数据缺失，数据缺失，不做激进判断；先等待更完整的数据源。",
+                }
+            )
+        buy_orders = []
+        guarded["operation_level"] = "C级：数据缺失，禁止激进买入"
+        guarded["need_action"] = False
+        guarded["today_rebalance"] = False
+        guarded["confidence"] = min(int(guarded.get("confidence", 60)), 55)
+        notes.append("数据质量风控：关键数据缺失，不输出激进买入建议。")
+        guarded["one_sentence_conclusion"] = (
+            "关键数据缺失，今天只做持有、观察和基础定投，不做激进买入。"
+        )
+    elif only_yfinance:
+        for order in buy_orders:
+            order["confidence"] = min(int(order.get("confidence", 60)), 60)
+            order["reason"] = f"{order.get('reason', '')} 数据源仅为 yfinance/缓存，置信度下调。".strip()
+        guarded["confidence"] = min(int(guarded.get("confidence", 65)), 60)
+        notes.append("数据质量风控：仅使用 yfinance/缓存，普通建议可保留，但降低置信度。")
+    elif macro_available and market_available:
+        notes.append("数据质量风控：宏观数据和市场数据同时可用，可保留较高置信度建议。")
+    else:
+        guarded["confidence"] = min(int(guarded.get("confidence", 65)), 65)
+        notes.append("数据质量风控：数据不完整，建议保持中性置信度。")
+
+    guarded["buy_orders"] = buy_orders
+    guarded["wait_orders"] = wait_orders
+    guarded["exception_notes"] = notes
+    guarded["data_quality_guardrail"] = {
+        "critical_missing": critical_missing,
+        "only_yfinance": only_yfinance,
+        "macro_available": macro_available,
+        "market_available": market_available,
+        "score": quality.get("score", 0),
+    }
+    return guarded
+
+
 def _build_context() -> tuple[
     dict[str, Any],
     dict[str, Any],
@@ -55,6 +114,7 @@ def _build_context() -> tuple[
     portfolio_result = PortfolioAgent(config, portfolio).analyze()
     risk_result = RiskAgent(config, portfolio_result, market_result).analyze()
     decision_result = DecisionAgent(config, market_result, portfolio_result, risk_result).decide()
+    decision_result = _apply_data_quality_guardrails(decision_result, live_market_result)
     rebalance_result = RebalanceAdvisor(portfolio_result, decision_result).analyze()
     dca_result = build_dca_plan(market_data, vix_result, macro_result)
     allocation_rebalance_result = build_rebalance_plan(portfolio_result)

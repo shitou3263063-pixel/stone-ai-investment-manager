@@ -111,13 +111,15 @@ class DecisionAgent:
 
     def _operation_level(self, max_deviation: float) -> str:
         if self.market["high_market_risk"]:
-            if max_deviation >= 0.10:
+            if max_deviation > 0.08:
                 return "B级：建议本周执行"
             return "C级：继续观察"
-        if max_deviation >= 0.15 and self.market["suitable_to_add"]:
+        if max_deviation > 0.12 and self.market["suitable_to_add"]:
             return "A级：建议立即执行"
-        if max_deviation >= 0.03:
+        if max_deviation > 0.08:
             return "B级：建议本周执行"
+        if max_deviation > 0.05:
+            return "C级：观察，优先用新增资金修正"
         return "C级：继续观察"
 
     def _buy_ratio_by_market(self) -> float:

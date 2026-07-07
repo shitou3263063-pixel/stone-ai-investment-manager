@@ -25,19 +25,19 @@ def _to_ratio(value: Any) -> float:
 
 
 def _status_for_deviation(abs_deviation: float) -> str:
-    if abs_deviation < 0.03:
-        return "不调仓"
-    if abs_deviation < 0.05:
+    if abs_deviation <= 0.05:
+        return "无需调仓"
+    if abs_deviation <= 0.08:
         return "观察"
-    return "提示再平衡"
+    return "给出再平衡方向"
 
 
 def _direction(category: str, deviation: float, status: str) -> str:
-    if status == "不调仓":
-        return "接近目标，继续持有。"
+    if status == "无需调仓":
+        return "资产偏离目标5%以内，无需调仓，继续持有。"
     if deviation < 0:
-        return f"{category}低配，优先用新增资金和定投慢慢补足。"
-    return f"{category}超配，优先减少新增资金投入；不建议频繁卖出长期资产。"
+        return f"{category}低配，优先用新增资金和定投慢慢补足，少做卖出腾挪。"
+    return f"{category}超配，暂停或减少新增资金投入；如偏离超过8%，再考虑小比例再平衡。"
 
 
 def build_rebalance_plan(
@@ -101,9 +101,9 @@ def build_rebalance_plan(
             "disclaimer": "仅供投资辅助，不构成投资建议；系统不会自动交易，也不承诺收益。",
         }
 
-    need_rebalance = any(item["status"] == "提示再平衡" for item in items)
+    need_rebalance = any(item["status"] == "给出再平衡方向" for item in items)
     watch_items = [item for item in items if item["status"] == "观察"]
-    rebalance_items = [item for item in items if item["status"] == "提示再平衡"]
+    rebalance_items = [item for item in items if item["status"] == "给出再平衡方向"]
 
     directions = []
     for item in rebalance_items + watch_items:
@@ -111,21 +111,21 @@ def build_rebalance_plan(
             f"{item['category']}：偏离{item['deviation_ratio'] * 100:.2f}%，{item['direction']}"
         )
     if not directions:
-        directions.append("各资产类别偏离均小于3%，本期不需要再平衡。")
+        directions.append("各资产类别偏离均在5%以内，本期无需调仓。")
 
     if need_rebalance:
-        summary = "存在偏离超过5%的资产类别，建议用新增资金优先再平衡，必要时再分批调整。"
+        summary = "存在偏离超过8%的资产类别，需要给出再平衡方向；优先用新增资金修正，尽量少卖出长期资产。"
     elif watch_items:
-        summary = "存在3%-5%的配置偏离，先观察并用后续新增资金微调。"
+        summary = "存在5%-8%的配置偏离，先观察，并用后续新增资金优先修正。"
     else:
-        summary = "当前配置接近本轮目标，不建议为了微小偏离频繁交易。"
+        summary = "当前配置偏离目标5%以内，无需调仓，不建议为了微小偏离频繁交易。"
 
     return {
         "need_rebalance": need_rebalance,
         "items": items,
         "directions": directions,
         "summary": summary,
-        "rule": "偏离<3%不调仓；3%-5%观察；>5%提示再平衡。",
-        "priority": "优先用新增资金再平衡，不建议频繁卖出长期资产。",
+        "rule": "偏离目标5%以内无需调仓；5%–8%观察并优先用新增资金修正；超过8%给出再平衡方向。",
+        "priority": "优先用新增资金再平衡，少卖出长期资产。",
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不会自动交易，也不承诺收益。",
     }

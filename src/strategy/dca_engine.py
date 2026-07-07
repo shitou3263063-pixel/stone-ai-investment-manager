@@ -63,7 +63,7 @@ def _vix_multiplier(vix_result: dict[str, Any]) -> tuple[float, str]:
         return 1.0, "VIX < 20，市场波动正常，按计划正常定投。"
     if vix_value < 30:
         return 0.7, "VIX 20-30，风险升高，本期定投金额减少30%。"
-    return 0.3, "VIX >= 30，暂停追涨，只保留小额定投。"
+    return 0.3, "VIX >= 30，暂停追涨，只允许小额分批低吸。"
 
 
 def build_dca_plan(
@@ -161,4 +161,3 @@ def build_dca_plan(
         "discipline": "定投不等于加杠杆；重大事件前不额外加仓，风险升高时降低节奏。",
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不会自动交易，也不承诺收益。",
     }
-

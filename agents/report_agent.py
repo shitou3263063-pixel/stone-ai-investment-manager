@@ -4,6 +4,18 @@ from datetime import date
 from typing import Any
 
 
+TARGET_ALLOCATION = {
+    "美股": 0.30,
+    "港股": 0.12,
+    "A股": 0.10,
+    "债券": 0.25,
+    "黄金": 0.15,
+    "现金": 0.08,
+}
+
+EQUITY_CATEGORIES = ("美股", "港股", "A股")
+
+
 class ReportAgent:
     """Report Agent：整合分析结果，生成 V12 生产版报告。"""
 
@@ -43,9 +55,33 @@ class ReportAgent:
         report_date = report_date or date.today()
         return "\n".join(
             [
-                "📅 Stone AI Investment Manager Pro V12 每日投资简报",
+                self._stone_cio_decision_text(),
                 "",
                 f"日期：{report_date.isoformat()}",
+                "系统定位：进取型长期增长组合",
+                "长期设计目标：年化 10%–15%，不保证收益",
+                "声明：仅供投资辅助，不构成投资建议。",
+                "",
+                "【目标年化状态】",
+                "",
+                self._target_annual_status_text(),
+                "",
+                "【新增资金投向建议】",
+                "",
+                self._opportunity_score_text(),
+                "",
+                "【暂停加仓清单】",
+                "",
+                self._pause_add_list_text(),
+                "",
+                "【风险约束】",
+                "",
+                self._growth_risk_constraints_text(),
+                "",
+                "【数据来源与质量】",
+                "",
+                self._data_quality_text(),
+                "",
                 f"总资产：{self.portfolio['total_assets_wan']:.2f} 万元",
                 f"市场风险评分：{self.market['market_risk_score']} / 100",
                 f"进攻指数：{self.market['offense_index']} / 100",
@@ -121,6 +157,284 @@ class ReportAgent:
                 "",
             ]
         )
+
+    def _categories_by_name(self) -> dict[str, dict[str, Any]]:
+        return {item["category"]: item for item in self.portfolio.get("categories", [])}
+
+    def _category_ratio(self, category: str) -> float:
+        item = self._categories_by_name().get(category, {})
+        return float(item.get("current_ratio", 0.0) or 0.0)
+
+    def _category_target(self, category: str) -> float:
+        item = self._categories_by_name().get(category, {})
+        return float(item.get("target_ratio", TARGET_ALLOCATION.get(category, 0.0)) or 0.0)
+
+    def _category_deviation(self, category: str) -> float:
+        return self._category_ratio(category) - self._category_target(category)
+
+    def _fmt_pct(self, value: float) -> str:
+        return f"{value * 100:.2f}%"
+
+    def _vix_value(self) -> float | None:
+        value = self.vix.get("vix")
+        try:
+            return None if value is None else float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _vix_policy_text(self) -> str:
+        vix = self._vix_value()
+        if vix is None:
+            return "VIX 暂不可用：按中性规则执行，正常定投但不额外追高。"
+        if vix < 20:
+            return f"VIX {vix:.2f} < 20：正常定投。"
+        if vix < 30:
+            return f"VIX {vix:.2f} 在20–30：定投金额降低30%，不追高。"
+        return f"VIX {vix:.2f} >= 30：暂停追涨，只允许小额分批低吸。"
+
+    def _equity_current_target_gap(self) -> tuple[float, float, float]:
+        current = sum(self._category_ratio(category) for category in EQUITY_CATEGORIES)
+        target = sum(self._category_target(category) for category in EQUITY_CATEGORIES)
+        return current, target, target - current
+
+    def _max_abs_deviation(self) -> float:
+        categories = self._categories_by_name()
+        if not categories:
+            return 0.0
+        return max(abs(float(item.get("deviation_ratio", 0.0) or 0.0)) for item in categories.values())
+
+    def _rebalance_path_text(self) -> str:
+        max_deviation = self._max_abs_deviation()
+        if max_deviation <= 0.05:
+            return f"否，最大偏离{self._fmt_pct(max_deviation)}，在5%以内，无需调仓。"
+        if max_deviation <= 0.08:
+            return f"轻微偏离，最大偏离{self._fmt_pct(max_deviation)}，观察，优先用新增资金修正。"
+        return f"是，最大偏离{self._fmt_pct(max_deviation)}超过8%，需要给出再平衡方向，但优先少卖出、用新增资金调整。"
+
+    def _today_operation_text(self) -> str:
+        cash_ratio = self._category_ratio("现金")
+        if cash_ratio < 0.05:
+            return f"需要：现金仅{self._fmt_pct(cash_ratio)}，暂停新增风险资产，优先补现金。"
+        if self._max_abs_deviation() > 0.08:
+            return "需要：组合偏离超过8%，给出再平衡方向，优先用新增资金修正。"
+        if self.dca.get("today_continue"):
+            return "不需要临时交易；可按定投纪律执行。"
+        return "不需要；等待更明确的价格或配置触发。"
+
+    def _dca_answer_text(self) -> str:
+        cash_ratio = self._category_ratio("现金")
+        if cash_ratio < 0.05:
+            return f"否。现金低于5%（当前{self._fmt_pct(cash_ratio)}），本期新增资金优先补现金。"
+        if 0.05 <= cash_ratio <= 0.08:
+            return f"是。现金{self._fmt_pct(cash_ratio)}处于5%–8%正常区间，可继续定投。{self._vix_policy_text()}"
+        return f"是，但不追高。当前现金{self._fmt_pct(cash_ratio)}，{self._vix_policy_text()}"
+
+    def _new_money_priority_text(self) -> str:
+        cash_ratio = self._category_ratio("现金")
+        if cash_ratio < 0.05:
+            return "现金。现金低于5%，先恢复流动性缓冲。"
+        _, _, equity_gap = self._equity_current_target_gap()
+        if equity_gap >= 0.05:
+            return "权益资产。顺序：VOO / QQQ / 沪深300ETF / 恒生科技ETF小额分批。"
+        rows = self._opportunity_rows()
+        best = max(rows, key=lambda item: item["score"]) if rows else None
+        if best:
+            return f"{best['asset']}。Opportunity Score {best['score']}，{best['reason']}"
+        return "暂不新增，等待下一次配置或估值触发。"
+
+    def _paused_asset_names(self) -> list[str]:
+        paused: list[str] = []
+        cash_ratio = self._category_ratio("现金")
+        if cash_ratio < 0.05:
+            paused.append("所有风险资产")
+        if self._category_ratio("债券") > 0.30:
+            paused.append("债券")
+        if self._category_ratio("黄金") >= 0.15:
+            paused.append("黄金")
+        if self._category_deviation("港股") > 0.05:
+            paused.append("港股新增大额加仓")
+        if self._category_ratio("美股") >= self._category_target("美股"):
+            paused.append("高估值美股追高")
+        return paused
+
+    def _one_sentence_cio_text(self) -> str:
+        cash_ratio = self._category_ratio("现金")
+        _, _, equity_gap = self._equity_current_target_gap()
+        if cash_ratio < 0.05:
+            return "现金偏低，今天优先补现金，不新增风险资产。"
+        if equity_gap >= 0.05:
+            return "权益资产低于目标，新增资金优先补VOO、QQQ、沪深300ETF和恒生科技ETF。"
+        if self._max_abs_deviation() <= 0.05:
+            return "配置接近目标，保持定投和持有，不做追涨式调仓。"
+        return "组合有偏离，但优先用新增资金慢慢修正，少卖出、少折腾。"
+
+    def _stone_cio_decision_text(self) -> str:
+        paused = self._paused_asset_names()
+        paused_text = "、".join(paused) if paused else "无明确暂停项，但高估值资产不追高"
+        return "\n".join(
+            [
+                "【Stone CIO 今日决策】",
+                "",
+                f"1. 今天是否需要操作？{self._today_operation_text()}",
+                f"2. 今天是否继续定投？{self._dca_answer_text()}",
+                f"3. 今天是否需要调仓？{self._rebalance_path_text()}",
+                f"4. 今日最大风险是什么？{self.decision.get('max_risk', '暂无')}",
+                f"5. 新增资金优先投向哪里？{self._new_money_priority_text()}",
+                f"6. 哪些资产暂停加仓？{paused_text}。",
+                f"7. 一句话结论。{self._one_sentence_cio_text()}",
+                "",
+                "仅供投资辅助，不构成投资建议。",
+            ]
+        )
+
+    def _target_annual_status_text(self) -> str:
+        max_deviation = self._max_abs_deviation()
+        if max_deviation <= 0.05:
+            path_text = "否，资产偏离目标5%以内。"
+        elif max_deviation <= 0.08:
+            path_text = "轻微偏离，先观察并用新增资金修正。"
+        else:
+            path_text = "是，偏离超过8%，需要给出再平衡方向。"
+        return "\n".join(
+            [
+                "- 长期设计目标：10%–15%",
+                "- 当前策略类型：进取型长期增长",
+                "- 当前风险容忍：最大回撤 25%–35%",
+                f"- 今日是否偏离目标路径：{path_text}",
+                "- 目标配置：美股30% / 港股12% / A股10% / 债券25% / 黄金15% / 现金8%",
+                "- 说明：该目标为长期设计目标，不保证收益；仅供投资辅助，不构成投资建议。",
+            ]
+        )
+
+    def _score_for_asset(self, asset: str, category: str) -> tuple[int, str, str]:
+        current = self._category_ratio(category)
+        target = self._category_target(category)
+        gap = target - current
+        cash_ratio = self._category_ratio("现金")
+        vix = self._vix_value()
+        score = 50 + int(max(min(gap * 250, 25), -25))
+        advice = "可小额分批"
+        reason = f"{category}当前{self._fmt_pct(current)}，目标{self._fmt_pct(target)}。"
+
+        if asset == "现金":
+            if cash_ratio < 0.05:
+                return 95, "优先补现金", f"现金{self._fmt_pct(cash_ratio)}低于5%，先恢复安全垫。"
+            if cash_ratio <= 0.08:
+                return 70, "维持正常现金", f"现金{self._fmt_pct(cash_ratio)}在5%–8%区间，可继续定投。"
+            return 35, "不优先增加", f"现金{self._fmt_pct(cash_ratio)}已高于目标附近，新增资金可投向低配资产。"
+
+        if category == "债券" and current > 0.30:
+            return 10, "暂停新增", f"债券{self._fmt_pct(current)}超过30%，暂停新增债券。"
+        if category == "黄金" and current >= 0.15:
+            return 15, "暂停新增", f"黄金{self._fmt_pct(current)}达到或超过15%，不追高。"
+        if category == "港股":
+            advice = "只小额分批" if current <= target + 0.05 else "暂停新增"
+            reason += "港股波动较高，按小额分批处理。"
+        if asset == "QQQ" and current >= target:
+            score -= 8
+            reason += "科技成长暴露已不低，不追高。"
+        if category in EQUITY_CATEGORIES:
+            _, _, equity_gap = self._equity_current_target_gap()
+            if equity_gap >= 0.05:
+                score += 15
+                advice = "新增资金优先补"
+                reason += "权益总仓低于目标5%以上。"
+        if vix is not None and 20 <= vix < 30:
+            score -= 5
+            reason += "VIX 20–30，金额降低30%。"
+        elif vix is not None and vix >= 30:
+            score -= 10
+            advice = "仅小额低吸"
+            reason += "VIX >= 30，不追涨。"
+
+        return max(0, min(100, score)), advice, reason
+
+    def _opportunity_rows(self) -> list[dict[str, Any]]:
+        assets = [
+            ("VOO", "美股"),
+            ("QQQ", "美股"),
+            ("沪深300ETF", "A股"),
+            ("恒生科技ETF", "港股"),
+            ("恒生医疗ETF", "港股"),
+            ("TLT", "债券"),
+            ("黄金", "黄金"),
+            ("现金", "现金"),
+        ]
+        rows = []
+        for asset, category in assets:
+            score, advice, reason = self._score_for_asset(asset, category)
+            rows.append({"asset": asset, "score": score, "advice": advice, "reason": reason})
+        return rows
+
+    def _opportunity_score_text(self) -> str:
+        lines = [
+            "| 资产 | 评分 | 建议 | 原因 |",
+            "| --- | ---: | --- | --- |",
+        ]
+        for row in sorted(self._opportunity_rows(), key=lambda item: item["score"], reverse=True):
+            lines.append(f"| {row['asset']} | {row['score']} | {row['advice']} | {row['reason']} |")
+        return "\n".join(lines)
+
+    def _pause_add_list_text(self) -> str:
+        gold_ratio = self._category_ratio("黄金")
+        bond_ratio = self._category_ratio("债券")
+        hk_ratio = self._category_ratio("港股")
+        us_ratio = self._category_ratio("美股")
+        return "\n".join(
+            [
+                f"- 黄金是否暂停：{'是，黄金已达到或超过15%，暂停新增黄金，不追高。' if gold_ratio >= 0.15 else '否，黄金未超过目标，但仍只做纪律性配置。'} 当前{self._fmt_pct(gold_ratio)}。",
+                f"- 债券是否暂停：{'是，债券超过30%，暂停新增债券，不建议继续加仓债券。' if bond_ratio > 0.30 else '否，债券未超过30%，但是否加仓仍看配置缺口。'} 当前{self._fmt_pct(bond_ratio)}。",
+                f"- 港股是否只小额分批：{'是，港股波动较高或已不低配，只小额分批。' if hk_ratio >= self._category_target('港股') - 0.05 else '否，港股低配较多时可小额补足，但仍不一次性重仓。'} 当前{self._fmt_pct(hk_ratio)}。",
+                f"- 高估值美股是否不追高：{'是，美股已达到或超过目标，不追高。' if us_ratio >= self._category_target('美股') else '是，即使美股低配，也只按VOO/QQQ分批补，不追涨。'} 当前{self._fmt_pct(us_ratio)}。",
+            ]
+        )
+
+    def _growth_risk_constraints_text(self) -> str:
+        return "\n".join(
+            [
+                "- 追求 10%–15% 年化意味着必须接受更高波动。",
+                "- 如果无法承受 25%–35% 回撤，不能执行该目标配置。",
+                "- 不使用杠杆，不融资，不做期权，不日内交易。",
+                "- 所有内容仅供投资辅助，不构成投资建议；系统不保证收益，不自动交易。",
+            ]
+        )
+
+    def _data_quality_text(self) -> str:
+        quality = self.live_market.get("data_quality", {}) or {}
+        rows = quality.get("key_rows", []) or []
+        score = int(quality.get("score", 0) or 0)
+        lines = [
+            f"- 数据可信度评分：{score} / 100",
+            f"- 市场数据是否可用：{'是' if quality.get('market_available') else '否'}",
+            f"- 宏观数据是否可用：{'是' if quality.get('macro_available') else '否'}",
+            f"- 是否仅使用 yfinance/缓存：{'是，已降低建议置信度。' if quality.get('only_yfinance') else '否'}",
+            f"- 是否有关键数据缺失：{'是，数据缺失，不做激进判断。' if quality.get('critical_missing') else '否'}",
+            f"- 是否使用过期缓存：{'是，数据可能过期，请谨慎使用。' if quality.get('stale_cache_used') else '否'}",
+            "",
+            "| 关键数据 | 来源 | 实时数据 | 使用缓存 | 是否缺失 | 备注 |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+        if rows:
+            for row in rows:
+                lines.append(
+                    "| "
+                    f"{row.get('name', '未知')} | "
+                    f"{row.get('source', 'unavailable')} | "
+                    f"{'是' if row.get('is_realtime') else '否'} | "
+                    f"{'是' if row.get('cache_used') else '否'} | "
+                    f"{'是' if row.get('missing') else '否'} | "
+                    f"{row.get('warning', '') or '正常'} |"
+                )
+        else:
+            lines.append("| 关键数据 | unavailable | 否 | 否 | 是 | 数据质量模块未返回明细，不做激进判断。 |")
+
+        warnings = [warning for warning in quality.get("warnings", []) if warning]
+        if warnings:
+            lines.extend(["", "数据缺失/降级说明："])
+            lines.extend(f"- {warning}" for warning in warnings[:8])
+        lines.append("")
+        lines.append("仅供投资辅助，不构成投资建议。")
+        return "\n".join(lines)
 
     def generate_weekly_report(self, report_date: date | None = None) -> str:
         report_date = report_date or date.today()
@@ -218,11 +532,14 @@ class ReportAgent:
         ]:
             item = items.get(ticker, {})
             if item.get("status") == "ok":
+                cache_text = "，使用缓存" if item.get("cache_used") else ""
+                stale_text = "，数据可能过期，请谨慎使用" if item.get("cache_stale") else ""
                 lines.append(
-                    f"- {ticker}：收盘 {item['close']}，日涨跌 {item['change_pct']}%"
+                    f"- {ticker}：收盘 {item['close']}，日涨跌 {item['change_pct']}%，"
+                    f"来源 {item.get('source', 'unknown')}{cache_text}{stale_text}"
                 )
             else:
-                lines.append(f"- {ticker}：获取失败，详见 logs/market_data.log")
+                lines.append(f"- {ticker}：获取失败，详见 logs/data_router.log")
         return "\n".join(lines)
 
     def _risk_score_text(self) -> str:

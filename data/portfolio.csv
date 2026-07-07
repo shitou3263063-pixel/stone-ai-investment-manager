@@ -1,5 +1,5 @@
 category,name,amount_wan,currency,quantity,unit,note
-美股,VOO,13.0,CNY,28,股,标普500ETF
+美股,VOO,13.0,CNY,28,股,标普500ETF；最新资产清单更新
 美股,NVDA,6.8,CNY,51,股,英伟达
 美股,GOOG,2.2,CNY,9,股,谷歌-C
 美股,TLT,5.5,CNY,95,股,美国长期国债ETF
@@ -12,6 +12,6 @@ category,name,amount_wan,currency,quantity,unit,note
 A股,沪深300ETF 510300,20.6,CNY,,,沪深300ETF
 A股,巨人网络 002558,4.1,CNY,,,巨人网络
 债券,中国债券组合,113.0,CNY,,,短债、中债、长债组合
-黄金,实物金条,,CNY,565,克,每日按黄金价格自动估值；无法获取实时金价时暂未估值
+黄金,实物金条,52.8,CNY,565,克,565克金条；临时手动估值，后续可替换为实际金条市值
 黄金,黄金ETF 518880,3.5,CNY,,,黄金ETF
 现金,现金,26.5,CNY,,,现金与货币资金

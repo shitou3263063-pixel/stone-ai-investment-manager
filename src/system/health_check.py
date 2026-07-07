@@ -53,21 +53,37 @@ dca_plan:
   targets:
     - symbol: VOO
       name: 标普500ETF
-      base_amount: 4000
+      base_amount: 3500
+    - symbol: QQQ
+      name: 纳斯达克100ETF
+      base_amount: 2500
     - symbol: 510300.SS
       name: 沪深300ETF
-      base_amount: 3000
+      base_amount: 2000
     - symbol: 3067.HK
       name: 恒生科技ETF
-      base_amount: 3000
+      base_amount: 2000
 
 target_allocation:
-  us_stock: 18
-  hk_stock: 10
-  cn_stock: 8
-  bond: 38
-  gold: 18
+  us_stock: 30
+  hk_stock: 12
+  cn_stock: 10
+  bond: 25
+  gold: 15
   cash: 8
+
+data_sources:
+  fred:
+    enabled: true
+    api_key_env: FRED_API_KEY
+  alpha_vantage:
+    enabled: true
+    api_key_env: ALPHA_VANTAGE_API_KEY
+  finnhub:
+    enabled: true
+    api_key_env: FINNHUB_API_KEY
+  yfinance:
+    enabled: true
 """
 
 DEFAULT_ENV_EXAMPLE = """SMTP_HOST=smtp.gmail.com
@@ -76,6 +92,9 @@ SMTP_USER=你的Gmail邮箱
 SMTP_PASSWORD=你的Gmail应用专用密码
 EMAIL_TO=shitou3263063@gmail.com
 OPENAI_API_KEY=你的OpenAI API Key
+FRED_API_KEY=
+ALPHA_VANTAGE_API_KEY=
+FINNHUB_API_KEY=
 """
 
 DEFAULT_ENV = """EMAIL_TO=shitou3263063@gmail.com

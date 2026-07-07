@@ -106,6 +106,15 @@ def _daily_header_lines(daily_content: str) -> dict[str, str]:
     return _parse_colon_lines(before_market)
 
 
+def _stone_cio_block(daily_content: str) -> str:
+    marker = "【Stone CIO 今日决策】"
+    if marker not in daily_content:
+        return ""
+    _, _, after_marker = daily_content.partition(marker)
+    block, _, _ = after_marker.partition("\n日期：")
+    return (marker + "\n" + block.strip()).strip()
+
+
 def _clip(value: str, limit: int = 240) -> str:
     value = " ".join(str(value or "").split())
     if len(value) <= limit:
@@ -122,9 +131,16 @@ def _plain_email_body(
     header = _daily_header_lines(daily_content)
     final = _final_decision_lines(daily_content)
     action = _parse_colon_lines(today_action_content)
+    cio_block = _stone_cio_block(daily_content)
 
     lines = [
-        f"Stone AI 每日投资摘要 - {send_date.isoformat()}",
+        "Stone CIO 今日决策",
+        "目标：长期年化 10%–15%",
+        "策略：进取型长期增长",
+        "提示：不保证收益，仅供投资辅助。",
+        "声明：仅供投资辅助，不构成投资建议。",
+        "",
+        _clip(cio_block, 1400) if cio_block else "今日CIO决策区块未解析，请查看附件 daily_report.md。",
         "",
         f"总资产：{header.get('总资产', '未获取')}",
         f"市场风险评分：{header.get('市场风险评分', '未获取')}",
@@ -180,6 +196,7 @@ def _html_email_body(
     header = _daily_header_lines(daily_content)
     final = _final_decision_lines(daily_content)
     action = _parse_colon_lines(today_action_content)
+    cio_block = _stone_cio_block(daily_content)
 
     total_assets = header.get("总资产", "未获取")
     risk_score = header.get("市场风险评分", "未获取")
@@ -196,12 +213,13 @@ def _html_email_body(
     <div style="max-width:720px;margin:0 auto;padding:24px 14px">
       <div style="background:#ffffff;border:1px solid #eaecf0;border-radius:14px;overflow:hidden">
         <div style="padding:22px 22px 18px;border-bottom:1px solid #eaecf0;background:#0f172a;color:#ffffff">
-          <div style="font-size:13px;opacity:.78;margin-bottom:6px">Stone AI Investment Manager</div>
-          <div style="font-size:24px;font-weight:800;line-height:1.25">每日投资摘要</div>
-          <div style="font-size:14px;opacity:.82;margin-top:8px">{escape(send_date.isoformat())}</div>
+          <div style="font-size:13px;opacity:.78;margin-bottom:6px">目标：长期年化 10%–15%</div>
+          <div style="font-size:24px;font-weight:800;line-height:1.25">Stone CIO 今日决策</div>
+          <div style="font-size:14px;opacity:.82;margin-top:8px">策略：进取型长期增长 · 提示：不保证收益，仅供投资辅助。</div>
         </div>
 
         <div style="padding:18px 22px">
+          <div style="background:#f9fafb;border:1px solid #eaecf0;border-radius:10px;padding:13px 14px;margin-bottom:14px;color:#101828;line-height:1.65;white-space:pre-wrap">{escape(_clip(cio_block, 1400) if cio_block else "今日CIO决策区块未解析，请查看附件 daily_report.md。")}</div>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
             {_html_row("总资产", total_assets, strong=True)}
             {_html_row("风险评分", risk_score, strong=True)}
@@ -288,7 +306,7 @@ def send_daily_reports(
 
     try:
         send_date = subject_date or date.today()
-        subject = f"Stone AI 每日投资摘要 - {send_date.isoformat()}"
+        subject = "Stone AI CIO Daily - 10%-15% Target"
         today_action_content = _read_report(today_action_path) if today_action_path.exists() else ""
         daily_content = _read_report(daily_path)
 

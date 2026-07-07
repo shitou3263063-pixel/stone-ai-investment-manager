@@ -168,6 +168,15 @@ def _apply_gold_bar_valuation(item: dict[str, Any]) -> dict[str, Any]:
         )
         return item
 
+    if float(item.get("amount_wan", 0.0) or 0.0) > 0:
+        item["valuation_status"] = "manual"
+        item["price_cny_per_gram"] = None
+        item["valuation_note"] = (
+            f"{grams_text}金条自动估值失败，保留持仓文件中的手动估值"
+            f"{item['amount_wan']:.2f}万元。"
+        )
+        return item
+
     item["amount_wan"] = 0.0
     item["valuation_status"] = "unvalued"
     item["price_cny_per_gram"] = None

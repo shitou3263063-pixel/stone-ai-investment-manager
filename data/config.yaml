@@ -5,21 +5,25 @@
 investor_profile:
   horizon_years: 5
   trading_frequency: low
-  drawdown_control_first: true
+  drawdown_control_first: false
   core_method: ETF_and_multi_asset
-  objective: steady_growth
+  objective: aggressive_long_term_growth
   avoid_frequent_rebalance: true
+  long_term_target_return: 10%-15%
+  max_drawdown_tolerance: 25%-35%
 
 target_allocation:
-  美股: 0.35
-  A股: 0.12
-  港股: 0.08
-  债券: 0.28
-  黄金: 0.12
-  现金: 0.05
+  美股: 0.30
+  港股: 0.12
+  A股: 0.10
+  债券: 0.25
+  黄金: 0.15
+  现金: 0.08
 
 rules:
-  deviation_threshold: 0.03
+  deviation_threshold: 0.05
+  deviation_watch_threshold: 0.05
+  deviation_rebalance_threshold: 0.08
   max_sell_ratio_per_category: 0.20
   gold_reduce_only_threshold: 0.15
   hong_kong_buy_threshold: 0.06

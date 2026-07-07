@@ -41,7 +41,7 @@ class RiskAgent:
                     "deviation_ratio": deviation_ratio,
                     "deviation_amount_wan": item["deviation_amount_wan"],
                     "max_single_sell_wan": round(max_single_sell, 2),
-                    "rule": "偏离目标超过3%" if triggered else "未触发偏离规则",
+                    "rule": "偏离目标超过5%" if triggered else "未触发偏离规则",
                 }
             )
 
