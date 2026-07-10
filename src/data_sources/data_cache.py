@@ -56,7 +56,10 @@ def read_cache(namespace: str, key: str, max_age_days: int = CACHE_MAX_AGE_DAYS)
         data.update(
             {
                 "source": payload.get("source", "cache"),
+                "published_at": data.get("published_at") or data.get("date"),
+                "retrieved_at": datetime.now().isoformat(timespec="seconds"),
                 "fetched_at": fetched_at_text,
+                "freshness_status": "stale" if stale else "fresh",
                 "cache_used": True,
                 "cache_stale": stale,
                 "cache_age_days": round(age.total_seconds() / 86400, 2),

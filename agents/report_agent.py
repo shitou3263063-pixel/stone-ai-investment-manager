@@ -308,8 +308,13 @@ class ReportAgent:
     def _format_orders(self, orders: list[dict[str, Any]]) -> str:
         if not orders:
             return "无"
+        amount_mode = self.execution_plan.get("amount_mode") if self.execution_plan else "exact"
         return "；".join(
-            f"{item['name']} {float(item.get('amount_yuan', 0.0)):.0f}元，分{int(item.get('parts', 1))}笔"
+            (
+                f"{item['name']} 不超过{float(item.get('amount_yuan', 0.0)):.0f}元，分{int(item.get('parts', 1))}笔"
+                if amount_mode == "cap"
+                else f"{item['name']} {float(item.get('amount_yuan', 0.0)):.0f}元，分{int(item.get('parts', 1))}笔"
+            )
             for item in orders
         )
 
@@ -317,8 +322,12 @@ class ReportAgent:
         if not self.execution_plan:
             return "执行计划模块暂不可用。"
 
+        amount_mode = self.execution_plan.get("amount_mode", "exact")
+        amount_label = "精确金额" if amount_mode == "exact" else ("金额上限" if amount_mode == "cap" else "不输出交易金额")
         lines = [
             f"- 操作等级：{self.execution_plan.get('action_level', self.decision.get('operation_level', '暂无'))}",
+            f"- DQS门槛：{self.execution_plan.get('data_policy', '暂无')}",
+            f"- 金额模式：{amount_label}",
             f"- 今日买多少：{self.execution_plan.get('today_buy_wan', 0.0) * 10000:.0f}元",
             f"- 今日买什么：{self._format_orders(self.execution_plan.get('today_orders', []))}",
             f"- 本周计划买入：{self.execution_plan.get('week_buy_wan', 0.0) * 10000:.0f}元",
@@ -480,10 +489,15 @@ class ReportAgent:
 
     def _data_quality_text(self) -> str:
         quality = self.live_market.get("data_quality", {}) or {}
+        source_audit = quality.get("source_audit", {}) or self.live_market.get("source_audit", {}) or {}
         rows = quality.get("key_rows", []) or []
         score = int(quality.get("score", 0) or 0)
         lines = [
             f"- 数据可信度评分：{score} / 100",
+            f"- Source Coverage：{source_audit.get('source_coverage_summary', '尚未生成来源覆盖审计。')}",
+            f"- 一级来源覆盖率：{float(source_audit.get('tier1_coverage', 0.0) or 0.0):.0%}",
+            f"- 关键指标覆盖率：{float(source_audit.get('critical_metric_coverage', 0.0) or 0.0):.0%}",
+            f"- 全球扫描状态：{source_audit.get('scan_status', 'unknown')}",
             f"- 市场数据是否可用：{'是' if quality.get('market_available') else '否'}",
             f"- 宏观数据是否可用：{'是' if quality.get('macro_available') else '否'}",
             f"- 是否仅使用 yfinance/缓存：{'是，已降低建议置信度。' if quality.get('only_yfinance') else '否'}",
@@ -506,6 +520,29 @@ class ReportAgent:
                 )
         else:
             lines.append("| 关键数据 | unavailable | 否 | 否 | 是 | 数据质量模块未返回明细，不做激进判断。 |")
+
+        metric_audit = source_audit.get("metric_audit", []) or []
+        if metric_audit:
+            lines.extend(
+                [
+                    "",
+                    "Source Audit关键数字复查：",
+                    "",
+                    "| 指标 | 数值 | 来源 | 时间戳 | 来源层级 | 是否过期 | 双源验证 |",
+                    "| --- | ---: | --- | --- | ---: | --- | --- |",
+                ]
+            )
+            for item in metric_audit[:12]:
+                lines.append(
+                    "| "
+                    f"{item.get('metric', 'unknown')} | "
+                    f"{item.get('value', 'NA') if item.get('value') is not None else 'NA'} | "
+                    f"{item.get('source', 'unavailable')} | "
+                    f"{item.get('fetched_at', 'unknown')} | "
+                    f"{item.get('tier', 'NA') if item.get('tier') is not None else 'NA'} | "
+                    f"{'是' if item.get('stale') else '否'} | "
+                    f"{'是' if item.get('double_source_verified') else '否'} |"
+                )
 
         warnings = [warning for warning in quality.get("warnings", []) if warning]
         if warnings:

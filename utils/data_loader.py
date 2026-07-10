@@ -76,7 +76,52 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 def load_portfolio(path: str | Path) -> list[dict[str, Any]]:
     """读取持仓 CSV。金额单位为万元。"""
-    return _load_portfolio(path)
+    portfolio_path = Path(path)
+    master_path = portfolio_path.with_name("portfolio_master.yaml")
+    if master_path.exists():
+        return _load_portfolio_master(master_path)
+    return _load_portfolio(portfolio_path)
+
+
+def _load_portfolio_master(path: Path) -> list[dict[str, Any]]:
+    """优先读取 portfolio_master.yaml，避免旧 CSV 和明细重复计算。"""
+    try:
+        import yaml  # type: ignore
+
+        with path.open("r", encoding="utf-8") as file:
+            master = yaml.safe_load(file) or {}
+    except Exception:
+        return _load_portfolio(path.with_name("portfolio.csv"))
+
+    totals = master.get("totals", {}) or {}
+    labels = master.get("asset_class_labels", {}) or {}
+    rows = []
+    for key, label in [
+        ("us_stock", "美股"),
+        ("hk_stock", "港股"),
+        ("cn_stock", "A股"),
+        ("china_bond", "债券"),
+        ("gold", "黄金"),
+        ("cash", "现金"),
+    ]:
+        amount_cny = float(totals.get(key, 0) or 0)
+        category = str(labels.get(key, label))
+        rows.append(
+            {
+                "category": category,
+                "name": f"{category}合计",
+                "symbol": "",
+                "amount_wan": amount_cny / 10000,
+                "currency": "CNY",
+                "quantity": None,
+                "unit": "",
+                "note": "来自portfolio_master.yaml；类别总额为最高优先级资产事实。",
+                "valuation_status": "master",
+                "valuation_note": "",
+                "price_cny_per_gram": None,
+            }
+        )
+    return rows
 
 
 def load_market_data(path: str | Path) -> dict[str, dict[str, Any]]:

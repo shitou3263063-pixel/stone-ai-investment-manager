@@ -77,6 +77,47 @@ def _risk_multiplier(
     return multiplier, reasons
 
 
+def _dqs_gate(live_market_result: dict[str, Any]) -> dict[str, Any]:
+    quality = _data_quality(live_market_result)
+    score = int(_to_float(quality.get("score"), 0.0))
+    blocking_errors = list(quality.get("blocking_errors", []) or [])
+    if blocking_errors:
+        return {
+            "score": score,
+            "amount_mode": "blocked",
+            "trade_advice_allowed": False,
+            "precise_amount_allowed": False,
+            "blocking_errors": blocking_errors,
+            "message": "blocking_errors 非空，停止执行单。",
+        }
+    if score >= 85:
+        return {
+            "score": score,
+            "amount_mode": "exact",
+            "trade_advice_allowed": True,
+            "precise_amount_allowed": True,
+            "blocking_errors": [],
+            "message": "DQS>=85，允许给精确金额。",
+        }
+    if score >= 70:
+        return {
+            "score": score,
+            "amount_mode": "cap",
+            "trade_advice_allowed": True,
+            "precise_amount_allowed": False,
+            "blocking_errors": [],
+            "message": "DQS 70-84，只给方向、比例或金额上限。",
+        }
+    return {
+        "score": score,
+        "amount_mode": "blocked",
+        "trade_advice_allowed": False,
+        "precise_amount_allowed": False,
+        "blocking_errors": [],
+        "message": "DQS<70，不得给交易建议。",
+    }
+
+
 def _configured_monthly_budget_wan(config: dict[str, Any], dca_result: dict[str, Any]) -> float:
     monthly = config.get("monthly_investment", {}) or {}
     configured = _to_float(monthly.get("total_wan"), 0.0)
@@ -202,6 +243,7 @@ def build_execution_plan(
     monthly_base_wan = monthly_base_wan if monthly_base_wan > 0 else 2.0
 
     risk_multiplier, risk_reasons = _risk_multiplier(live_market_result, vix_result, macro_result)
+    dqs_gate = _dqs_gate(live_market_result)
     cash_plan_wan = min(cash_available_wan, monthly_base_wan)
     bond_transfer_month_wan = 0.0
     if bond_ratio > 0.30 and bond_excess_wan > 0:
@@ -221,6 +263,12 @@ def build_execution_plan(
         week_total_wan = 0.0
         month_execute_wan = 0.0
         risk_reasons.append("现金低于5%，暂停新增风险资产，优先恢复现金。")
+
+    if not dqs_gate["trade_advice_allowed"]:
+        today_total_wan = 0.0
+        week_total_wan = 0.0
+        month_execute_wan = 0.0
+        risk_reasons.append(dqs_gate["message"])
 
     today_total_wan = round(max(0.0, today_total_wan), 2)
     week_total_wan = round(max(today_total_wan, week_total_wan), 2)
@@ -247,7 +295,13 @@ def build_execution_plan(
 
     return {
         "as_of": date.today().isoformat(),
-        "action_level": "B级：建议本周执行" if today_total_wan > 0 or bond_transfer_month_wan > 0 else "C级：继续观察",
+        "action_level": (
+            "B级：建议本周执行"
+            if (today_total_wan > 0 or bond_transfer_month_wan > 0) and dqs_gate["trade_advice_allowed"]
+            else "C级：继续观察"
+        ),
+        "dqs": dqs_gate,
+        "amount_mode": dqs_gate["amount_mode"],
         "today_buy_wan": today_total_wan,
         "week_buy_wan": week_total_wan,
         "month_buy_wan": month_execute_wan,
@@ -267,8 +321,7 @@ def build_execution_plan(
             f"缺口约{equity_gap_ratio * 100:.2f}%；新增资金优先补VOO、QQQ、沪深300ETF和恒生科技ETF。"
         ),
         "data_policy": (
-            f"数据可信度{int(_to_float(_data_quality(live_market_result).get('score'), 0))}/100；"
-            "关键数据缺失时只做基础/半速计划，不做激进调仓。"
+            f"数据可信度{dqs_gate['score']}/100；{dqs_gate['message']}"
         ),
         "rebalance_summary": allocation_rebalance_result.get("summary", "暂无再平衡结论。"),
         "market_summary": market_result.get("summary", "暂无市场摘要。"),

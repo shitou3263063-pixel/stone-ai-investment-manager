@@ -35,13 +35,17 @@ def get_quote(symbol: str) -> dict[str, Any]:
     close = float(quote.get("05. price"))
     previous_close = float(quote.get("08. previous close") or close)
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
+    retrieved_at = datetime.now().isoformat(timespec="seconds")
     return {
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
         "change_pct": round(change_pct, 2),
         "status": "ok",
         "source": "alpha_vantage",
-        "fetched_at": datetime.now().isoformat(timespec="seconds"),
+        "published_at": quote.get("07. latest trading day"),
+        "retrieved_at": retrieved_at,
+        "fetched_at": retrieved_at,
+        "freshness_status": "fresh",
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,

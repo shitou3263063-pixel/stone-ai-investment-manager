@@ -1,0 +1,184 @@
+schema_version: 1
+policy:
+  official_source_precedence: true
+  unregistered_source_policy: block_trade_conclusion
+  tier1_coverage_min: 0.80
+  critical_metric_coverage_min: 0.85
+  low_coverage_dqs_cap: 69
+  key_metric_double_source:
+    - price
+    - vix
+    - yield
+    - fx
+  trade_candidate_evidence:
+    required_groups:
+      - market_valuation
+      - macro_fundamental
+      - flow_volatility_behavior
+    rule: "任何交易候选必须同时具备市场/估值、宏观/基本面、资金流/波动率/行为三类独立证据；不满足时只能进入观察或待复核。"
+
+sources:
+  fred:
+    name: "FRED"
+    tier: 1
+    type: official
+  treasury:
+    name: "U.S. Treasury"
+    tier: 1
+    type: official
+  cboe_official:
+    name: "Cboe Official"
+    tier: 1
+    type: official
+  sec_edgar:
+    name: "SEC EDGAR"
+    tier: 1
+    type: official
+  hkex:
+    name: "HKEX"
+    tier: 1
+    type: official
+  sse:
+    name: "Shanghai Stock Exchange"
+    tier: 1
+    type: official
+  szse:
+    name: "Shenzhen Stock Exchange"
+    tier: 1
+    type: official
+  alpha_vantage:
+    name: "Alpha Vantage"
+    tier: 2
+    type: professional_api
+  finnhub:
+    name: "Finnhub"
+    tier: 2
+    type: professional_api
+  yfinance:
+    name: "yfinance"
+    tier: 3
+    type: free_aggregator
+  local_cache:
+    name: "Local Cache"
+    tier: 3
+    type: cache
+  market_data_csv:
+    name: "Manual market_data.csv"
+    tier: 4
+    type: manual
+  media_news:
+    name: "Registered Media News"
+    tier: 4
+    type: media
+
+categories:
+  macro:
+    primary_source: fred
+    backup_source: local_cache
+    source_tier: tier_1_official
+    freshness_limit: 45d
+    verification_requirement: official_or_cache_with_timestamp
+  market:
+    primary_source: alpha_vantage
+    backup_source: finnhub
+    source_tier: tier_2_professional_api
+    freshness_limit: 2d
+    verification_requirement: dual_source_for_key_price
+  index:
+    primary_source: cboe_official
+    backup_source: yfinance
+    source_tier: tier_1_official_for_vix
+    freshness_limit: 2d
+    verification_requirement: dual_source_for_vix_and_index
+  company_filings:
+    primary_source: sec_edgar
+    backup_source: finnhub
+    source_tier: tier_1_official
+    freshness_limit: 7d
+    verification_requirement: official_preferred_over_media
+  fund_flow:
+    primary_source: finnhub
+    backup_source: alpha_vantage
+    source_tier: tier_2_professional_api
+    freshness_limit: 7d
+    verification_requirement: independent_behavior_or_volume_confirmation
+  news:
+    primary_source: finnhub
+    backup_source: media_news
+    source_tier: tier_2_professional_api
+    freshness_limit: 3d
+    verification_requirement: explanation_only_not_trade_fact
+
+critical_metrics:
+  VOO:
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: alpha_vantage
+    backup_source: finnhub
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  QQQ:
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: alpha_vantage
+    backup_source: finnhub
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  TLT:
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: alpha_vantage
+    backup_source: finnhub
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  GLD:
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: alpha_vantage
+    backup_source: finnhub
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "3067.HK":
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: finnhub
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "510300.SS":
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: finnhub
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "^VIX":
+    category: index
+    metric_type: vix
+    evidence_group: flow_volatility_behavior
+    primary_source: cboe_official
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  DGS10:
+    category: macro
+    metric_type: yield
+    evidence_group: macro_fundamental
+    primary_source: fred
+    backup_source: treasury
+    freshness_limit: 7d
+    verification_requirement: dual_source
+  DX-Y.NYB:
+    category: market
+    metric_type: fx
+    evidence_group: flow_volatility_behavior
+    primary_source: alpha_vantage
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
