@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "updated_at": null,
+  "status_values": [
+    "suggested",
+    "pending_confirmation",
+    "executed",
+    "cancelled"
+  ],
+  "order_types": [
+    "base_dca",
+    "opportunity_add"
+  ],
+  "weekly_rules": {
+    "base_dca_weekday": "Wednesday",
+    "base_dca_max_per_natural_week": 1,
+    "non_wednesday_default_trade": false
+  },
+  "records": []
+}

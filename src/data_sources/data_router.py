@@ -42,13 +42,17 @@ MACRO_SERIES = {
 
 
 def _failed_item(symbol: str, errors: list[str]) -> dict[str, Any]:
+    retrieved_at = datetime.now().isoformat(timespec="seconds")
     return {
         "close": None,
         "previous_close": None,
         "change_pct": None,
         "status": "failed",
         "source": "unavailable",
-        "fetched_at": datetime.now().isoformat(timespec="seconds"),
+        "published_at": None,
+        "retrieved_at": retrieved_at,
+        "fetched_at": retrieved_at,
+        "freshness_status": "missing",
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,
@@ -87,13 +91,18 @@ def _official_vix_quote() -> dict[str, Any]:
     close = float(data.get("current_price") or data.get("close"))
     previous_close = close - float(data.get("price_change") or 0)
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
+    retrieved_at = datetime.now().isoformat(timespec="seconds")
+    published_at = payload.get("timestamp") or retrieved_at
     return {
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
         "change_pct": round(change_pct, 2),
         "status": "ok",
         "source": "cboe_official",
-        "fetched_at": payload.get("timestamp") or datetime.now().isoformat(timespec="seconds"),
+        "published_at": published_at,
+        "retrieved_at": retrieved_at,
+        "fetched_at": retrieved_at,
+        "freshness_status": "fresh",
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,
@@ -245,6 +254,8 @@ def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any
             {
                 "name": symbol,
                 "source": item.get("source", "unavailable"),
+                "fetched_at": item.get("fetched_at"),
+                "value": item.get("close"),
                 "is_realtime": bool(item.get("is_realtime", False)),
                 "cache_used": bool(item.get("cache_used", False)),
                 "cache_stale": bool(item.get("cache_stale", False)),
@@ -259,6 +270,8 @@ def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any
             {
                 "name": label,
                 "source": item.get("source", "unavailable"),
+                "fetched_at": item.get("fetched_at") or item.get("date"),
+                "value": item.get("value"),
                 "is_realtime": False,
                 "cache_used": bool(item.get("cache_used", False)),
                 "cache_stale": bool(item.get("cache_stale", False)),
@@ -275,6 +288,11 @@ def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any
     )
     critical_missing = any(row["missing"] for row in key_rows if row["name"] in {"VOO", "QQQ", "^VIX", "10Y Treasury"})
     stale_cache_used = any(row["cache_stale"] for row in key_rows)
+    blocking_errors = [
+        f"{row['name']} 数据缺失"
+        for row in key_rows
+        if row["missing"] and row["name"] in {"VOO", "QQQ", "^VIX", "10Y Treasury"}
+    ]
 
     return {
         "score": _quality_score(items, macro),
@@ -286,6 +304,7 @@ def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any
         "stale_cache_used": stale_cache_used,
         "news_available": bool(news.get("items")),
         "missing_count": sum(1 for row in key_rows if row["missing"]),
+        "blocking_errors": blocking_errors,
         "warnings": [row["warning"] for row in key_rows if row["warning"]],
     }
 

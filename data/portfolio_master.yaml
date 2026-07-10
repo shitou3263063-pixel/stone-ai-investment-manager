@@ -1,0 +1,80 @@
+schema_version: 1
+as_of: 2026-07-11
+currency: CNY
+source: user_confirmed
+notes:
+  - "portfolio_master.yaml 是最高优先级资产事实源。"
+  - "10年地债约132200元已包含在中国债券中，不得重复计算。"
+
+totals:
+  us_stock: 385000
+  hk_stock: 272600
+  cn_stock: 266500
+  china_bond: 1130000
+  gold: 547000
+  cash: 220000
+  total_assets: 2821100
+
+asset_class_labels:
+  us_stock: 美股
+  hk_stock: 港股
+  cn_stock: A股
+  china_bond: 债券
+  gold: 黄金
+  cash: 现金
+
+confirmed_quantities:
+  巨人网络:
+    symbol: "002558"
+    quantity: 1500
+    unit: 股
+    asset_class: cn_stock
+  "*ST闻泰":
+    symbol: ""
+    quantity: 500
+    unit: 股
+    asset_class: cn_stock
+  恒生医疗:
+    symbol: "513060"
+    quantity: 177600
+    unit: 份
+    asset_class: hk_stock
+  香港证券:
+    symbol: "513090"
+    quantity: 17000
+    unit: 份
+    asset_class: hk_stock
+  300ETF:
+    symbol: "510300"
+    quantity: 42900
+    unit: 份
+    asset_class: cn_stock
+  黄金ETF:
+    symbol: "518880"
+    quantity: 4000
+    unit: 份
+    asset_class: gold
+  10年地债:
+    symbol: ""
+    quantity: 1100
+    unit: 份
+    asset_class: china_bond
+    amount_cny_approx: 132200
+    included_in: 中国债券
+    duplicate_counting_allowed: false
+  南方恒生:
+    symbol: "03033"
+    quantity: 35200
+    unit: 份
+    asset_class: hk_stock
+
+ledger_policy:
+  priority:
+    - portfolio_master.yaml
+    - broker_and_trade_records
+    - execution_state.json
+    - market_data
+    - codex_candidate_suggestions
+    - gmail_reports
+    - news_explanation
+  gmail_policy: "Gmail只作为报告和通知渠道，不得作为资产事实或成交事实的唯一来源。"

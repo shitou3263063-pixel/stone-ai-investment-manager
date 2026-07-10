@@ -32,13 +32,19 @@ def get_quote(symbol: str) -> dict[str, Any]:
         raise RuntimeError(f"Finnhub 返回无效行情: {payload}")
 
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
+    retrieved_at = datetime.now().isoformat(timespec="seconds")
+    timestamp = payload.get("t")
+    published_at = datetime.fromtimestamp(float(timestamp)).isoformat(timespec="seconds") if timestamp else None
     return {
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
         "change_pct": round(change_pct, 2),
         "status": "ok",
         "source": "finnhub",
-        "fetched_at": datetime.now().isoformat(timespec="seconds"),
+        "published_at": published_at,
+        "retrieved_at": retrieved_at,
+        "fetched_at": retrieved_at,
+        "freshness_status": "fresh",
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,

@@ -40,13 +40,17 @@ def get_series_latest(series_id: str) -> dict[str, Any]:
     value = observation.get("value")
     if value in (None, "", "."):
         raise RuntimeError(f"FRED {series_id} 最新值不可用")
+    retrieved_at = datetime.now().isoformat(timespec="seconds")
     return {
         "series_id": series_id,
         "value": float(value),
         "date": observation.get("date"),
         "status": "ok",
         "source": "fred",
-        "fetched_at": datetime.now().isoformat(timespec="seconds"),
+        "published_at": observation.get("date"),
+        "retrieved_at": retrieved_at,
+        "fetched_at": retrieved_at,
+        "freshness_status": "fresh",
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,

@@ -21,6 +21,7 @@ from src.strategy.dca_engine import build_dca_plan
 from src.strategy.execution_plan import build_execution_plan
 from src.strategy.rebalance_engine import build_rebalance_plan
 from src.system.health_check import format_health_report, run_health_check
+from scripts.build_daily_snapshot import write_snapshot
 from utils.data_loader import load_config, load_market_data, load_portfolio, project_root
 from utils.market_data_provider import fetch_yfinance_market_data
 
@@ -87,7 +88,7 @@ def _apply_data_quality_guardrails(
     return guarded
 
 
-def _build_context() -> tuple[
+def _build_context(snapshot: dict[str, Any] | None = None) -> tuple[
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
@@ -108,7 +109,7 @@ def _build_context() -> tuple[
     config = load_config(root / "data" / "config.yaml")
     portfolio = load_portfolio(root / "data" / "portfolio.csv")
     market_data = load_market_data(root / "data" / "market_data.csv")
-    live_market_result = fetch_yfinance_market_data()
+    live_market_result = (snapshot or {}).get("market") or fetch_yfinance_market_data()
     macro_result = analyze_macro_calendar()
     vix_result = analyze_vix_risk(live_market_result, market_data)
 
@@ -189,13 +190,22 @@ def _write_today_action(
         if today_orders
         else "今日不建议买入"
     )
+    if execution_plan_result.get("amount_mode") == "cap" and today_orders:
+        today_buy_text = "；".join(f"{item['name']} 不超过{item['amount_yuan']}元" for item in today_orders)
+    if execution_plan_result.get("amount_mode") == "blocked":
+        today_buy_text = f"DQS门槛未通过：{execution_plan_result.get('data_policy', '不输出交易建议')}"
     pause_text = "、".join(execution_plan_result.get("pause_list", [])) or "无"
+    amount_label = "今日买多少"
+    if execution_plan_result.get("amount_mode") == "cap":
+        amount_label = "今日买入上限"
+    elif execution_plan_result.get("amount_mode") == "blocked":
+        amount_label = "今日买多少"
     return "\n".join(
         [
             f"今日是否交易：{trade_text}",
             f"今日是否定投：{dca_text}",
             f"今日是否再平衡：{rebalance_text}",
-            f"今日买多少：{today_buy_wan * 10000:.0f}元",
+            f"{amount_label}：{today_buy_wan * 10000:.0f}元",
             f"今日买什么：{today_buy_text}",
             f"本周计划买入：{execution_plan_result.get('week_buy_wan', 0.0) * 10000:.0f}元",
             f"本月计划买入：{execution_plan_result.get('month_buy_wan', 0.0) * 10000:.0f}元",
@@ -216,6 +226,7 @@ def run() -> str:
     reports_dir = root / "reports"
     reports_dir.mkdir(exist_ok=True)
     today = date.today()
+    snapshot = write_snapshot()
 
     (
         config,
@@ -233,7 +244,7 @@ def run() -> str:
         cross_asset_result,
         ai_advice_result,
         history_review_result,
-    ) = _build_context()
+    ) = _build_context(snapshot)
     report_agent = ReportAgent(
         market_result,
         portfolio_result,
