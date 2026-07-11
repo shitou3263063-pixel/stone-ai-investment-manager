@@ -489,14 +489,16 @@ class ReportAgent:
 
     def _data_quality_text(self) -> str:
         quality = self.live_market.get("data_quality", {}) or {}
-        source_audit = quality.get("source_audit", {}) or self.live_market.get("source_audit", {}) or {}
+        source_audit = self.live_market.get("source_audit", {}) or quality.get("source_audit", {}) or {}
         rows = quality.get("key_rows", []) or []
         score = int(quality.get("score", 0) or 0)
         lines = [
             f"- 数据可信度评分：{score} / 100",
             f"- Source Coverage：{source_audit.get('source_coverage_summary', '尚未生成来源覆盖审计。')}",
+            f"- 数据源覆盖率：{float(source_audit.get('data_source_coverage', source_audit.get('critical_metric_coverage', 0.0)) or 0.0):.0%}",
+            f"- 双源验证覆盖率：{float(source_audit.get('dual_source_coverage', 0.0) or 0.0):.0%}",
             f"- 一级来源覆盖率：{float(source_audit.get('tier1_coverage', 0.0) or 0.0):.0%}",
-            f"- 关键指标覆盖率：{float(source_audit.get('critical_metric_coverage', 0.0) or 0.0):.0%}",
+            f"- 关键指标可用覆盖率：{float(source_audit.get('critical_metric_coverage', 0.0) or 0.0):.0%}",
             f"- 全球扫描状态：{source_audit.get('scan_status', 'unknown')}",
             f"- 市场数据是否可用：{'是' if quality.get('market_available') else '否'}",
             f"- 宏观数据是否可用：{'是' if quality.get('macro_available') else '否'}",
