@@ -88,13 +88,20 @@ def _items(values: list[str] | None) -> list[str]:
 
 
 def format_validation_report(validation: dict[str, Any], decision: dict[str, Any]) -> str:
+    dqs_value = decision.get("dqs")
+    if isinstance(dqs_value, dict):
+        dqs_text = f"{dqs_value.get('score')} / {dqs_value.get('mode_label')}"
+        amount_text = dqs_value.get("mode", "不适用")
+    else:
+        dqs_text = str(dqs_value)
+        amount_text = f"{decision.get('amount_mode')} / {decision.get('amount_label')}"
     lines = [
         "# Validation Report",
         "",
         f"- 状态：{'通过' if validation.get('ok') else '未通过，已降级'}",
         f"- 时间：{validation.get('validated_at')}",
-        f"- DQS：{decision.get('dqs')}",
-        f"- 金额模式：{decision.get('amount_mode')} / {decision.get('amount_label')}",
+        f"- DQS：{dqs_text}",
+        f"- 金额模式：{amount_text}",
         f"- 是否触发保守降级：{'是' if validation.get('fallback_applied') else '否'}",
         "",
         "## Final Errors",

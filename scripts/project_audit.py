@@ -17,20 +17,20 @@ def build_project_audit() -> str:
     workflow_files = _files("*.yml") + _files("*.yaml")
     report_files = [path for path in _files("*.md") if path.startswith("reports/")]
     test_files = [path for path in python_files if path.startswith("tests/")]
-    legacy_entrypoints = [path for path in main_files if path != "src/main.py"]
+    legacy_entrypoints = [path for path in main_files if path != "main.py"]
 
     lines = [
         "# Stone AI Project Audit",
         "",
         f"- 生成时间：{datetime.now().isoformat(timespec='seconds')}",
-        "- 正式版本：Stone AI Investment Manager Pro V12",
-        "- 唯一正式入口：`python src/main.py`",
+        "- 正式版本：Stone AI Investment Manager Pro V12.2 Smart Grid",
+        "- 唯一正式入口：`python main.py`",
         "",
         "## 1. 入口审计",
         "",
-        "- 正式入口：`src/main.py`",
-        "- 根目录 `main.py`：只保留提示，不再运行投资系统。",
-        "- `run.py`：历史兼容文件，不作为正式 CI 或本地推荐入口。",
+        "- 正式入口：根目录 `main.py`。",
+        "- 核心业务逻辑：`src/app.py`。",
+        "- 旧 `src/main.py` 与 `run.py` 已移入 `archive/`，不再被正式流程调用。",
         "",
         "## 2. 发现的历史入口",
     ]
@@ -45,11 +45,11 @@ def build_project_audit() -> str:
             '  A["portfolio.csv / portfolio_master.yaml"] --> B["每日快照"]',
             '  C["FRED / Alpha Vantage / Finnhub / yfinance"] --> B',
             '  B --> D["Portfolio / Market / Risk / DCA / Rebalance"]',
-            '  D --> E["Unified Decision Engine"]',
-            '  E --> F["Decision Validator"]',
+            '  D --> E["V12.2 CIO + Smart Grid Decision Engine"]',
+            '  E --> F["Consistency Validator"]',
             '  F --> G["decision.json"]',
             '  G --> H["Report Center"]',
-            '  H --> I["today_action / daily / weekly / monthly"]',
+            '  H --> I["today_action / daily / weekly / monthly / grid"]',
             '  H --> J["Gmail SMTP"]',
             "```",
             "",
@@ -61,10 +61,10 @@ def build_project_audit() -> str:
             "",
             "## 5. DQS门槛",
             "",
-            "- DQS >= 90：允许精确金额。",
-            "- DQS 80-89：只允许金额上限或区间。",
-            "- DQS 70-79：只允许方向，不给金额。",
-            "- DQS < 70：不得给交易建议。",
+            "- DQS >= 85：允许正常金额建议。",
+            "- DQS 75-84：只允许金额区间和分批计划。",
+            "- DQS 60-74：只允许方向性建议。",
+            "- DQS < 60：禁止新增仓位建议。",
             "- blocking_errors 非空：停止执行单。",
             "",
             "## 6. 测试覆盖",

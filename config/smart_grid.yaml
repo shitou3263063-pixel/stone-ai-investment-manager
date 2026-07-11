@@ -1,0 +1,97 @@
+smart_grid:
+  enabled: true
+  auto_trade: false
+  paper_mode: true
+  live_advice_enabled: false
+
+  portfolio:
+    total_grid_capital_pct: 4
+    max_total_grid_capital_pct: 8
+    cash_reserve_pct: 25
+
+  symbols:
+    VOO:
+      enabled: true
+      trade_symbol: VOO
+      benchmark_symbol: VOO
+      core_position_pct: 75
+      grid_position_pct: 25
+      max_capital_pct: 5
+      low_vol_buy_min_pct: 2.0
+      low_vol_buy_max_pct: 2.5
+      low_vol_sell_min_pct: 2.5
+      low_vol_sell_max_pct: 3.0
+      normal_grid_min_pct: 2.5
+      normal_grid_max_pct: 3.5
+      normal_sell_min_pct: 3.0
+      normal_sell_max_pct: 4.0
+      high_vol_grid_min_pct: 4.0
+      high_vol_grid_max_pct: 6.0
+      high_vol_sell_min_pct: 4.0
+      high_vol_sell_max_pct: 6.0
+      max_buy_levels: 5
+      max_daily_trades: 1
+      max_consecutive_buys: 3
+      min_grid_hold_pct: 20
+
+    QQQ:
+      enabled: true
+      trade_symbol: QQQ
+      benchmark_symbol: ^NDX
+      alternative_symbol: QQQM
+      core_position_pct: 70
+      grid_position_pct: 30
+      max_capital_pct: 4
+      low_vol_buy_min_pct: 2.5
+      low_vol_buy_max_pct: 3.5
+      low_vol_sell_min_pct: 3.0
+      low_vol_sell_max_pct: 4.0
+      normal_grid_min_pct: 3.5
+      normal_grid_max_pct: 5.0
+      normal_sell_min_pct: 4.0
+      normal_sell_max_pct: 5.5
+      high_vol_grid_min_pct: 5.0
+      high_vol_grid_max_pct: 8.0
+      high_vol_sell_min_pct: 5.0
+      high_vol_sell_max_pct: 8.0
+      max_buy_levels: 5
+      max_daily_trades: 1
+      max_consecutive_buys: 2
+      min_grid_hold_pct: 30
+      tech_concentration_limit_pct: 18
+
+  buy_layers_pct: [15, 17.5, 20, 22.5, 25]
+
+  anchor:
+    default_mode: last_grid_trade
+    monthly_review: true
+    allow_manual_anchor: true
+
+  risk:
+    require_dqs: 85
+    block_before_major_event_hours: 48
+    max_monthly_trades_per_symbol: 8
+    max_consecutive_buys: 3
+    max_grid_drawdown_pct: 15
+    stop_new_buys_below_cash_line: true
+    block_if_dqs_mode_not_exact: true
+    block_if_core_price_missing: true
+
+  transaction_cost:
+    commission_rate: 0
+    estimated_slippage_bps: 5
+    min_expected_profit_bps: 20
+
+  backtest:
+    enabled: true
+    run_on_daily: true
+    history_years: 18
+    initial_capital_yuan: 100000
+    benchmark_source: yahoo_chart
+    cache_days: 7
+    rolling_window_years: 3
+    validation_years: 2
+
+  simulator:
+    enabled: true
+    min_paper_days_before_live: 20

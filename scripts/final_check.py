@@ -7,7 +7,6 @@ import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = PROJECT_ROOT
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -15,13 +14,13 @@ from src.system.health_check import format_health_report, run_health_check  # no
 
 
 SMTP_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"]
+DATA_KEYS = ["FRED_API_KEY", "ALPHA_VANTAGE_API_KEY", "FINNHUB_API_KEY"]
 
 
 def _load_env(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.exists():
         return values
-
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -41,10 +40,9 @@ def _mask_status(key: str, env_values: dict[str, str]) -> str:
 
 
 def _workflow_has_keys(keys: list[str]) -> dict[str, bool]:
-    workflow_path = REPO_ROOT / ".github" / "workflows" / "daily.yml"
+    workflow_path = PROJECT_ROOT / ".github" / "workflows" / "daily.yml"
     if not workflow_path.exists():
         return {key: False for key in keys}
-
     content = workflow_path.read_text(encoding="utf-8")
     return {key: key in content for key in keys}
 
@@ -52,15 +50,17 @@ def _workflow_has_keys(keys: list[str]) -> dict[str, bool]:
 def build_system_check_report() -> str:
     env_values = _load_env(PROJECT_ROOT / ".env")
     health_result = run_health_check(auto_fix=True)
-    workflow_status = _workflow_has_keys(SMTP_KEYS)
+    workflow_keys = SMTP_KEYS + DATA_KEYS + ["OPENAI_API_KEY"]
+    workflow_status = _workflow_has_keys(workflow_keys)
     all_smtp_configured = all(_mask_status(key, env_values) == "已配置" for key in SMTP_KEYS)
 
     lines = [
-        "# Stone AI Investment Manager Pro V12 系统检查报告",
+        "# Stone AI Investment Manager Pro V12.2 Smart Grid 系统检查报告",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 总体状态：{health_result.get('status', 'UNKNOWN')}",
         f"- 是否可运行：{'是' if health_result.get('can_run') else '否'}",
+        "- 唯一正式入口：`python main.py`",
         "",
         "## 基础自检",
         "",
@@ -78,6 +78,10 @@ def build_system_check_report() -> str:
     for key in SMTP_KEYS:
         lines.append(f"- {key}：{_mask_status(key, env_values)}")
 
+    lines.extend(["", "## 数据源参数检查", ""])
+    for key in DATA_KEYS + ["OPENAI_API_KEY"]:
+        lines.append(f"- {key}：{_mask_status(key, env_values)}")
+
     lines.extend(["", "## GitHub Actions Secrets 映射检查", ""])
     for key, present in workflow_status.items():
         lines.append(f"- {key}：{'daily.yml 已映射' if present else 'daily.yml 未映射'}")
@@ -89,7 +93,8 @@ def build_system_check_report() -> str:
             "",
             "```bash",
             "python scripts/test_email.py",
-            "python run.py",
+            "pytest",
+            "python main.py",
             "```",
             "",
             "## 邮件发送失败常见原因",
@@ -101,9 +106,9 @@ def build_system_check_report() -> str:
             "",
             "## 安全说明",
             "",
-            "- 本报告只显示是否配置，不输出 SMTP_PASSWORD 的具体值。",
+            "- 本报告只显示是否配置，不输出任何密钥值。",
             "- 不要把 `.env` 提交到 GitHub。",
-            "- 邮件未配置或发送失败不会影响日报生成。",
+            "- 邮件、OpenAI 或外部数据源失败不会影响报告生成。",
             "- 系统只提醒，不自动交易；所有内容仅供投资辅助，不构成投资建议。",
             "",
         ]
