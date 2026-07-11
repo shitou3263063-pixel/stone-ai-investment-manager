@@ -90,23 +90,32 @@ def _dqs_gate(live_market_result: dict[str, Any]) -> dict[str, Any]:
             "blocking_errors": blocking_errors,
             "message": "blocking_errors 非空，停止执行单。",
         }
-    if score >= 85:
+    if score >= 90:
         return {
             "score": score,
             "amount_mode": "exact",
             "trade_advice_allowed": True,
             "precise_amount_allowed": True,
             "blocking_errors": [],
-            "message": "DQS>=85，允许给精确金额。",
+            "message": "DQS>=90，允许给精确金额。",
         }
-    if score >= 70:
+    if score >= 80:
         return {
             "score": score,
             "amount_mode": "cap",
             "trade_advice_allowed": True,
             "precise_amount_allowed": False,
             "blocking_errors": [],
-            "message": "DQS 70-84，只给方向、比例或金额上限。",
+            "message": "DQS 80-89，只给方向、比例或金额上限。",
+        }
+    if score >= 70:
+        return {
+            "score": score,
+            "amount_mode": "direction_only",
+            "trade_advice_allowed": True,
+            "precise_amount_allowed": False,
+            "blocking_errors": [],
+            "message": "DQS 70-79，只给方向，不输出具体金额。",
         }
     return {
         "score": score,
@@ -265,6 +274,12 @@ def build_execution_plan(
         risk_reasons.append("现金低于5%，暂停新增风险资产，优先恢复现金。")
 
     if not dqs_gate["trade_advice_allowed"]:
+        today_total_wan = 0.0
+        week_total_wan = 0.0
+        month_execute_wan = 0.0
+        risk_reasons.append(dqs_gate["message"])
+
+    if dqs_gate.get("amount_mode") == "direction_only":
         today_total_wan = 0.0
         week_total_wan = 0.0
         month_execute_wan = 0.0

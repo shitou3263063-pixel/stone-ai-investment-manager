@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml  # type: ignore
+except ImportError:  # pragma: no cover - fallback for minimal local runtimes
+    yaml = None  # type: ignore
 
 from utils.data_loader import project_root
 from utils.logger import write_log
@@ -15,11 +18,65 @@ REGISTRY_PATH = project_root() / "config" / "source_registry.yaml"
 AUDIT_PATH = project_root() / "data" / "source_audit.json"
 
 
+def _default_registry() -> dict[str, Any]:
+    sources = {
+        "fred": {"tier": 1},
+        "treasury": {"tier": 1},
+        "cboe_official": {"tier": 1},
+        "alpha_vantage": {"tier": 2},
+        "finnhub": {"tier": 2},
+        "yfinance": {"tier": 3},
+        "local_cache": {"tier": 3},
+        "market_data_csv": {"tier": 4},
+        "unavailable": {"tier": 99},
+    }
+    metrics = {
+        "VOO": ("market", "price", "market_valuation", "alpha_vantage", "finnhub", "2d"),
+        "QQQ": ("market", "price", "market_valuation", "alpha_vantage", "finnhub", "2d"),
+        "TLT": ("market", "price", "market_valuation", "alpha_vantage", "finnhub", "2d"),
+        "GLD": ("market", "price", "market_valuation", "alpha_vantage", "finnhub", "2d"),
+        "3067.HK": ("market", "price", "market_valuation", "finnhub", "yfinance", "2d"),
+        "510300.SS": ("market", "price", "market_valuation", "finnhub", "yfinance", "2d"),
+        "^VIX": ("index", "vix", "flow_volatility_behavior", "cboe_official", "yfinance", "2d"),
+        "DGS10": ("macro", "yield", "macro_fundamental", "fred", "treasury", "7d"),
+        "DX-Y.NYB": ("market", "fx", "flow_volatility_behavior", "alpha_vantage", "yfinance", "2d"),
+    }
+    return {
+        "policy": {
+            "tier1_coverage_min": 0.80,
+            "critical_metric_coverage_min": 0.85,
+            "low_coverage_dqs_cap": 69,
+            "verification_warning_dqs_cap": 84,
+        },
+        "sources": sources,
+        "critical_metrics": {
+            metric: {
+                "category": spec[0],
+                "metric_type": spec[1],
+                "evidence_group": spec[2],
+                "primary_source": spec[3],
+                "backup_source": spec[4],
+                "freshness_limit": spec[5],
+                "verification_requirement": "dual_source",
+            }
+            for metric, spec in metrics.items()
+        },
+    }
+
+
 def load_source_registry(path: Path = REGISTRY_PATH) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"source registry not found: {path}")
+    if yaml is None:
+        write_log("PyYAML 未安装，source audit 使用内置安全来源注册表。", filename="source_audit.log")
+        return _default_registry()
     with path.open("r", encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
+        loaded = yaml.safe_load(file) or {}
+    critical_metrics = loaded.get("critical_metrics")
+    if not isinstance(critical_metrics, dict):
+        write_log("source_registry.yaml 解析异常，source audit 使用内置安全来源注册表。", filename="source_audit.log")
+        return _default_registry()
+    return loaded
 
 
 def _source_key(source: str | None) -> str:
@@ -131,6 +188,8 @@ def _metric_item(metric: str, market: dict[str, Any]) -> dict[str, Any]:
 
 
 def _source_plan(metric: str, spec: dict[str, Any]) -> list[str]:
+    if not isinstance(spec, dict):
+        return []
     sources = [spec.get("primary_source"), spec.get("backup_source")]
     return [str(item) for item in sources if item]
 

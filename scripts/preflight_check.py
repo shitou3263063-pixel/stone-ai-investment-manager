@@ -8,7 +8,10 @@ from pathlib import Path
 import subprocess
 from typing import Any
 
-import yaml
+try:
+    import yaml  # type: ignore
+except ImportError:  # pragma: no cover - fallback for minimal local runtimes
+    yaml = None  # type: ignore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +24,10 @@ REQUIREMENTS_PATH = PROJECT_ROOT / "requirements.txt"
 def load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
+    if yaml is None:
+        from utils.data_loader import _load_yaml_without_dependency
+
+        return _load_yaml_without_dependency(path)
     with path.open("r", encoding="utf-8") as file:
         return yaml.safe_load(file) or {}
 
