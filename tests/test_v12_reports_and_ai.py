@@ -26,9 +26,11 @@ class ReportsAndAiTest(unittest.TestCase):
                 os.environ["OPENAI_API_KEY"] = old
 
         self.assertEqual(result["ai_status"], "rule_only")
+        self.assertEqual(result["actual_provider"], "stone_rule_engine")
         self.assertIn("fallback_reason", result)
         self.assertNotIn("{'error'", result["summary"])
         self.assertNotIn("Error code: 429", result["summary"])
+        self.assertNotIn("未配置", result["summary"])
 
     def test_report_uses_v12_1_decision_object(self) -> None:
         decision = build_v12_1_decision(
@@ -44,6 +46,11 @@ class ReportsAndAiTest(unittest.TestCase):
         self.assertIn("## 6. Opportunity Score", daily)
         self.assertIn("## 10. DQS数据质量", daily)
         self.assertIn("## 12. 三种市场情景", daily)
+        self.assertIn("## 13. Stone CIO 规则增强分析（OpenAI可选）", daily)
+        self.assertIn("今日最重要风险", daily)
+        self.assertIn("今日最建议做的事", daily)
+        self.assertIn("今日最不建议做的事", daily)
+        self.assertNotIn("失败/降级原因", daily)
 
     def test_service_health_report_has_no_secret_values(self) -> None:
         rows = collect_service_health()

@@ -30,19 +30,21 @@ def _safe_json(data: Any) -> str:
 
 
 def _fallback_result(message: str, reason: str = "rule_only", retry_count: int = 0) -> dict[str, Any]:
+    # OpenAI 只是可选复核层。技术原因留在日志和结构化字段中，用户报告使用中性文案。
+    neutral_summary = "Stone CIO规则引擎已完成分析；OpenAI可选复核本次未参与，不影响核心风控与决策。"
     return {
         "enabled": False,
         "ai_status": "rule_only",
-        "actual_provider": "rule_only",
+        "actual_provider": "stone_rule_engine",
         "fallback_reason": reason,
         "retry_count": retry_count,
         "degrade_level": "RULE_ENHANCED",
         "response_timestamp": "",
-        "summary": message,
-        "most_important_risk": "AI深度分析不可用，本次以本地规则、资产配置、数据质量和风险模型为准。",
+        "summary": neutral_summary,
+        "most_important_risk": "以DQS、资产配置、现金安全线和风险评分识别的首要风险为准。",
         "best_action_today": "按日报中的DQS、现金安全线、定投和再平衡约束执行，所有操作人工确认。",
-        "avoid_action_today": "不要因为AI不可用而临时重仓交易，不要绕过DQS和现金约束。",
-        "one_sentence": message,
+        "avoid_action_today": "不要绕过DQS、现金安全线、资金来源和重大事件约束进行交易。",
+        "one_sentence": neutral_summary,
         "raw_text": "",
         "model": "",
         "disclaimer": "仅供投资辅助，不构成投资建议；不自动交易，不承诺收益，最终决策由用户负责。",
@@ -135,13 +137,13 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
     _load_env_file(env_path or PROJECT_ROOT / ".env")
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        return _fallback_result("AI深度分析未启用：未配置 OPENAI_API_KEY", "missing_openai_key", 0)
+        return _fallback_result("", "missing_openai_key", 0)
 
     try:
         from openai import OpenAI  # type: ignore
     except ImportError:
         write_log("OpenAI SDK not installed", filename="openai_advisor.log")
-        return _fallback_result("AI深度分析暂不可用，系统已切换规则增强模式。", "openai_sdk_missing", 0)
+        return _fallback_result("", "openai_sdk_missing", 0)
 
     model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
     max_retries = int(os.getenv("MAX_LLM_RETRIES", "2") or 2)
@@ -196,10 +198,10 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
 
     if "insufficient_quota" in last_error or "You exceeded your current quota" in last_error:
         write_log("OpenAI unavailable: insufficient_quota", filename="openai_advisor.log")
-        return _fallback_result("OpenAI深度分析暂不可用：额度不足，系统已切换规则增强模式。", "insufficient_quota", max_retries)
+        return _fallback_result("", "insufficient_quota", max_retries)
     if "rate_limit" in last_error or "429" in last_error:
         write_log("OpenAI unavailable: rate_limit", filename="openai_advisor.log")
-        return _fallback_result("OpenAI深度分析暂不可用：遇到限流，系统已切换规则增强模式。", "rate_limit", max_retries)
+        return _fallback_result("", "rate_limit", max_retries)
     reason = "network_or_timeout" if "timeout" in last_error.lower() else (last_error[:80] or "unknown_error")
     write_log(f"OpenAI unavailable: {reason}", filename="openai_advisor.log")
-    return _fallback_result("AI深度分析暂不可用，系统已切换规则增强模式。", reason, max_retries)
+    return _fallback_result("", reason, max_retries)

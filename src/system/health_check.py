@@ -316,10 +316,10 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
     else:
         items.append(
             HealthItem(
-                "OpenAI API Key",
-                "WARN",
-                "未配置 OPENAI_API_KEY，AI 深度分析会跳过，基础日报可运行。",
-                "需要 AI 深度分析时，在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。",
+                "OpenAI可选复核",
+                "OK",
+                "未配置 OPENAI_API_KEY；Stone CIO规则增强分析将完整运行，不影响日报和核心决策。",
+                "需要额外AI解释时，可在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。",
             )
         )
 

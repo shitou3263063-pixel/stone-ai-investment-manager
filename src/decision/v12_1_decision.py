@@ -857,12 +857,57 @@ def build_ai_mode(ai_advice: dict[str, Any], dqs: dict[str, Any]) -> dict[str, A
         mode = "RULE_ENHANCED"
     return {
         "mode": mode,
-        "provider": ai_advice.get("actual_provider", "rule_only"),
+        "provider": ai_advice.get("actual_provider", "stone_rule_engine"),
+        "openai_participated": ai_advice.get("ai_status") == "available",
         "fallback_reason": ai_advice.get("fallback_reason", ""),
         "retry_count": ai_advice.get("retry_count", 0),
         "impact": "AI仅解释，不覆盖DQS、资金预算和风控硬门槛。",
-        "summary": ai_advice.get("summary", "AI不可用，使用规则增强模式。"),
+        "summary": ai_advice.get("summary", "Stone CIO规则引擎已完成分析。"),
+        "most_important_risk": ai_advice.get("most_important_risk", "以规则引擎识别的首要风险为准。"),
+        "best_action_today": ai_advice.get("best_action_today", "服从DQS、现金安全线与资金来源约束。"),
+        "avoid_action_today": ai_advice.get("avoid_action_today", "不绕过硬风控进行交易。"),
+        "one_sentence": ai_advice.get("one_sentence", "规则引擎已完成今日复核。"),
     }
+
+
+def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
+    """用统一决策对象生成完整规则分析，OpenAI缺席时也不留空白。"""
+    ai = dict(decision.get("ai", {}) or {})
+    if ai.get("openai_participated"):
+        return ai
+
+    allocation = decision.get("allocation", []) or []
+    underweight = min(allocation, key=lambda row: row.get("deviation_ratio", 0), default={})
+    overweight = max(allocation, key=lambda row: row.get("deviation_ratio", 0), default={})
+    budget = decision.get("budget", {}) or {}
+    dqs = decision.get("dqs", {}) or {}
+    risk = decision.get("risk", {}) or {}
+    trade_text = "执行已通过风控的计划" if decision.get("today_trade") else "今日不交易"
+    investable_cash = float(budget.get("investable_cash_yuan", 0) or 0)
+
+    ai.update(
+        {
+            "provider": "Stone CIO规则引擎",
+            "summary": (
+                f"组合总资产约{decision.get('portfolio_value_wan', 0):.2f}万元；"
+                f"{underweight.get('category', '低配资产')}为{underweight.get('status', '待复核')}，"
+                f"{overweight.get('category', '超配资产')}为{overweight.get('status', '待复核')}。"
+                f"当前DQS={dqs.get('score')}、风险评分={risk.get('score')}，规则结论为{trade_text}。"
+            ),
+            "most_important_risk": decision.get("max_risk", "暂无可靠风险结论"),
+            "best_action_today": (
+                f"{trade_text}；可投资现金为{investable_cash:,.0f}元。"
+                f"下一复核日为{decision.get('next_review_date')}，只在DQS、资金到账和事件纪律同时满足后执行。"
+            ),
+            "avoid_action_today": (
+                f"不要使用现金安全线以内资金；不要向{overweight.get('category', '超配资产')}追加常规资金；"
+                "不要把未到账债券资金或模拟网格资金当作真实可用现金。"
+            ),
+            "one_sentence": decision.get("one_sentence", "规则引擎已完成今日复核。"),
+            "impact": "OpenAI是可选解释层；本次由规则引擎完成全部核心分析，DQS、预算和风控结论不受影响。",
+        }
+    )
+    return ai
 
 
 def apply_dqs_to_opportunity(opportunity: list[dict[str, Any]], dqs: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1043,6 +1088,7 @@ def build_v12_1_decision(
         decision["budget"]["today_total_yuan"] = 0
         decision["no_trade_reasons"] = ["数据对账失败，今日不操作"] + decision.get("no_trade_reasons", [])
         decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
+    decision["ai"] = build_rule_enhanced_analysis(decision)
     write_log(f"V12.5 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
     return decision
 
@@ -1071,7 +1117,7 @@ def build_system_audit_text(context: dict[str, Any], decision: dict[str, Any]) -
         f"- 美股/A股/港股/黄金显示0.00：旧市场摘要使用 `market_data.csv` 默认变化值，缺失行情没有区分失败和真实0；V12.5继续保持“暂无可靠数据/请求失败/缓存”表达。",
         f"- 双源验证覆盖率：旧路由拿到第一个成功源就返回，导致候选源不足；V12.5按候选源和Source Audit区分覆盖率。",
         f"- 一级来源覆盖率：取决于本次实际成功来源，不再把配置占位算作成功。",
-        f"- AI状态：{decision['ai']['mode']}，原因：{decision['ai'].get('fallback_reason') or 'OpenAI可用性和DQS共同决定'}。",
+        f"- 分析状态：{decision['ai']['mode']}，来源：{decision['ai'].get('provider')}；OpenAI仅为可选解释层。",
         f"- 本周0元、本月金额、债券转权益冲突：旧逻辑把现金预算和未到账债券资金混用；V12.5拆成账户总现金、可投资现金和条件性债券到账计划。",
         f"- 基础定投无金额：V12.5在资金计划中明确计划日、金额、资金来源和不执行原因。",
         f"- 风险评分明细：旧评分来自 MarketAgent 汇总值 {market_result.get('market_risk_score', '暂无')}；V12.5继续输出八项风险分解。",
