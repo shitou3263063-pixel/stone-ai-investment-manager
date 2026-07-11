@@ -5,6 +5,7 @@ policy:
   tier1_coverage_min: 0.80
   critical_metric_coverage_min: 0.85
   low_coverage_dqs_cap: 69
+  verification_warning_dqs_cap: 84
   key_metric_double_source:
     - price
     - vix

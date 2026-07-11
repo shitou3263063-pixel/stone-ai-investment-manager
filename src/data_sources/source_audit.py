@@ -35,8 +35,7 @@ def _source_tier(source: str | None, registry: dict[str, Any]) -> int | None:
 
 
 def _is_registered(source: str | None, registry: dict[str, Any]) -> bool:
-    key = _source_key(source)
-    return key in (registry.get("sources", {}) or {})
+    return _source_key(source) in (registry.get("sources", {}) or {})
 
 
 def _is_tier1(source: str | None, registry: dict[str, Any]) -> bool:
@@ -77,7 +76,7 @@ def _is_stale(fetched_at: str | None, freshness_limit: str | int | float | None,
 
 
 def choose_preferred_source(candidates: list[dict[str, Any]], registry: dict[str, Any]) -> dict[str, Any]:
-    """Pick the most authoritative candidate; official tier-1 beats media/aggregators."""
+    """优先选择更权威的来源：官方一级源优先于媒体和聚合平台。"""
 
     valid = [item for item in candidates if item.get("status", "ok") == "ok"]
     if not valid:
@@ -98,7 +97,7 @@ def detect_data_conflict(
     registry: dict[str, Any],
     tolerance_pct: float = 1.0,
 ) -> dict[str, Any] | None:
-    values = []
+    values: list[tuple[float, dict[str, Any]]] = []
     for item in candidates:
         if item.get("status", "ok") != "ok":
             continue
@@ -163,33 +162,55 @@ def _source_summary(metric: str, item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _audit_failure(message: str) -> dict[str, Any]:
+    return {
+        "scan_status": "failed",
+        "scan_complete": False,
+        "message": message,
+        "planned_sources": [],
+        "successful_sources": [],
+        "failed_sources": [],
+        "stale_sources": [],
+        "tier1_coverage": 0.0,
+        "critical_metric_coverage": 0.0,
+        "data_source_coverage": 0.0,
+        "usable_metric_coverage": 0.0,
+        "dual_source_coverage": 0.0,
+        "data_conflicts": [],
+        "unregistered_sources": [],
+        "missing_double_source": [],
+        "evidence_groups": [],
+        "trade_evidence_ready": False,
+        "metric_audit": [],
+        "response_summaries": [],
+        "blocking_errors": ["全球权威数据扫描未完成"],
+        "verification_warnings": [],
+        "dqs_cap": 69,
+        "precision_allowed": False,
+        "source_coverage_summary": "全球权威数据扫描未完成，禁止精确金额建议。",
+    }
+
+
 def build_source_audit(
     market: dict[str, Any],
     registry: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    """生成来源审计，并区分“数据可用覆盖率”和“双源验证覆盖率”。
+
+    数据源覆盖率回答：关键指标是否有已登记、未过期、带数值的数据。
+    双源验证覆盖率回答：关键指标是否至少有两个独立来源互相校验。
+    两者分开后，系统不会再把“单源但可用”误判成“关键指标覆盖率 0%”。
+    """
+
     now = now or datetime.now()
     try:
         registry = registry or load_source_registry()
     except Exception as exc:  # noqa: BLE001 - audit failure must degrade safely
-        return {
-            "scan_status": "failed",
-            "scan_complete": False,
-            "message": f"全球权威数据扫描失败：{exc}",
-            "planned_sources": [],
-            "successful_sources": [],
-            "failed_sources": [],
-            "stale_sources": [],
-            "tier1_coverage": 0.0,
-            "critical_metric_coverage": 0.0,
-            "data_conflicts": [],
-            "blocking_errors": ["全球权威数据扫描未完成"],
-            "dqs_cap": 69,
-            "precision_allowed": False,
-            "source_coverage_summary": "全球权威数据扫描未完成，禁止精确金额建议。",
-        }
+        return _audit_failure(f"全球权威数据扫描失败：{exc}")
 
     critical_metrics = registry.get("critical_metrics", {}) or {}
+    policy = registry.get("policy", {}) or {}
     planned_sources: list[dict[str, Any]] = []
     successful_sources: list[dict[str, Any]] = []
     failed_sources: list[dict[str, Any]] = []
@@ -199,7 +220,6 @@ def build_source_audit(
     data_conflicts: list[dict[str, Any]] = []
     metric_audit: list[dict[str, Any]] = []
     response_summaries: list[dict[str, Any]] = []
-    evidence_groups: set[str] = set()
 
     for metric, spec in critical_metrics.items():
         item = _metric_item(metric, market)
@@ -210,24 +230,30 @@ def build_source_audit(
             preferred = choose_preferred_source(candidates, registry)
             if preferred:
                 item = {**item, **preferred}
+
         plan = _source_plan(metric, spec)
         planned_sources.append({"metric": metric, "sources": plan})
         response_summaries.append(_source_summary(metric, item))
 
-        successes = []
+        successes: list[str] = []
         for candidate in candidates:
             successes.extend(_success_sources(candidate))
         successes = list(dict.fromkeys(successes))
+
         if successes:
             for source in successes:
                 row = {"metric": metric, "source": source, "fetched_at": item.get("fetched_at") or item.get("date")}
                 successful_sources.append(row)
                 if not _is_registered(source, registry):
                     unregistered_sources.append(row)
-                elif _is_tier1(source, registry):
-                    evidence_groups.add(str(spec.get("evidence_group", "")))
         else:
-            failed_sources.append({"metric": metric, "planned_sources": plan, "error": item.get("error") or item.get("warning") or "missing"})
+            failed_sources.append(
+                {
+                    "metric": metric,
+                    "planned_sources": plan,
+                    "error": item.get("error") or item.get("warning") or "missing",
+                }
+            )
 
         stale = bool(item.get("cache_stale", False)) or _is_stale(
             item.get("published_at") or item.get("date") or item.get("fetched_at"),
@@ -235,68 +261,97 @@ def build_source_audit(
             now,
         )
         if successes and stale:
-            stale_sources.append({"metric": metric, "source": successes[0], "fetched_at": item.get("fetched_at") or item.get("date")})
+            stale_sources.append(
+                {
+                    "metric": metric,
+                    "source": successes[0],
+                    "fetched_at": item.get("fetched_at") or item.get("date"),
+                }
+            )
 
-        if str(spec.get("verification_requirement", "")).lower() == "dual_source" and len(set(map(_source_key, successes))) < 2:
+        source_count = len(set(map(_source_key, successes)))
+        if str(spec.get("verification_requirement", "")).lower() == "dual_source" and source_count < 2:
             missing_double_source.append(metric)
 
+        selected_source = item.get("source") or (successes[0] if successes else None)
         metric_audit.append(
             {
                 "metric": metric,
                 "category": spec.get("category"),
                 "metric_type": spec.get("metric_type"),
+                "evidence_group": spec.get("evidence_group"),
                 "source": item.get("source", "unavailable"),
                 "published_at": item.get("published_at") or item.get("date"),
                 "retrieved_at": item.get("retrieved_at"),
                 "freshness_status": item.get("freshness_status", "stale" if stale else "fresh"),
                 "fetched_at": item.get("fetched_at") or item.get("date"),
                 "registered": all(_is_registered(source, registry) for source in successes) if successes else False,
-                "tier": _source_tier(successes[0], registry) if successes else None,
+                "tier": _source_tier(selected_source, registry),
                 "stale": stale,
-                "double_source_verified": len(set(map(_source_key, successes))) >= 2,
+                "double_source_verified": source_count >= 2,
                 "value": item.get("close", item.get("value")),
             }
         )
 
     planned_count = len(critical_metrics) or 1
-    tier1_success_count = sum(1 for row in successful_sources if _is_tier1(row.get("source"), registry))
-    usable_critical_count = sum(
-        1
+    usable_metrics = [
+        row
         for row in metric_audit
-        if row["registered"] and not row["stale"] and row["value"] is not None and row["metric"] not in missing_double_source
-    )
-    tier1_coverage = tier1_success_count / planned_count
-    critical_metric_coverage = usable_critical_count / planned_count
+        if row["registered"] and not row["stale"] and row["value"] is not None
+    ]
+    usable_metric_coverage = len(usable_metrics) / planned_count
+    critical_metric_coverage = usable_metric_coverage
+    data_source_coverage = usable_metric_coverage
+    dual_source_coverage = sum(1 for row in usable_metrics if row["double_source_verified"]) / planned_count
+    tier1_coverage = sum(1 for row in usable_metrics if _is_tier1(row.get("source"), registry)) / planned_count
+    evidence_groups = {str(row.get("evidence_group")) for row in usable_metrics if row.get("evidence_group")}
 
     blocking_errors: list[str] = []
+    verification_warnings: list[str] = []
+
     if unregistered_sources:
         blocking_errors.append("存在未登记来源，禁止形成交易结论")
-    if missing_double_source:
-        blocking_errors.append("关键数据未完成双源验证")
 
-    low_coverage = (
-        tier1_coverage < float((registry.get("policy", {}) or {}).get("tier1_coverage_min", 0.8))
-        or critical_metric_coverage < float((registry.get("policy", {}) or {}).get("critical_metric_coverage_min", 0.85))
-    )
-    dqs_cap = int((registry.get("policy", {}) or {}).get("low_coverage_dqs_cap", 69)) if low_coverage else 100
+    low_coverage = critical_metric_coverage < float(policy.get("critical_metric_coverage_min", 0.85))
     if low_coverage:
         blocking_errors.append("数据覆盖不足")
 
-    required_groups = set(((registry.get("policy", {}) or {}).get("trade_candidate_evidence", {}) or {}).get("required_groups", []))
+    required_groups = set((policy.get("trade_candidate_evidence", {}) or {}).get("required_groups", []))
     evidence_ready = required_groups.issubset(evidence_groups)
     if not evidence_ready:
         blocking_errors.append("交易候选缺少三类独立证据")
 
+    tier1_low = tier1_coverage < float(policy.get("tier1_coverage_min", 0.80))
+    if tier1_low:
+        verification_warnings.append("一级来源覆盖率不足，禁止精确金额建议")
+    if missing_double_source:
+        verification_warnings.append("关键数据未完成双源验证，禁止精确金额建议")
+
+    hard_cap = int(policy.get("low_coverage_dqs_cap", 69))
+    soft_cap = int(policy.get("verification_warning_dqs_cap", 84))
+    if blocking_errors:
+        dqs_cap = hard_cap
+        message = "数据覆盖不足"
+    elif verification_warnings:
+        dqs_cap = soft_cap
+        message = "数据可用但验证不足"
+    else:
+        dqs_cap = 100
+        message = "全球权威数据扫描完成"
+
     audit = {
         "scan_status": "complete",
         "scan_complete": True,
-        "message": "全球权威数据扫描完成" if not low_coverage else "数据覆盖不足",
+        "message": message,
         "planned_sources": planned_sources,
         "successful_sources": successful_sources,
         "failed_sources": failed_sources,
         "stale_sources": stale_sources,
         "tier1_coverage": round(tier1_coverage, 4),
         "critical_metric_coverage": round(critical_metric_coverage, 4),
+        "data_source_coverage": round(data_source_coverage, 4),
+        "usable_metric_coverage": round(usable_metric_coverage, 4),
+        "dual_source_coverage": round(dual_source_coverage, 4),
         "data_conflicts": data_conflicts,
         "unregistered_sources": unregistered_sources,
         "missing_double_source": missing_double_source,
@@ -305,11 +360,17 @@ def build_source_audit(
         "metric_audit": metric_audit,
         "response_summaries": response_summaries,
         "blocking_errors": list(dict.fromkeys(blocking_errors)),
+        "verification_warnings": list(dict.fromkeys(verification_warnings)),
         "dqs_cap": dqs_cap,
-        "precision_allowed": dqs_cap >= 85 and not blocking_errors,
+        "precision_allowed": dqs_cap >= 85 and not blocking_errors and not verification_warnings,
         "source_coverage_summary": (
-            f"一级来源覆盖率{tier1_coverage:.0%}，关键指标覆盖率{critical_metric_coverage:.0%}；"
-            + ("数据覆盖不足，禁止精确金额建议。" if low_coverage else "覆盖率达标。")
+            f"数据源覆盖率{data_source_coverage:.0%}，双源验证率{dual_source_coverage:.0%}，"
+            f"一级来源覆盖率{tier1_coverage:.0%}；"
+            + (
+                "数据覆盖不足，禁止交易建议。"
+                if blocking_errors
+                else ("验证不足，只允许方向或金额上限。" if verification_warnings else "覆盖率和验证均达标。")
+            )
         ),
     }
     return audit
@@ -326,19 +387,28 @@ def apply_source_audit_to_market(market: dict[str, Any], audit: dict[str, Any]) 
         "scan_complete": audit.get("scan_complete"),
         "tier1_coverage": audit.get("tier1_coverage", 0.0),
         "critical_metric_coverage": audit.get("critical_metric_coverage", 0.0),
+        "data_source_coverage": audit.get("data_source_coverage", audit.get("critical_metric_coverage", 0.0)),
+        "usable_metric_coverage": audit.get("usable_metric_coverage", audit.get("critical_metric_coverage", 0.0)),
+        "dual_source_coverage": audit.get("dual_source_coverage", 0.0),
         "source_coverage_summary": audit.get("source_coverage_summary", ""),
         "precision_allowed": audit.get("precision_allowed", False),
         "trade_evidence_ready": audit.get("trade_evidence_ready", False),
+        "verification_warnings": audit.get("verification_warnings", []),
+        "metric_audit": audit.get("metric_audit", []),
     }
+
     warnings = list(quality.get("warnings", []) or [])
     if audit.get("source_coverage_summary"):
         warnings.append(str(audit["source_coverage_summary"]))
+    warnings.extend(audit.get("verification_warnings", []) or [])
     quality["warnings"] = list(dict.fromkeys(warnings))
+
     blocking_errors = list(quality.get("blocking_errors", []) or [])
     blocking_errors.extend(audit.get("blocking_errors", []) or [])
     quality["blocking_errors"] = list(dict.fromkeys(blocking_errors))
     if audit.get("blocking_errors"):
         quality["critical_missing"] = True
+
     adjusted["data_quality"] = quality
     adjusted["source_audit"] = audit
     return adjusted

@@ -17,6 +17,7 @@ def _registry() -> dict:
             "tier1_coverage_min": 0.80,
             "critical_metric_coverage_min": 0.85,
             "low_coverage_dqs_cap": 69,
+            "verification_warning_dqs_cap": 84,
             "trade_candidate_evidence": {
                 "required_groups": [
                     "market_valuation",
@@ -59,6 +60,21 @@ def _registry() -> dict:
     }
 
 
+def _market_with_single_sources(now: datetime) -> dict:
+    return {
+        "items": {
+            "VOO": {"status": "ok", "source": "alpha_vantage", "close": 500, "fetched_at": now.isoformat()},
+            "^VIX": {"status": "ok", "source": "cboe_official", "close": 16, "fetched_at": now.isoformat()},
+        },
+        "macro": {
+            "items": {
+                "DGS10": {"status": "ok", "source": "fred", "value": 4.1, "fetched_at": now.isoformat()},
+            }
+        },
+        "data_quality": {"score": 92, "blocking_errors": []},
+    }
+
+
 class SourceAuditTest(unittest.TestCase):
     def test_official_source_wins_when_media_conflicts(self) -> None:
         now = datetime(2026, 7, 11, 8, 0, 0)
@@ -89,7 +105,21 @@ class SourceAuditTest(unittest.TestCase):
         audit = build_source_audit(market, _registry(), now=now)
         self.assertEqual(audit["data_conflicts"][0]["preferred_source"], "fred")
 
-    def test_single_non_official_key_source_blocks_precise_trade(self) -> None:
+    def test_usable_coverage_is_separate_from_dual_source_coverage(self) -> None:
+        now = datetime(2026, 7, 11, 8, 0, 0)
+        market = _market_with_single_sources(now)
+        audit = build_source_audit(market, _registry(), now=now)
+        adjusted = apply_source_audit_to_market(market, audit)
+
+        self.assertEqual(audit["data_source_coverage"], 1.0)
+        self.assertEqual(audit["critical_metric_coverage"], 1.0)
+        self.assertEqual(audit["dual_source_coverage"], 0.0)
+        self.assertEqual(audit["dqs_cap"], 84)
+        self.assertFalse(audit["precision_allowed"])
+        self.assertFalse(adjusted["data_quality"]["blocking_errors"])
+        self.assertEqual(adjusted["data_quality"]["score"], 84)
+
+    def test_single_key_source_with_missing_other_evidence_blocks_trade(self) -> None:
         now = datetime(2026, 7, 11, 8, 0, 0)
         market = {
             "items": {
@@ -102,7 +132,7 @@ class SourceAuditTest(unittest.TestCase):
         adjusted = apply_source_audit_to_market(market, audit)
         self.assertFalse(audit["precision_allowed"])
         self.assertLessEqual(adjusted["data_quality"]["score"], 69)
-        self.assertIn("关键数据未完成双源验证", adjusted["data_quality"]["blocking_errors"])
+        self.assertIn("数据覆盖不足", adjusted["data_quality"]["blocking_errors"])
 
     def test_stale_source_reduces_dqs(self) -> None:
         now = datetime(2026, 7, 11, 8, 0, 0)

@@ -304,7 +304,7 @@ def check_data_source_connection_status(snapshot: dict[str, Any] | None = None) 
     }
 
 
-def check_source_audit_status(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+def _legacy_check_source_audit_status(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     snapshot = snapshot or {}
     audit = snapshot.get("source_audit", {}) or {}
     if not audit:
@@ -328,6 +328,48 @@ def check_source_audit_status(snapshot: dict[str, Any] | None = None) -> dict[st
             if ok
             else "数据覆盖不足：一级来源覆盖率低于80%或关键指标覆盖率低于85%，禁止精确金额建议。"
         ),
+    }
+
+
+def check_source_audit_status(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    snapshot = snapshot or {}
+    audit = snapshot.get("source_audit", {}) or {}
+    if not audit:
+        return {
+            "name": "source_audit",
+            "status": "WARN",
+            "message": "尚未生成 source_audit.json；不得声称全球权威数据扫描完成。",
+        }
+
+    scan_complete = bool(audit.get("scan_complete"))
+    tier1_coverage = float(audit.get("tier1_coverage", 0.0) or 0.0)
+    critical_coverage = float(audit.get("critical_metric_coverage", 0.0) or 0.0)
+    data_source_coverage = float(audit.get("data_source_coverage", critical_coverage) or 0.0)
+    dual_source_coverage = float(audit.get("dual_source_coverage", 0.0) or 0.0)
+    blocking_errors = list(audit.get("blocking_errors", []) or [])
+    verification_warnings = list(audit.get("verification_warnings", []) or [])
+
+    ok = scan_complete and data_source_coverage >= 0.85 and not blocking_errors and not verification_warnings
+    if blocking_errors:
+        message = "数据源覆盖不足或存在硬错误，禁止交易建议。"
+    elif verification_warnings:
+        message = "数据源覆盖可用，但双源/一级源验证不足，禁止精确金额建议。"
+    elif not scan_complete:
+        message = "全球权威数据扫描未完成，不得声称扫描完成。"
+    else:
+        message = "全球权威数据扫描覆盖率和验证均达标。"
+
+    return {
+        "name": "source_audit",
+        "status": "OK" if ok else "WARN",
+        "scan_complete": scan_complete,
+        "tier1_coverage": tier1_coverage,
+        "critical_metric_coverage": critical_coverage,
+        "data_source_coverage": data_source_coverage,
+        "dual_source_coverage": dual_source_coverage,
+        "blocking_errors": blocking_errors,
+        "verification_warnings": verification_warnings,
+        "message": message,
     }
 
 
