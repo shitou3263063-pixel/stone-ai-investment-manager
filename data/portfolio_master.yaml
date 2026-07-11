@@ -1,3 +1,5 @@
+config_version: V12.5_STABLE
+data_role: production_portfolio_authority
 schema_version: 2
 as_of: 2026-07-11
 currency: CNY

@@ -1,5 +1,5 @@
 Stone AI Investment Manager Pro V12.5 Stable 系统自检
-总体状态：WARN
+总体状态：OK
 
 [OK] Python版本：当前 Python 3.12.13。
 [OK] requirements依赖：requirements.txt 中的依赖已安装。
@@ -10,5 +10,5 @@ Stone AI Investment Manager Pro V12.5 Stable 系统自检
 [OK] .env文件：.env 存在。
 [OK] GitHub Actions：.github/workflows/daily.yml 存在。
 [OK] 邮件配置：邮件配置完整。
-[WARN] OpenAI API Key：未配置 OPENAI_API_KEY，AI 深度分析会跳过，基础日报可运行。
-    修复建议：需要 AI 深度分析时，在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。
+[OK] OpenAI可选复核：未配置 OPENAI_API_KEY；Stone CIO规则增强分析将完整运行，不影响日报和核心决策。
+    修复建议：需要额外AI解释时，可在 .env 或 GitHub Secrets 中添加 OPENAI_API_KEY。

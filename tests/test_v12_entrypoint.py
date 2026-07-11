@@ -15,8 +15,11 @@ class EntrypointTest(unittest.TestCase):
     def test_legacy_entrypoints_are_archived(self) -> None:
         self.assertFalse((PROJECT_ROOT / "src" / "main.py").exists())
         self.assertFalse((PROJECT_ROOT / "run.py").exists())
-        self.assertTrue((PROJECT_ROOT / "archive" / "src_main_legacy.py").exists())
-        self.assertTrue((PROJECT_ROOT / "archive" / "run_legacy.py").exists())
+        legacy = PROJECT_ROOT / "archive" / "legacy_entrypoints"
+        self.assertTrue((legacy / "src_main_deprecated.py").exists())
+        self.assertTrue((legacy / "run_deprecated.py").exists())
+        self.assertIn("禁止生产运行", (legacy / "src_main_deprecated.py").read_text(encoding="utf-8"))
+        self.assertIn("禁止生产运行", (legacy / "run_deprecated.py").read_text(encoding="utf-8"))
 
     def test_workflow_uses_root_main_and_pytest(self) -> None:
         workflow = (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")

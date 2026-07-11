@@ -16,6 +16,22 @@ python main.py
 
 根目录 `main.py` 只负责启动系统，核心业务逻辑在 `src/app.py` 和 `src/` 下的业务模块中。历史入口已经移动到 `archive/`，不再被正式流程调用。
 
+禁止生产运行：`archive/legacy_entrypoints/run_deprecated.py` 和 `archive/legacy_entrypoints/src_main_deprecated.py`。这些文件只用于历史追溯。
+
+## 生产配置权威来源
+
+生产配置统一标记为 `config_version: V12.5_STABLE`。每类数据只有一个权威来源：
+
+| 数据 | 权威来源 | 说明 |
+| -- | -- | -- |
+| 用户持仓、六大类资产金额、现金事实 | `data/portfolio_master.yaml` | 最高优先级资产事实；`portfolio.csv`仅为兼容读取镜像 |
+| 目标配置、现金安全线、DQS、风险阈值、定投与债券迁移上限 | `config/strategy.yaml` | Stone CIO最终决策唯一策略配置 |
+| 网格模拟账户与网格风控 | `config/smart_grid.yaml` | 默认SIMULATION，`auto_trade`必须为`false` |
+| 数据源优先级与验证要求 | `config/source_registry.yaml` | 未登记来源不得形成交易结论 |
+| 宏观事件和旧代理兼容输入 | `config/settings.yaml`、`data/config.yaml` | 兼容输入，不得覆盖上述权威配置 |
+
+目标配置冻结为：美股30%、港股12%、A股10%、债券25%、黄金15%、现金8%。修改持仓时只维护`portfolio_master.yaml`，不要在Python代码中改数字。
+
 ## 每天自动运行
 
 GitHub Actions 文件：
@@ -266,7 +282,7 @@ smart_grid:
 - 本地缓存：`data/cache/`。
 - 手工资产台账：`data/portfolio.csv` 和 `data/portfolio_master.yaml`。
 
-## Secrets
+## 环境变量与Secrets
 
 邮件必需：
 
@@ -286,6 +302,25 @@ FRED_API_KEY
 ALPHA_VANTAGE_API_KEY
 FINNHUB_API_KEY
 ```
+
+OpenAI是可选解释层。未配置、额度不足或请求失败时，Stone CIO规则增强分析仍会完整生成，不影响DQS、资金预算、风控和邮件日报。
+
+## 分支与版本冻结
+
+- `main`：GitHub Actions当前生产部署分支，与冻结版本保持一致。
+- `stable/v12.5`：V12.5稳定基线，只允许严重Bug、数据源接口失效和必要运行环境修复。
+- `develop/v13`：未来功能的隔离开发起点，本次不实现任何V13功能。
+- `feature/*`：单项功能分支，必须经过测试、日报生成、一致性验证、V12.5结果对比和人工确认后才能合并。
+
+未经人工确认，不得把新功能合并到`stable/v12.5`。版本标签为`v12.5-stable`。
+
+## 错误恢复
+
+1. 先运行`pytest`和`python main.py`确认错误可复现。
+2. 检查`reports/system_check_report.md`、`reports/validation_report.md`和`logs/stone_ai.log`。
+3. 配置或数据错误时，按`CONFIG_GUIDE.md`修复，不要修改策略代码。
+4. 严重代码故障时，可从`v12.5-stable`标签或`stable/v12.5`分支恢复，经测试后再部署。
+5. 邮件或OpenAI失败不会阻止报告保存；先从GitHub Actions Artifact下载`reports/`和`logs/`排查。
 
 ## 上传到 GitHub
 

@@ -1,3 +1,5 @@
+config_version: V12.5_STABLE
+config_role: production_strategy_authority
 version: V12.5 Stable
 
 target_allocation:

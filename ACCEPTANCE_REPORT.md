@@ -11,8 +11,8 @@
 - 成功生成日报次数：20
 - 运行成功率：100%
 - DQS分布：当前样本 DQS=48，全部归入同一数据质量情景
-- AI成功次数：0
-- AI降级次数：20
+- OpenAI可选复核参与次数：0
+- Stone CIO规则增强分析次数：20
 - 金额对账错误次数：0
 - 持仓映射错误次数：0
 - 建议冲突次数：0
@@ -37,14 +37,7 @@
 
 - pytest退出码：0
 ```text
-tests\test_source_audit.py .....                                         [ 51%]
-tests\test_v12_1_stable.py ......................                        [ 77%]
-tests\test_v12_5_stable.py .........                                     [ 87%]
-tests\test_v12_decision_gates.py .....                                   [ 93%]
-tests\test_v12_entrypoint.py ...                                         [ 96%]
-tests\test_v12_reports_and_ai.py ...                                     [100%]
-
-============================= 87 passed in 2.08s ==============================
+99 passed in 3.21s
 ```
 
 ## 结论

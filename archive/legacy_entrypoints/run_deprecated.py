@@ -1,3 +1,5 @@
+"""禁止生产运行：V12.5 Stable 之前的 run.py 入口，仅供历史追溯。"""
+
 from __future__ import annotations
 
 from pathlib import Path
