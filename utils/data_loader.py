@@ -7,63 +7,64 @@ from typing import Any
 from src.portfolio import load_portfolio as _load_portfolio
 
 
-def _to_number_or_text(value: str) -> Any:
-    """把配置里的文本转成布尔值、数字或普通字符串。"""
-
-    value = value.strip()
-    if value == "":
+def _to_number_or_text(value: Any) -> Any:
+    text = str(value or "").strip()
+    if text == "":
         return ""
-    if value.lower() == "true":
+    if text.lower() in {"null", "none", "~"}:
+        return None
+    if text.lower() == "true":
         return True
-    if value.lower() == "false":
+    if text.lower() == "false":
         return False
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
     try:
-        if "." in value:
-            return float(value)
-        return int(value)
+        if "." in text:
+            return float(text)
+        return int(text)
     except ValueError:
-        return value
+        return text
 
 
 def _load_yaml_without_dependency(path: Path) -> dict[str, Any]:
-    """简易 YAML 读取器。
+    """Minimal YAML reader used only when PyYAML is unavailable.
 
-    本项目的 config.yaml 只有两层字典，用这个函数即可运行。
-    如果安装了 PyYAML，系统会优先使用 PyYAML。
+    It supports the subset this project uses: nested dictionaries with
+    `key: value` lines. Lists are ignored because they are not needed for
+    portfolio totals or hard data-quality gates.
     """
 
     result: dict[str, Any] = {}
-    current_section: str | None = None
+    stack: list[tuple[int, dict[str, Any]]] = [(-1, result)]
 
     for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
         line = raw_line.split("#", 1)[0].rstrip()
-        if not line.strip():
+        if not line.strip() or line.lstrip().startswith("- ") or ":" not in line:
             continue
 
-        if not raw_line.startswith(" "):
-            key, _, value = line.partition(":")
-            key = key.strip()
-            value = value.strip()
-            if value == "":
-                result[key] = {}
-                current_section = key
-            else:
-                result[key] = _to_number_or_text(value)
-                current_section = None
-            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        key, value = line.strip().split(":", 1)
+        key = key.strip().strip('"').strip("'")
+        value = value.strip()
 
-        if current_section is None:
-            continue
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1] if stack else result
 
-        key, _, value = line.strip().partition(":")
-        result[current_section][key.strip()] = _to_number_or_text(value)
+        if value == "":
+            child: dict[str, Any] = {}
+            parent[key] = child
+            stack.append((indent, child))
+        else:
+            parent[key] = _to_number_or_text(value)
 
     return result
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
-    """读取系统配置。"""
-
     config_path = Path(path)
     try:
         import yaml  # type: ignore
@@ -75,7 +76,6 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 
 def load_portfolio(path: str | Path) -> list[dict[str, Any]]:
-    """读取持仓 CSV。金额单位为万元。"""
     portfolio_path = Path(path)
     master_path = portfolio_path.with_name("portfolio_master.yaml")
     if master_path.exists():
@@ -84,19 +84,20 @@ def load_portfolio(path: str | Path) -> list[dict[str, Any]]:
 
 
 def _load_portfolio_master(path: Path) -> list[dict[str, Any]]:
-    """优先读取 portfolio_master.yaml，避免旧 CSV 和明细重复计算。"""
     try:
         import yaml  # type: ignore
 
         with path.open("r", encoding="utf-8") as file:
             master = yaml.safe_load(file) or {}
+    except ImportError:
+        master = _load_yaml_without_dependency(path)
     except Exception:
         return _load_portfolio(path.with_name("portfolio.csv"))
 
     totals = master.get("totals", {}) or {}
     labels = master.get("asset_class_labels", {}) or {}
-    rows = []
-    for key, label in [
+    rows: list[dict[str, Any]] = []
+    for key, fallback_label in [
         ("us_stock", "美股"),
         ("hk_stock", "港股"),
         ("cn_stock", "A股"),
@@ -105,7 +106,7 @@ def _load_portfolio_master(path: Path) -> list[dict[str, Any]]:
         ("cash", "现金"),
     ]:
         amount_cny = float(totals.get(key, 0) or 0)
-        category = str(labels.get(key, label))
+        category = str(labels.get(key, fallback_label) or fallback_label)
         rows.append(
             {
                 "category": category,
@@ -125,8 +126,6 @@ def _load_portfolio_master(path: Path) -> list[dict[str, Any]]:
 
 
 def load_market_data(path: str | Path) -> dict[str, dict[str, Any]]:
-    """读取手动维护的市场数据。"""
-
     market: dict[str, dict[str, Any]] = {}
     with Path(path).open("r", encoding="utf-8-sig", newline="") as file:
         for row in csv.DictReader(file):
@@ -146,6 +145,4 @@ def load_market_data(path: str | Path) -> dict[str, dict[str, Any]]:
 
 
 def project_root() -> Path:
-    """返回项目根目录。"""
-
     return Path(__file__).resolve().parents[1]
