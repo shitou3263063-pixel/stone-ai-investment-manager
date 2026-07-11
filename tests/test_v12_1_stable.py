@@ -175,7 +175,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         encoded = json.dumps(decision, ensure_ascii=False, default=str)
-        self.assertIn("Stone AI Investment Manager Pro V12.2 Smart Grid", encoded)
+        self.assertIn("Stone AI Investment Manager Pro V12.5 Stable", encoded)
 
     def test_report_fields_complete(self) -> None:
         decision = build_v12_1_decision(

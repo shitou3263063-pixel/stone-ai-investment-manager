@@ -1,10 +1,13 @@
-schema_version: 1
+schema_version: 2
 as_of: 2026-07-11
 currency: CNY
 source: user_confirmed
+
 notes:
-  - "portfolio_master.yaml 是最高优先级资产事实源。"
+  - "portfolio_master.yaml 是最高优先级资产事实来源。"
   - "10年地债约132200元已包含在中国债券中，不得重复计算。"
+  - "现金统一按用户最新确认的220000元处理。"
+  - "黄金分类总额547000元，等于实物金条512000元 + 黄金ETF 35000元。"
 
 totals:
   us_stock: 385000
@@ -23,58 +26,307 @@ asset_class_labels:
   gold: 黄金
   cash: 现金
 
-confirmed_quantities:
-  巨人网络:
-    symbol: "002558"
-    quantity: 1500
-    unit: 股
-    asset_class: cn_stock
-  "*ST闻泰":
-    symbol: ""
-    quantity: 500
-    unit: 股
-    asset_class: cn_stock
-  恒生医疗:
-    symbol: "513060"
-    quantity: 177600
-    unit: 份
-    asset_class: hk_stock
-  香港证券:
-    symbol: "513090"
-    quantity: 17000
-    unit: 份
-    asset_class: hk_stock
-  300ETF:
-    symbol: "510300"
-    quantity: 42900
-    unit: 份
-    asset_class: cn_stock
-  黄金ETF:
-    symbol: "518880"
-    quantity: 4000
-    unit: 份
-    asset_class: gold
-  10年地债:
-    symbol: ""
-    quantity: 1100
-    unit: 份
-    asset_class: china_bond
-    amount_cny_approx: 132200
-    included_in: 中国债券
-    duplicate_counting_allowed: false
-  南方恒生:
-    symbol: "03033"
-    quantity: 35200
-    unit: 份
-    asset_class: hk_stock
+cash_policy:
+  account_total_cash_cny: 220000
+  safety_reserve_ratio: 0.08
+  live_grid_cash_cny: 0
+  other_reserved_cash_cny: 0
+  unsettled_conditional_cash_cny: 0
+  note: "网格模拟现金不属于真实资产，不计入账户现金或可投资现金。"
 
-ledger_policy:
-  priority:
-    - portfolio_master.yaml
-    - broker_and_trade_records
-    - execution_state.json
-    - market_data
-    - codex_candidate_suggestions
-    - gmail_reports
-    - news_explanation
-  gmail_policy: "Gmail只作为报告和通知渠道，不得作为资产事实或成交事实的唯一来源。"
+holdings:
+  - asset_id: us_voo
+    asset_class: us_stock
+    security_name: VOO 标普500ETF
+    security_code: VOO
+    market: US
+    currency: CNY
+    quantity: 28
+    unit: share
+    market_value_cny: 130000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: core_etf
+
+  - asset_id: us_nvda
+    asset_class: us_stock
+    security_name: NVDA 英伟达
+    security_code: NVDA
+    market: US
+    currency: CNY
+    quantity: 51
+    unit: share
+    market_value_cny: 68000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: single_stock
+
+  - asset_id: us_goog
+    asset_class: us_stock
+    security_name: GOOG 谷歌-C
+    security_code: GOOG
+    market: US
+    currency: CNY
+    quantity: 9
+    unit: share
+    market_value_cny: 22000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: single_stock
+
+  - asset_id: us_tlt
+    asset_class: us_stock
+    security_name: TLT 美国长期国债ETF
+    security_code: TLT
+    market: US
+    currency: CNY
+    quantity: 95
+    unit: share
+    market_value_cny: 55000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: duration_bond_etf
+
+  - asset_id: us_ibkr
+    asset_class: us_stock
+    security_name: IBKR 盈透证券
+    security_code: IBKR
+    market: US
+    currency: CNY
+    quantity: 64
+    unit: share
+    market_value_cny: 40000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: single_stock
+
+  - asset_id: us_xlf
+    asset_class: us_stock
+    security_name: XLF 美国金融ETF
+    security_code: XLF
+    market: US
+    currency: CNY
+    quantity: 112
+    unit: share
+    market_value_cny: 42000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: sector_etf
+
+  - asset_id: us_baba
+    asset_class: us_stock
+    security_name: BABA 阿里巴巴
+    security_code: BABA
+    market: US
+    currency: CNY
+    quantity: 44
+    unit: share
+    market_value_cny: 28000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: IBKR
+    liquidity_status: liquid
+    strategy_bucket: single_stock
+
+  - asset_id: hk_03033
+    asset_class: hk_stock
+    security_name: 南方恒生科技ETF
+    security_code: "03033"
+    market: HK
+    currency: CNY
+    quantity: 35200
+    unit: unit
+    market_value_cny: 140400
+    data_source: user_confirmed_category_reconciled
+    valuation_time: 2026-07-11
+    confidence: medium
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: core_etf
+    pricing_proxy: 3067.HK
+
+  - asset_id: hk_513060
+    asset_class: hk_stock
+    security_name: 恒生医疗ETF
+    security_code: "513060"
+    market: CN
+    currency: CNY
+    quantity: 177600
+    unit: unit
+    market_value_cny: 99000
+    data_source: user_confirmed_category_reconciled
+    valuation_time: 2026-07-11
+    confidence: medium
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: thematic_etf
+
+  - asset_id: hk_513090
+    asset_class: hk_stock
+    security_name: 香港证券ETF
+    security_code: "513090"
+    market: CN
+    currency: CNY
+    quantity: 17000
+    unit: unit
+    market_value_cny: 33200
+    data_source: user_confirmed_category_reconciled
+    valuation_time: 2026-07-11
+    confidence: medium
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: thematic_etf
+
+  - asset_id: cn_510300
+    asset_class: cn_stock
+    security_name: 沪深300ETF
+    security_code: "510300"
+    market: CN
+    currency: CNY
+    quantity: 42900
+    unit: unit
+    market_value_cny: 206000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: core_etf
+    pricing_proxy: 510300.SS
+
+  - asset_id: cn_002558
+    asset_class: cn_stock
+    security_name: 巨人网络
+    security_code: "002558"
+    market: CN
+    currency: CNY
+    quantity: 1500
+    unit: share
+    market_value_cny: 41000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: single_stock
+    pricing_proxy: 002558.SZ
+
+  - asset_id: cn_st_wentai
+    asset_class: cn_stock
+    security_name: "*ST闻泰"
+    security_code: ""
+    market: CN
+    currency: CNY
+    quantity: 500
+    unit: share
+    market_value_cny: 19500
+    data_source: user_confirmed_category_reconciled
+    valuation_time: 2026-07-11
+    confidence: medium
+    account: securities_account
+    liquidity_status: restricted_watch
+    strategy_bucket: single_stock_high_risk
+
+  - asset_id: bond_cn_core
+    asset_class: china_bond
+    security_name: 中国债券组合（不含10年地债）
+    security_code: CN_BOND_CORE
+    market: CN
+    currency: CNY
+    quantity: null
+    unit: portfolio
+    market_value_cny: 997800
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: bond_account
+    liquidity_status: scheduled_liquidity
+    strategy_bucket: defensive_bond
+
+  - asset_id: bond_cn_10y_local
+    asset_class: china_bond
+    security_name: 10年地债
+    security_code: CN_LOCAL_BOND_10Y
+    market: CN
+    currency: CNY
+    quantity: 1100
+    unit: unit
+    market_value_cny: 132200
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: bond_account
+    liquidity_status: scheduled_liquidity
+    strategy_bucket: defensive_bond
+    included_in_total: 中国债券
+    duplicate_counting_allowed: false
+
+  - asset_id: gold_bar_565g
+    asset_class: gold
+    security_name: 实物金条
+    security_code: GOLD_BAR_565G
+    market: physical
+    currency: CNY
+    quantity: 565
+    unit: gram
+    market_value_cny: 512000
+    data_source: user_confirmed_manual_override
+    valuation_time: 2026-07-11
+    confidence: medium
+    account: physical_gold
+    liquidity_status: illiquid
+    strategy_bucket: defensive_gold
+    gold_price_cny_per_gram: 906.19
+    manual_override: true
+
+  - asset_id: gold_518880
+    asset_class: gold
+    security_name: 黄金ETF
+    security_code: "518880"
+    market: CN
+    currency: CNY
+    quantity: 4000
+    unit: unit
+    market_value_cny: 35000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: securities_account
+    liquidity_status: liquid
+    strategy_bucket: defensive_gold
+    pricing_proxy: 518880.SS
+
+  - asset_id: cash_total
+    asset_class: cash
+    security_name: 账户总现金
+    security_code: CASH_CNY
+    market: cash
+    currency: CNY
+    quantity: null
+    unit: cny
+    market_value_cny: 220000
+    data_source: user_confirmed
+    valuation_time: 2026-07-11
+    confidence: high
+    account: cash_accounts
+    liquidity_status: immediately_available
+    strategy_bucket: cash_reserve

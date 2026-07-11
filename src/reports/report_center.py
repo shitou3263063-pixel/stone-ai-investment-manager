@@ -88,12 +88,13 @@ def generate_today_action(decision: dict[str, Any]) -> str:
 
 def _money_plan_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 类型 | 是否执行 | 金额 | 标的 | 资金来源 | 原因 |",
-        "| -- | ---- | -: | -- | ---- | -- |",
+        "| budget_id | 类型 | 是否执行 | 金额 | 标的 | 资金来源 | 原因 |",
+        "| -- | -- | ---- | -: | -- | ---- | -- |",
     ]
     for item in decision.get("budget", {}).get("rows", []) or []:
         rows.append(
             "| "
+            f"{_text(item.get('budget_id'), '不适用')} | "
             f"{_text(item.get('type'))} | "
             f"{_yes_no(item.get('execute'))} | "
             f"{_yuan(item.get('amount_yuan', 0))} | "
@@ -132,16 +133,35 @@ def _migration_table(decision: dict[str, Any]) -> list[str]:
     return rows
 
 
+def _cash_table(decision: dict[str, Any]) -> list[str]:
+    budget = decision.get("budget", {}) or {}
+    rows = [
+        "| 现金口径 | 金额 | 说明 |",
+        "| -- | -: | -- |",
+        f"| 账户总现金 | {_yuan(budget.get('account_total_cash_yuan'))} | 用户确认的全部账户现金 |",
+        f"| 现金安全储备 | {_yuan(budget.get('cash_safety_reserve_yuan'))} | 目标配置中必须保留，不用于投资 |",
+        f"| 可投资现金 | {_yuan(budget.get('investable_cash_yuan'))} | 账户总现金扣除安全储备和占用资金后余额 |",
+        f"| 网格实盘专用现金 | {_yuan(budget.get('live_grid_cash_yuan'))} | 当前未启用真实网格交易 |",
+        f"| 网格模拟现金 | {_yuan(budget.get('paper_grid_cash_yuan'))} | 只用于SIMULATION，不计入真实资产 |",
+        f"| 条件性未到账资金 | {_yuan(budget.get('actual_bond_cash_arrived_yuan'))} | 未到账债券资金不得当作现金使用 |",
+    ]
+    return rows
+
+
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 标的 | 机会评分 | 当前持仓 | 组合适配 | 建议 | 原因 |",
-        "| -- | ---: | ---: | ---- | -- | -- |",
+        "| 标的 | 最终分 | 原始分 | 数据调整 | 当前持仓 | 组合适配 | 建议 | 分项得分 | 限制条件 | 原因 |",
+        "| -- | ---: | ---: | ---: | ---: | ---- | -- | -- | -- | -- |",
     ]
     for item in decision.get("opportunity", []) or []:
+        components = item.get("components", {}) or {}
+        component_text = "；".join(f"{key}{value}" for key, value in components.items()) or "暂无"
+        limitations = "；".join(item.get("limitations", []) or ["无"])
         rows.append(
             "| "
-            f"{item['name']} | {item['score']} | {_yuan(item['current_holding_yuan'])} | "
-            f"{item['portfolio_fit']} | {item['advice']} | {item['reason']} |"
+            f"{item['name']} | {item['score']} | {item.get('raw_score', item['score'])} | "
+            f"{item.get('data_quality_adjustment', 0)} | {_yuan(item['current_holding_yuan'])} | "
+            f"{item['portfolio_fit']} | {item['advice']} | {component_text} | {limitations} | {item['reason']} |"
         )
     return rows
 
@@ -254,7 +274,7 @@ def generate_daily_report(
     consistency = decision.get("consistency", {})
     ai = decision.get("ai", {})
     lines = [
-        "# Stone AI Investment Manager Pro V12.2 Smart Grid 日报",
+        "# Stone AI Investment Manager Pro V12.5 Stable 日报",
         "",
         "## 0. 报告状态",
         "",
@@ -266,27 +286,43 @@ def generate_daily_report(
         f"- DQS：{dqs.get('score')} / {dqs.get('mode_label')}",
         f"- 数据完整性结论：{dqs.get('conclusion')}",
         "",
-        "## 1. Stone CIO 今日决策",
+        "## 1. Stone CIO 今日决策卡",
         "",
-        f"1. 今日是否交易：{_yes_no(decision.get('today_trade'))}",
-        f"2. 今日交易类型：{decision.get('trade_type')}",
-        f"3. 今日建议金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
-        f"4. 建议标的及分配：{decision.get('targets')}",
-        f"5. 资金来源：{decision.get('funding_source')}",
-        f"6. 今日不操作的具体原因：{'；'.join(decision.get('no_trade_reasons', [])) or '不适用'}",
-        f"7. 下一触发条件：{'；'.join(decision.get('next_triggers', []))}",
-        f"8. 下一复核日期：{decision.get('next_review_date')}",
-        f"9. 最大风险：{decision.get('max_risk')}",
-        f"10. 最大机会：{decision.get('max_opportunity')}",
-        f"11. 一句话结论：{decision.get('one_sentence')}",
+        f"- 今日是否操作：{_yes_no(decision.get('today_trade'))}",
+        f"- 今日操作类型：{decision.get('trade_type')}",
+        f"- 今日操作金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
+        f"- 今日操作标的：{decision.get('targets')}",
+        f"- 资金来源：{decision.get('funding_source')}",
+        f"- 一句话结论：{decision.get('one_sentence')}",
+        "",
+        "### 今日不操作或操作的三个核心原因",
+        "",
+        _items((decision.get("no_trade_reasons") or [])[:3]),
+        "",
+        f"- 当前最大风险：{decision.get('max_risk')}",
+        f"- 当前最大机会：{decision.get('max_opportunity')}",
+        f"- 下一次复核日期：{decision.get('next_review_date')}",
+        "",
+        "### 下一触发条件",
+        "",
+        _items((decision.get("next_triggers") or [])[:3]),
+        "",
+        "### 三种情景预案",
+        "",
+        "- 市场平稳：只在计划定投日复核，不追涨。",
+        "- 下跌触发：指数回撤且DQS达标、资金到账后，优先评估核心ETF分批。",
+        "- 快速上涨：不做机会追高，保留基础定投纪律。",
         "",
         "## 2. 今日资金计划",
         "",
         *_money_plan_table(decision),
         "",
-        f"- 确认可用现金：{_yuan(budget.get('confirmed_cash_available_yuan'))}",
-        f"- 现金安全线：{_yuan(budget.get('cash_floor_yuan'))}",
+        "### 现金口径",
+        "",
+        *_cash_table(decision),
+        "",
         f"- 条件性债券转权益月度额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
+        f"- 本月批准债券转权益额度：{_yuan(budget.get('approved_bond_to_equity_month_yuan'))}",
         f"- 说明：{budget.get('funding_note')}",
         "",
         "## 3. 下一触发条件",
@@ -303,6 +339,10 @@ def generate_daily_report(
         f"- 目标债券金额：{_yuan(migration.get('target_bond_yuan'))}",
         f"- 理论需转出金额：{_yuan(migration.get('theoretical_transfer_yuan'))}",
         f"- 每月建议转出上限：{_yuan(migration.get('monthly_cap_yuan'))}",
+        f"- 本月批准额度：{_yuan(migration.get('approved_this_month_yuan'))}",
+        f"- 实际到账资金：{_yuan(migration.get('actual_arrived_yuan'))}",
+        f"- 本月已执行：{_yuan(migration.get('executed_this_month_yuan'))}",
+        f"- 本月剩余额度：{_yuan(migration.get('remaining_this_month_yuan'))}",
         f"- 暂停转移条件：{'；'.join(migration.get('pause_conditions', []))}",
         f"- 加快转移条件：{'；'.join(migration.get('accelerate_conditions', []))}",
         f"- 优先配置方向：{'；'.join(migration.get('priority_targets', []))}",
@@ -362,7 +402,7 @@ def generate_daily_report(
         "",
         "## 15. 一致性验证",
         "",
-        f"- 验证结果：{'通过' if consistency.get('ok') else '未通过'}",
+        f"- 验证结果：{consistency.get('status', 'PASS' if consistency.get('ok') else 'FAIL')}",
         f"- 错误：{'; '.join(consistency.get('errors', [])) or '无'}",
         f"- 警告：{'; '.join(consistency.get('warnings', [])) or '无'}",
         "",
@@ -377,7 +417,7 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.2 Smart Grid 周报",
+            "# Stone AI V12.5 Stable 周报",
             "",
             f"- 本周确认买入额度：{_yuan(budget.get('week_confirmed_yuan'))}",
             f"- 条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
@@ -395,7 +435,7 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.2 Smart Grid 月报",
+            "# Stone AI V12.5 Stable 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
             f"- 本月条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",

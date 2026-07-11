@@ -21,6 +21,7 @@ from scripts.preflight_check import (  # noqa: E402
     run_preflight,
 )
 from src.data_sources.source_audit import build_and_write_source_audit  # noqa: E402
+from src.portfolio_snapshot import build_portfolio_snapshot  # noqa: E402
 from utils.market_data_provider import fetch_yfinance_market_data  # noqa: E402
 
 
@@ -28,6 +29,7 @@ SNAPSHOT_PATH = PROJECT_ROOT / "data" / "daily_snapshot.json"
 
 
 def _portfolio_summary(master: dict[str, Any]) -> dict[str, Any]:
+    snapshot = build_portfolio_snapshot()
     totals = master.get("totals", {}) or {}
     total_assets = float(totals.get("total_assets", 0) or 0)
     labels = master.get("asset_class_labels", {}) or {}
@@ -42,6 +44,10 @@ def _portfolio_summary(master: dict[str, Any]) -> dict[str, Any]:
     return {
         "total_assets_cny": total_assets,
         "asset_classes": classes,
+        "snapshot": snapshot,
+        "holdings": snapshot.get("holdings", []),
+        "cash": snapshot.get("cash", {}),
+        "gold": snapshot.get("gold", {}),
         "confirmed_quantities": master.get("confirmed_quantities", {}) or {},
         "notes": master.get("notes", []) or [],
     }

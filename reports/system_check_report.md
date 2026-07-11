@@ -1,9 +1,8 @@
-Stone AI Investment Manager Pro V12.2 Smart Grid 系统自检
+Stone AI Investment Manager Pro V12.5 Stable 系统自检
 总体状态：WARN
 
-[OK] Python版本：当前 Python 3.14.6。
-[WARN] requirements依赖：部分依赖未安装：pytest>=8.0.0
-    修复建议：可运行：python -m pip install -r requirements.txt
+[OK] Python版本：当前 Python 3.12.13。
+[OK] requirements依赖：requirements.txt 中的依赖已安装。
 [OK] 持仓文件：data/portfolio.csv 存在且格式可读取。
 [OK] 策略配置：config/settings.yaml 存在。
 [OK] 报告目录：reports 文件夹存在。

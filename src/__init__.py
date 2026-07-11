@@ -1,1 +1,1 @@
-"""Stone AI Investment Manager Pro V12.2 Smart Grid."""
+"""Stone AI Investment Manager Pro V12.5 Stable."""

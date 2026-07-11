@@ -1,6 +1,6 @@
-# Stone AI Investment Manager Pro V12.2 Smart Grid 部署前检查报告
+# Stone AI Investment Manager Pro V12.5 Stable 部署前检查报告
 
-- 生成时间：2026-07-11 15:13:20
+- 生成时间：2026-07-12 00:20:43
 - 总体状态：WARN
 
 ## 检查结果

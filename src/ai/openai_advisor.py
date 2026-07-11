@@ -82,7 +82,7 @@ def build_ai_context(
 
 def _build_prompt(context: dict[str, Any]) -> str:
     return f"""
-你是 Stone AI Investment Manager Pro V12.2 Smart Grid 的 AI CIO 复核助手。
+你是 Stone AI Investment Manager Pro V12.5 Stable 的 AI CIO 复核助手。
 
 硬边界：
 - 不允许自动交易。

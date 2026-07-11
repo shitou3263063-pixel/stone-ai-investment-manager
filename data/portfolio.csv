@@ -1,17 +1,19 @@
 category,name,amount_wan,currency,quantity,unit,note
-美股,VOO,13.0,CNY,28,股,标普500ETF；最新资产清单更新
-美股,NVDA,6.8,CNY,51,股,英伟达
-美股,GOOG,2.2,CNY,9,股,谷歌-C
-美股,TLT,5.5,CNY,95,股,美国长期国债ETF
-美股,IBKR,4.0,CNY,64,股,盈透证券
-美股,XLF,4.2,CNY,112,股,美国金融ETF
-美股,BABA,2.8,CNY,44,股,阿里巴巴
-港股,南方恒生科技ETF 03033,13.6,CNY,,,南方恒生科技ETF
-港股,恒生医疗ETF 513060,9.6,CNY,,,恒生医疗ETF
-港股,香港证券ETF 513090,3.2,CNY,,,香港证券ETF
-A股,沪深300ETF 510300,20.6,CNY,,,沪深300ETF
-A股,巨人网络 002558,4.1,CNY,,,巨人网络
-债券,中国债券组合,113.0,CNY,,,短债、中债、长债组合
-黄金,实物金条,52.8,CNY,565,克,565克金条；临时手动估值，后续可替换为实际金条市值
-黄金,黄金ETF 518880,3.5,CNY,,,黄金ETF
-现金,现金,26.5,CNY,,,现金与货币资金
+美股,VOO 标普500ETF,13.00,CNY,28,股,来自portfolio_master.yaml
+美股,NVDA 英伟达,6.80,CNY,51,股,来自portfolio_master.yaml
+美股,GOOG 谷歌-C,2.20,CNY,9,股,来自portfolio_master.yaml
+美股,TLT 美国长期国债ETF,5.50,CNY,95,股,美国长期国债ETF；高久期利率资产
+美股,IBKR 盈透证券,4.00,CNY,64,股,来自portfolio_master.yaml
+美股,XLF 美国金融ETF,4.20,CNY,112,股,来自portfolio_master.yaml
+美股,BABA 阿里巴巴,2.80,CNY,44,股,来自portfolio_master.yaml
+港股,南方恒生科技ETF,14.04,CNY,35200,份,实际持仓03033；3067.HK仅作行情代理
+港股,恒生医疗ETF,9.90,CNY,177600,份,来自portfolio_master.yaml
+港股,香港证券ETF,3.32,CNY,17000,份,来自portfolio_master.yaml
+A股,沪深300ETF,20.60,CNY,42900,份,来自portfolio_master.yaml
+A股,巨人网络,4.10,CNY,1500,股,代码002558
+A股,*ST闻泰,1.95,CNY,500,股,高风险个股；仅记录持仓，不自动建议加仓
+债券,中国债券组合（不含10年地债）,99.78,CNY,,组合,10年地债另列但仍包含在债券总额中
+债券,10年地债,13.22,CNY,1100,份,已包含在中国债券113万元中，不重复计算
+黄金,实物金条,51.20,CNY,565,克,人工覆盖估值；黄金分类总额需与portfolio_master一致
+黄金,黄金ETF,3.50,CNY,4000,份,代码518880
+现金,账户总现金,22.00,CNY,,元,统一现金口径；可投资现金需扣除现金安全储备

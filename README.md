@@ -1,8 +1,8 @@
-# Stone AI Investment Manager Pro V12.2 Smart Grid
+# Stone AI Investment Manager Pro V12.5 Stable
 
 Stone AI Investment Manager 是个人投资管理和投资日报系统。它负责读取资产、获取市场和宏观数据、计算资产偏离、执行风控规则、生成候选建议、调用 AI 做解释复核，并通过 Gmail 发送日报。
 
-V12.2 在 V12.1 Stable 的基础上新增了 VOO 和纳斯达克100智能网格模块。网格模块默认只做模拟运行，不自动下单，不占用真实现金，不修改真实持仓。
+V12.5 Stable 是在 V12.2 Smart Grid 基础上的最终稳定版收尾升级，重点修复资产口径、现金口径、黄金对账、Opportunity Score持仓映射和一致性验证。网格模块默认只做模拟运行，不自动下单，不占用真实现金，不修改真实持仓。
 
 系统不自动交易，不接券商下单权限，不使用杠杆，不做空，不使用期权，不承诺收益。所有内容仅供投资辅助，不构成投资建议，最终操作必须由用户人工确认。
 
@@ -294,7 +294,7 @@ FINNHUB_API_KEY
 ```bash
 git init
 git add .
-git commit -m "Stone AI Investment Manager Pro V12.2 Smart Grid"
+git commit -m "Stone AI Investment Manager Pro V12.5 Stable"
 git branch -M main
 git remote add origin 你的GitHub仓库地址
 git push -u origin main
@@ -304,7 +304,7 @@ git push -u origin main
 
 ```bash
 git add .
-git commit -m "Update Stone AI Investment Manager Pro V12.2 Smart Grid"
+git commit -m "Update Stone AI Investment Manager Pro V12.5 Stable"
 git push origin main
 ```
 

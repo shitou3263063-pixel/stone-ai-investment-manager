@@ -53,7 +53,7 @@ jobs:
       - name: Run tests
         run: pytest
 
-      - name: Run Stone AI Investment Manager Pro V12.2 Smart Grid
+      - name: Run Stone AI Investment Manager Pro V12.5 Stable
         run: python main.py
 
       - name: Upload reports and logs artifact

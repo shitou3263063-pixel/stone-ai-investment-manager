@@ -1,0 +1,204 @@
+schema_version: 1
+as_of: 2026-07-12
+
+securities:
+  - canonical_id: VOO
+    display_name: VOO 标普500ETF
+    ticker: VOO
+    exchange: NYSE_ARCA
+    aliases: [VOO, 标普500ETF, S&P500 ETF]
+    pricing_proxy: VOO
+    asset_class: 美股
+    strategy_type: core_etf
+    currency: USD
+
+  - canonical_id: QQQ
+    display_name: QQQ 纳斯达克100ETF
+    ticker: QQQ
+    exchange: NASDAQ
+    aliases: [QQQ, 纳斯达克100, Nasdaq-100 ETF]
+    pricing_proxy: QQQ
+    asset_class: 美股
+    strategy_type: growth_etf
+    currency: USD
+
+  - canonical_id: QQQM
+    display_name: QQQM 纳斯达克100ETF
+    ticker: QQQM
+    exchange: NASDAQ
+    aliases: [QQQM]
+    pricing_proxy: QQQM
+    asset_class: 美股
+    strategy_type: growth_etf
+    currency: USD
+
+  - canonical_id: NVDA
+    display_name: NVDA 英伟达
+    ticker: NVDA
+    exchange: NASDAQ
+    aliases: [NVDA, 英伟达, NVIDIA]
+    pricing_proxy: NVDA
+    asset_class: 美股
+    strategy_type: single_stock
+    currency: USD
+
+  - canonical_id: GOOG
+    display_name: GOOG 谷歌-C
+    ticker: GOOG
+    exchange: NASDAQ
+    aliases: [GOOG, GOOGL, 谷歌, 谷歌-C, Alphabet]
+    pricing_proxy: GOOG
+    asset_class: 美股
+    strategy_type: single_stock
+    currency: USD
+
+  - canonical_id: TLT
+    display_name: TLT 美国长期国债ETF
+    ticker: TLT
+    exchange: NASDAQ
+    aliases: [TLT, 美国长期国债ETF, 长债ETF]
+    pricing_proxy: TLT
+    asset_class: 美股
+    strategy_type: duration_bond_etf
+    currency: USD
+
+  - canonical_id: IBKR
+    display_name: IBKR 盈透证券
+    ticker: IBKR
+    exchange: NASDAQ
+    aliases: [IBKR, 盈透证券]
+    pricing_proxy: IBKR
+    asset_class: 美股
+    strategy_type: single_stock
+    currency: USD
+
+  - canonical_id: XLF
+    display_name: XLF 美国金融ETF
+    ticker: XLF
+    exchange: NYSE_ARCA
+    aliases: [XLF, 美国金融ETF, 金融ETF]
+    pricing_proxy: XLF
+    asset_class: 美股
+    strategy_type: sector_etf
+    currency: USD
+
+  - canonical_id: BABA
+    display_name: BABA 阿里巴巴
+    ticker: BABA
+    exchange: NYSE
+    aliases: [BABA, 阿里巴巴]
+    pricing_proxy: BABA
+    asset_class: 美股
+    strategy_type: single_stock
+    currency: USD
+
+  - canonical_id: HK_03033
+    display_name: 南方恒生科技ETF
+    ticker: "03033"
+    exchange: HKEX
+    aliases: ["03033", "03033.HK", "3067.HK", 南方恒生科技ETF, 恒生科技ETF]
+    pricing_proxy: 3067.HK
+    asset_class: 港股
+    strategy_type: core_etf
+    currency: HKD
+    note: "03033为用户实际持仓代码；3067.HK可作为行情参考代理，不代表真实持仓。"
+
+  - canonical_id: HK_513060
+    display_name: 恒生医疗ETF
+    ticker: "513060"
+    exchange: SSE
+    aliases: ["513060", "513060.SS", 恒生医疗ETF, 恒生医疗]
+    pricing_proxy: 513060.SS
+    asset_class: 港股
+    strategy_type: thematic_etf
+    currency: CNY
+
+  - canonical_id: HK_513090
+    display_name: 香港证券ETF
+    ticker: "513090"
+    exchange: SSE
+    aliases: ["513090", "513090.SS", 香港证券ETF, 香港证券]
+    pricing_proxy: 513090.SS
+    asset_class: 港股
+    strategy_type: thematic_etf
+    currency: CNY
+
+  - canonical_id: CN_510300
+    display_name: 沪深300ETF
+    ticker: "510300"
+    exchange: SSE
+    aliases: ["510300", "510300.SS", "300ETF", 沪深300ETF]
+    pricing_proxy: 510300.SS
+    asset_class: A股
+    strategy_type: core_etf
+    currency: CNY
+
+  - canonical_id: CN_002558
+    display_name: 巨人网络
+    ticker: "002558"
+    exchange: SZSE
+    aliases: ["002558", "002558.SZ", 巨人网络]
+    pricing_proxy: 002558.SZ
+    asset_class: A股
+    strategy_type: single_stock
+    currency: CNY
+
+  - canonical_id: CN_ST_WENTAI
+    display_name: "*ST闻泰"
+    ticker: ""
+    exchange: CN
+    aliases: ["*ST闻泰", ST闻泰]
+    pricing_proxy: ""
+    asset_class: A股
+    strategy_type: single_stock_high_risk
+    currency: CNY
+
+  - canonical_id: CN_BOND_CORE
+    display_name: 中国债券组合
+    ticker: CN_BOND_CORE
+    exchange: CN
+    aliases: [中国债券组合, 中国债券, 短债, 中债, 长债]
+    pricing_proxy: ""
+    asset_class: 债券
+    strategy_type: defensive_bond
+    currency: CNY
+
+  - canonical_id: CN_LOCAL_BOND_10Y
+    display_name: 10年地债
+    ticker: CN_LOCAL_BOND_10Y
+    exchange: CN
+    aliases: [10年地债, 地债]
+    pricing_proxy: ""
+    asset_class: 债券
+    strategy_type: defensive_bond
+    currency: CNY
+
+  - canonical_id: GOLD_BAR_565G
+    display_name: 实物金条
+    ticker: GOLD_BAR_565G
+    exchange: physical
+    aliases: [实物金条, 金条, 565克金条]
+    pricing_proxy: GC=F
+    asset_class: 黄金
+    strategy_type: defensive_gold
+    currency: CNY
+
+  - canonical_id: GOLD_518880
+    display_name: 黄金ETF
+    ticker: "518880"
+    exchange: SSE
+    aliases: ["518880", "518880.SS", 黄金ETF]
+    pricing_proxy: 518880.SS
+    asset_class: 黄金
+    strategy_type: defensive_gold
+    currency: CNY
+
+  - canonical_id: CASH_CNY
+    display_name: 账户总现金
+    ticker: CASH_CNY
+    exchange: cash
+    aliases: [现金, 账户总现金, CASH_CNY]
+    pricing_proxy: ""
+    asset_class: 现金
+    strategy_type: cash_reserve
+    currency: CNY

@@ -79,7 +79,12 @@ def load_portfolio(path: str | Path) -> list[dict[str, Any]]:
     portfolio_path = Path(path)
     master_path = portfolio_path.with_name("portfolio_master.yaml")
     if master_path.exists():
-        return _load_portfolio_master(master_path)
+        try:
+            from src.portfolio_snapshot import portfolio_rows_for_legacy_agents
+
+            return portfolio_rows_for_legacy_agents()
+        except Exception:
+            return _load_portfolio_master(master_path)
     return _load_portfolio(portfolio_path)
 
 

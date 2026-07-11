@@ -1,5 +1,5 @@
 {
-  "version": "Stone AI Investment Manager Pro V12.2 Smart Grid",
+  "version": "Stone AI Investment Manager Pro V12.5 Stable",
   "symbols": {
     "VOO": {
       "symbol": "VOO",
@@ -24,7 +24,7 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-11T15:54:00"
+      "updated_at": "2026-07-12T00:20:41"
     },
     "QQQ": {
       "symbol": "QQQ",
@@ -49,8 +49,8 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-11T15:54:00"
+      "updated_at": "2026-07-12T00:20:41"
     }
   },
-  "updated_at": "2026-07-11T15:54:00"
+  "updated_at": "2026-07-12T00:20:41"
 }
