@@ -1,20 +1,22 @@
-# Stone AI Investment Manager Pro V12
+# Stone AI Investment Manager Pro V12.2 Smart Grid
 
-Stone AI Investment Manager 是个人投资管理和投资日报系统。它只做数据读取、质量审计、资产配置分析、候选建议、报告生成和 Gmail 邮件提醒。
+Stone AI Investment Manager 是个人投资管理和投资日报系统。它负责读取资产、获取市场和宏观数据、计算资产偏离、执行风控规则、生成候选建议、调用 AI 做解释复核，并通过 Gmail 发送日报。
 
-系统不自动交易，不接券商下单权限，不承诺收益；所有内容仅供投资辅助，不构成投资建议，最终操作必须由用户人工确认。
+V12.2 在 V12.1 Stable 的基础上新增了 VOO 和纳斯达克100智能网格模块。网格模块默认只做模拟运行，不自动下单，不占用真实现金，不修改真实持仓。
 
-## 正式入口
+系统不自动交易，不接券商下单权限，不使用杠杆，不做空，不使用期权，不承诺收益。所有内容仅供投资辅助，不构成投资建议，最终操作必须由用户人工确认。
 
-本项目的唯一正式运行入口：
+## 唯一正式入口
+
+本地运行、GitHub Actions 和定时任务都只调用同一个入口：
 
 ```bash
-python src/main.py
+python main.py
 ```
 
-根目录 `main.py` 只保留为提示文件，不再运行投资系统。GitHub Actions 也必须调用 `python src/main.py`。
+根目录 `main.py` 只负责启动系统，核心业务逻辑在 `src/app.py` 和 `src/` 下的业务模块中。历史入口已经移动到 `archive/`，不再被正式流程调用。
 
-## 每日自动运行
+## 每天自动运行
 
 GitHub Actions 文件：
 
@@ -25,14 +27,40 @@ GitHub Actions 文件：
 运行规则：
 
 - 每天北京时间 8:30 自动运行。
-- cron：`30 0 * * *`
+- cron：`30 0 * * *`。
 - 支持手动运行 `workflow_dispatch`。
 - 使用 Python 3.11。
-- 先运行服务健康检查。
-- 再运行自动测试。
-- 最后运行 `python src/main.py`。
-- 上传 `reports/` 为 artifact。
-- 邮件发送今日摘要和完整报告附件。
+- 安装 `requirements.txt`。
+- 运行服务健康检查、自动测试和 `python main.py`。
+- 上传 `reports/` 和 `logs/` 为 artifact。
+- 报告生成成功后发送 Gmail，邮件失败不影响报告保存。
+
+## 手动运行 GitHub Actions
+
+1. 打开 GitHub 仓库。
+2. 点击 `Actions`。
+3. 选择 `Daily Stone AI Investment Report`。
+4. 点击 `Run workflow`。
+5. 分支选择 `main`。
+6. 运行完成后查看 `Artifacts`。
+7. 检查 Gmail 是否收到日报。
+
+## 本地运行
+
+```bash
+pip install -r requirements.txt
+pytest
+python main.py
+```
+
+常用检查：
+
+```bash
+python scripts/check_all_services.py
+python scripts/final_check.py
+python scripts/deploy_check.py
+python scripts/test_email.py
+```
 
 ## 每日生成文件
 
@@ -41,85 +69,206 @@ reports/today_action.md
 reports/daily_report.md
 reports/weekly_report.md
 reports/monthly_report.md
+reports/grid_report.md
+reports/grid_weekly_report.md
+reports/grid_backtest_report.md
 reports/system_check_report.md
+reports/system_audit.md
 reports/service_health.md
 reports/validation_report.md
 reports/project_audit.md
 reports/decision.json
 ```
 
-其中 `reports/decision.json` 是统一决策对象。日报、周报、月报、邮件正文都从它生成，避免互相矛盾。
+其中 `reports/decision.json` 是统一决策对象。今日行动、日报、周报、月报、网格报告和邮件正文都从同一份决策对象生成，避免互相矛盾。
 
-## 本地运行
+## 智能网格模块
 
-安装依赖：
+配置文件：
 
-```bash
-pip install -r requirements.txt
+```text
+config/smart_grid.yaml
 ```
 
-服务健康检查：
+默认状态：
 
-```bash
-python scripts/check_all_services.py
+```yaml
+enabled: true
+auto_trade: false
+paper_mode: true
+live_advice_enabled: false
 ```
 
-运行测试：
+含义：
 
-```bash
-python -m unittest discover -s tests -v
+- `paper_mode: true`：只模拟，不生成真实执行金额建议。
+- `live_advice_enabled: false`：不输出实盘网格建议。
+- `auto_trade: false`：永远不自动下单。
+
+支持标的：
+
+- VOO：标普500核心 ETF。
+- QQQ：纳斯达克100网格交易标的。
+- QQQM：保留为长期低费率替代配置，默认不与 QQQ 同时参与网格。
+
+## VOO 默认网格参数
+
+- 核心仓：75%
+- 网格仓：25%
+- 单标的网格资金上限：总资产 5%
+- 正常波动买入间距：2.5% 至 3.5%
+- 正常波动卖出间距：3.0% 至 4.0%
+- 高波动间距：4.0% 至 6.0%
+- 最大普通买入层级：5
+- 单日最大交易次数：1
+
+## QQQ 默认网格参数
+
+- 核心仓：70%
+- 网格仓：30%
+- 单标的网格资金上限：总资产 4%
+- 正常波动买入间距：3.5% 至 5.0%
+- 正常波动卖出间距：4.0% 至 5.5%
+- 高波动间距：5.0% 至 8.0%
+- 最大普通买入层级：5
+- 单日最大交易次数：1
+- 科技集中度限制：18%
+
+## 核心仓与网格仓隔离
+
+核心仓用于长期持有，不参与普通网格卖出。
+
+网格仓有独立状态：
+
+```text
+data/grid/grid_state.json
 ```
 
-正式运行：
+人工成交记录：
 
-```bash
-python src/main.py
+```text
+data/grid/manual_trades.csv
 ```
 
-测试 Gmail：
+只有 `manual_trades.csv` 中状态为 `confirmed` 的成交才会更新网格状态。`suggested`、`rejected`、`expired`、`cancelled` 都不会入账。
 
-```bash
-python scripts/test_email.py
+模拟信号记录：
+
+```text
+data/grid/simulation_trades.csv
 ```
+
+## 网格资金规则
+
+- 网格总资金默认使用总资产 4% 作为模拟预算。
+- 网格总资金原则上不超过总资产 8%。
+- 单标的不超过配置上限。
+- 模拟模式不占用真实现金、基础定投资金、机会加仓资金或债券转权益预算。
+- 现金安全线以内资金不得用于网格。
+- 未到账债券赎回资金不得用于网格。
+
+## 市场状态识别
+
+网格模块综合以下指标识别市场状态：
+
+- 20日、50日、200日均线
+- 20日历史波动率
+- VIX
+- 近20日和60日最大回撤
+- 当前价格与趋势位置
+
+状态包括：
+
+- 震荡：正常运行网格。
+- 上升趋势：降低卖出频率，扩大卖出间距。
+- 下降趋势：扩大买入间距，限制连续买入。
+- 高波动/危机：暂停普通密集网格，降低单笔金额。
+
+## 总风控否决
+
+网格信号必须经过 Stone CIO 总风控。以下情况会否决：
+
+- DQS 低于网格门槛。
+- 核心行情数据缺失。
+- 现金低于安全线。
+- 网格预算不足。
+- 未来48小时内存在高等级宏观事件。
+- 科技集中度过高。
+- QQQ 与 NVDA、GOOG 等科技持仓重叠过高。
+- 卖出会触及核心仓。
+- 美股仍严重低配时普通网格卖出。
+- 交易成本和滑点后预期收益不足。
+
+## 回测
+
+回测报告：
+
+```text
+reports/grid_backtest_report.md
+```
+
+回测数据优先使用 Yahoo chart API 的复权收盘价，并缓存到：
+
+```text
+data/cache/grid_history_VOO.json
+data/cache/grid_history_QQQ.json
+```
+
+如果数据源不可用，系统不会伪造历史行情，会在回测报告中明确写明数据覆盖不足。
+
+回测比较：
+
+- 买入并持有
+- 固定网格
+- 动态网格
+- 核心仓加动态网格
+
+输出指标包括收益、年化、最大回撤、波动率、夏普、卡玛、胜率、交易次数、已实现收益、超额收益和回撤改善。
+
+## 关闭网格模块
+
+编辑 `config/smart_grid.yaml`：
+
+```yaml
+smart_grid:
+  enabled: false
+```
+
+关闭后主系统继续生成日报，网格章节显示未启用。
+
+## 未来人工开启实盘建议模式
+
+必须手动修改：
+
+```yaml
+smart_grid:
+  auto_trade: false
+  paper_mode: false
+  live_advice_enabled: true
+```
+
+即使开启实盘建议：
+
+- 仍然不自动下单。
+- 仍然需要用户人工确认。
+- 仍然受 DQS、现金安全线、总风控和重大事件过滤限制。
 
 ## 数据源
 
 系统按分层和降级方式使用数据：
 
 - FRED：宏观主数据源。
-- Alpha Vantage：美股、ETF、外汇和技术数据备份源。
-- Finnhub：全球股票、ETF、新闻和基本面备份源。
-- CBOE：VIX 官方参考。
+- Alpha Vantage：美股、ETF、外汇和技术数据来源。
+- Finnhub：股票、ETF、公司新闻和基本面备用来源。
+- CBOE：VIX 官方参考来源。
 - yfinance：免费兜底行情源。
-- 本地缓存和 `data/market_data.csv`：所有在线数据失败时兜底。
+- Yahoo chart API：网格历史回测数据源。
+- 本地缓存：`data/cache/`。
+- 手工资产台账：`data/portfolio.csv` 和 `data/portfolio_master.yaml`。
 
-如果缺少 API Key，系统会降级运行，但会降低 DQS，并在报告里写明数据覆盖不足。
+## Secrets
 
-## DQS 硬门槛
-
-- DQS >= 90：允许精确金额。
-- DQS 80-89：只允许金额上限或区间。
-- DQS 70-79：只允许方向，不给具体金额。
-- DQS < 70：不得给交易建议。
-- `blocking_errors` 非空：停止执行单。
-
-## Gmail 配置
-
-本地可创建 `.env`，GitHub Actions 必须使用 GitHub Secrets。不要提交 `.env`。
-
-```text
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USER=你的Gmail邮箱
-SMTP_PASSWORD=你的Gmail应用专用密码
-EMAIL_TO=shitou3263063@gmail.com
-```
-
-Gmail 需要开启两步验证，然后创建“应用专用密码”。`SMTP_PASSWORD` 填应用专用密码，不是 Gmail 登录密码。
-
-## GitHub Secrets
-
-必需：
+邮件必需：
 
 ```text
 SMTP_HOST
@@ -138,45 +287,26 @@ ALPHA_VANTAGE_API_KEY
 FINNHUB_API_KEY
 ```
 
-可选 LLM 备用：
+## 上传到 GitHub
 
-```text
-GEMINI_API_KEY
-ANTHROPIC_API_KEY
-DEEPSEEK_API_KEY
-QWEN_API_KEY
-OLLAMA_BASE_URL
-LLM_PROVIDER_PRIORITY
-ALLOW_RULE_ONLY_MODE
-MAX_LLM_RETRIES
+首次部署：
+
+```bash
+git init
+git add .
+git commit -m "Stone AI Investment Manager Pro V12.2 Smart Grid"
+git branch -M main
+git remote add origin 你的GitHub仓库地址
+git push -u origin main
 ```
 
-## 手动运行 GitHub Actions
+日常更新：
 
-1. 打开 GitHub 仓库。
-2. 点击 `Actions`。
-3. 选择 `Daily Stone AI Investment Report`。
-4. 点击 `Run workflow`。
-5. 分支选择 `main`。
-6. 运行完成后查看 `Artifacts`。
-7. 检查 Gmail 是否收到邮件。
-
-## 资产数据
-
-持仓文件：
-
-```text
-data/portfolio.csv
+```bash
+git add .
+git commit -m "Update Stone AI Investment Manager Pro V12.2 Smart Grid"
+git push origin main
 ```
-
-系统兼容常见字段名：
-
-- 名称：`Asset`、`asset`、`标的`、`名称`、`name`
-- 代码：`Symbol`、`symbol`、`ticker`、`代码`
-- 类别：`Category`、`category`、`类型`、`资产类别`
-- 金额：`Amount`、`amount`、`amount_wan`、`amount_cny`、`市值`、`金额`
-
-用户确认的主资产台账优先级高于市场数据、新闻和邮件。
 
 ## 安全要求
 
@@ -188,3 +318,7 @@ data/portfolio.csv
 - 不接券商下单权限。
 - 不承诺收益。
 - Gmail 只作为报告通知渠道，不作为资产事实或成交事实来源。
+
+## 免责声明
+
+本系统输出仅供投资辅助和个人复盘使用，不构成投资建议、收益承诺或交易指令。所有买卖操作必须由用户自行判断和人工执行。

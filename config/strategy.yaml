@@ -1,0 +1,111 @@
+version: V12.1 Stable
+
+target_allocation:
+  美股: 0.30
+  港股: 0.12
+  A股: 0.10
+  债券: 0.25
+  黄金: 0.15
+  现金: 0.08
+
+cash:
+  safety_ratio: 0.08
+  hard_floor_ratio: 0.05
+
+dqs_thresholds:
+  exact_amount: 85
+  range_amount: 75
+  direction_only: 60
+  no_new_position: 0
+  cap_when_dual_source_below: 0.25
+  severe_conflict_cap: 59
+
+dqs_weights:
+  market_completeness: 25
+  macro_completeness: 15
+  tier1_coverage: 15
+  dual_source: 20
+  freshness: 15
+  consistency: 10
+
+risk_weights:
+  valuation: 20
+  volatility: 15
+  interest_rate: 15
+  liquidity: 10
+  macro_event: 15
+  trend: 10
+  policy_geo: 10
+  data_quality: 5
+
+opportunity_weights:
+  valuation: 0.25
+  fundamentals: 0.25
+  trend: 0.15
+  risk_reward: 0.20
+  portfolio_fit: 0.15
+
+budget:
+  monthly_base_dca_yuan: 10000
+  single_trade_cash_ratio_cap: 0.03
+  weekly_cash_ratio_cap: 0.05
+  monthly_cash_ratio_cap: 0.08
+  bond_to_equity_monthly_cap_yuan: 30000
+  bond_to_equity_single_cap_yuan: 15000
+  per_symbol_cap_yuan: 12000
+
+dca:
+  enabled: true
+  frequency: twice_monthly
+  scheduled_weekday: 2
+  scheduled_weeks: [1, 3]
+  holiday_policy: next_valid_trading_day
+  funding_priority:
+    - bond_maturity_or_redemption
+    - new_cash
+  targets:
+    - symbol: VOO
+      name: VOO/标普500ETF
+      base_weight: 0.40
+    - symbol: QQQ
+      name: QQQ/纳斯达克100ETF
+      base_weight: 0.20
+    - symbol: 510300
+      name: 沪深300ETF
+      base_weight: 0.25
+    - symbol: 03033
+      name: 恒生科技ETF
+      base_weight: 0.15
+
+rebalance:
+  no_action_deviation_pct: 0.05
+  funding_only_deviation_pct: 0.08
+  progressive_rebalance_deviation_pct: 0.08
+  prefer_new_money: true
+  avoid_large_one_day_switch: true
+
+drawdown_triggers:
+  mild_pct: -0.03
+  medium_pct: -0.05
+  severe_pct: -0.08
+
+vix_triggers:
+  normal_below: 20
+  reduce_between_low: 20
+  reduce_between_high: 30
+  high_risk_above: 30
+
+event_rules:
+  high_event_no_chase_days_before: 7
+  high_event_no_chase_days_after: 1
+
+data_freshness_hours:
+  market: 48
+  macro: 168
+  news: 72
+
+dual_source_thresholds:
+  price_pct: 1.0
+  vix_pct: 5.0
+  yield_pct: 3.0
+  fx_pct: 1.0

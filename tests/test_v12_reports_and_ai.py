@@ -7,6 +7,8 @@ import unittest
 
 from scripts.check_all_services import collect_service_health, format_service_health
 from src.ai.openai_advisor import generate_openai_advice
+from tests.test_v12_1_stable import _live_market, _portfolio
+from src.decision.v12_1_decision import build_v12_1_decision
 from src.reports.report_center import generate_daily_report, generate_today_action
 
 
@@ -24,57 +26,24 @@ class ReportsAndAiTest(unittest.TestCase):
                 os.environ["OPENAI_API_KEY"] = old
 
         self.assertEqual(result["ai_status"], "rule_only")
+        self.assertIn("fallback_reason", result)
         self.assertNotIn("{'error'", result["summary"])
         self.assertNotIn("Error code: 429", result["summary"])
 
-    def test_report_uses_unified_decision_amounts(self) -> None:
-        decision = {
-            "portfolio_value_wan": 282.11,
-            "action_level": "B",
-            "dqs": 84,
-            "amount_mode": "upper_limit",
-            "amount_label": "金额上限",
-            "base_dca": True,
-            "base_dca_status": "allowed",
-            "tactical_add": False,
-            "rebalance_today": False,
-            "rebalance_required": True,
-            "reduce_positions": False,
-            "today_buy_amount_yuan": 4000,
-            "week_buy_amount_yuan": 9000,
-            "month_buy_amount_yuan": 25000,
-            "conditional_month_buy_upper_yuan": 30000,
-            "bond_weekly_transfer_wan": 3.0,
-            "bond_monthly_transfer_wan": 3.4,
-            "cash_current_wan": 22.0,
-            "cash_floor_wan": 22.57,
-            "cash_available_wan": 0.0,
-            "priority_assets": ["VOO/QQQ", "沪深300ETF"],
-            "paused_assets": ["债券", "黄金", "TLT"],
-            "warnings": ["现金接近安全线"],
-            "reasons": ["债券超配"],
-            "one_sentence": "按上限分批，不追涨。",
-            "source_coverage": {"data_source_coverage": 0.9, "dual_source_coverage": 0.7, "tier1_coverage": 0.8},
-            "risk_score": 55,
-            "macro_event_high_next_7_days": False,
-            "ai_status": "rule_only",
-            "llm_provider": "rule-only",
-        }
-        today = generate_today_action(decision)
-        daily = generate_daily_report(
-            decision=decision,
-            portfolio_result={"categories": []},
-            market_result={"summary": "test"},
-            live_market_result={"data_quality": {"score": 84}},
-            macro_result={"upcoming_events": []},
-            allocation_rebalance_result={"need_rebalance": True},
-            ai_advice_result={"summary": "规则模式"},
-            validation={"ok": True, "fallback_applied": False, "warnings": [], "errors": []},
+    def test_report_uses_v12_1_decision_object(self) -> None:
+        decision = build_v12_1_decision(
+            portfolio_result=_portfolio(),
+            live_market_result=_live_market(),
+            macro_result={"has_high_event_next_7_days": False, "upcoming_events": []},
+            ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
+        today = generate_today_action(decision)
+        daily = generate_daily_report(decision=decision)
 
-        self.assertIn("今日买多少：不超过4,000元", today)
-        self.assertIn("本周买多少：不超过9,000元", daily)
-        self.assertIn("reports/decision.json", Path("README.md").read_text(encoding="utf-8"))
+        self.assertIn("今日建议金额", today)
+        self.assertIn("## 6. Opportunity Score", daily)
+        self.assertIn("## 10. DQS数据质量", daily)
+        self.assertIn("## 12. 三种市场情景", daily)
 
     def test_service_health_report_has_no_secret_values(self) -> None:
         rows = collect_service_health()

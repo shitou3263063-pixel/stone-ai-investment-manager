@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any
 
 from utils.logger import write_log
@@ -28,12 +29,14 @@ def _safe_json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, default=str, indent=2)
 
 
-def _fallback_result(message: str, reason: str = "rule_only") -> dict[str, Any]:
+def _fallback_result(message: str, reason: str = "rule_only", retry_count: int = 0) -> dict[str, Any]:
     return {
         "enabled": False,
         "ai_status": "rule_only",
         "actual_provider": "rule_only",
         "fallback_reason": reason,
+        "retry_count": retry_count,
+        "degrade_level": "RULE_ENHANCED",
         "response_timestamp": "",
         "summary": message,
         "most_important_risk": "AI深度分析不可用，本次以本地规则、资产配置、数据质量和风险模型为准。",
@@ -79,7 +82,7 @@ def build_ai_context(
 
 def _build_prompt(context: dict[str, Any]) -> str:
     return f"""
-你是 Stone AI Investment Manager Pro V12 的 AI CIO 复核助手。
+你是 Stone AI Investment Manager Pro V12.2 Smart Grid 的 AI CIO 复核助手。
 
 硬边界：
 - 不允许自动交易。
@@ -132,51 +135,71 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
     _load_env_file(env_path or PROJECT_ROOT / ".env")
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        return _fallback_result("AI深度分析未启用：未配置 OPENAI_API_KEY", "missing_openai_key")
+        return _fallback_result("AI深度分析未启用：未配置 OPENAI_API_KEY", "missing_openai_key", 0)
 
     try:
         from openai import OpenAI  # type: ignore
     except ImportError:
         write_log("OpenAI SDK not installed", filename="openai_advisor.log")
-        return _fallback_result("AI深度分析暂不可用，系统已切换规则模式。", "openai_sdk_missing")
+        return _fallback_result("AI深度分析暂不可用，系统已切换规则增强模式。", "openai_sdk_missing", 0)
 
     model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    max_retries = int(os.getenv("MAX_LLM_RETRIES", "2") or 2)
+    timeout_seconds = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30") or 30)
+    prompt = _build_prompt(context)
+    if len(prompt) > 18000:
+        prompt = prompt[:18000] + "\n\n[输入因长度限制已截断，系统只保留关键结构化数据。]"
+    last_error = ""
     try:
-        client = OpenAI(api_key=api_key)
-        response = client.responses.create(
-            model=model,
-            input=[
-                {
-                    "role": "system",
-                    "content": "你是谨慎的投资复核助手，只做解释和风险复核，不做自动交易。",
-                },
-                {"role": "user", "content": _build_prompt(context)},
-            ],
-        )
-        raw_text = getattr(response, "output_text", "") or ""
-        sections = _extract_sections(raw_text)
-        return {
-            "enabled": True,
-            "ai_status": "available",
-            "actual_provider": "openai",
-            "fallback_reason": "",
-            "response_timestamp": "",
-            "summary": sections.get("summary") or raw_text,
-            "most_important_risk": sections.get("most_important_risk") or "AI未明确输出该字段。",
-            "best_action_today": sections.get("best_action_today") or "AI未明确输出该字段。",
-            "avoid_action_today": sections.get("avoid_action_today") or "AI未明确输出该字段。",
-            "one_sentence": sections.get("one_sentence") or "AI深度分析已生成。",
-            "raw_text": raw_text,
-            "model": model,
-            "disclaimer": "仅供投资辅助，不构成投资建议；不自动交易，不承诺收益。",
-        }
-    except Exception as exc:  # noqa: BLE001 - LLM不可用不得中断主程序
-        raw_error = str(exc)
-        if "insufficient_quota" in raw_error or "You exceeded your current quota" in raw_error:
-            write_log("OpenAI unavailable: insufficient_quota", filename="openai_advisor.log")
-            return _fallback_result("OpenAI深度分析暂不可用，系统已切换备用模型或规则模式。", "insufficient_quota")
-        if "rate_limit" in raw_error or "429" in raw_error:
-            write_log("OpenAI unavailable: rate_limit", filename="openai_advisor.log")
-            return _fallback_result("OpenAI深度分析暂不可用，遇到临时限流，系统已切换备用模型或规则模式。", "rate_limit")
-        write_log(f"OpenAI unavailable: {type(exc).__name__}", filename="openai_advisor.log")
-        return _fallback_result("AI深度分析暂不可用，系统已切换规则模式。", type(exc).__name__)
+        client = OpenAI(api_key=api_key, timeout=timeout_seconds)
+        for attempt in range(max_retries + 1):
+            try:
+                write_log(f"OpenAI请求开始：model={model} attempt={attempt + 1}", filename="stone_ai.log")
+                response = client.responses.create(
+                    model=model,
+                    input=[
+                        {
+                            "role": "system",
+                            "content": "你是谨慎的投资复核助手，只做解释和风险复核，不做自动交易。请优先返回清晰分段文本。",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                raw_text = getattr(response, "output_text", "") or ""
+                sections = _extract_sections(raw_text)
+                return {
+                    "enabled": True,
+                    "ai_status": "available",
+                    "actual_provider": "openai",
+                    "fallback_reason": "",
+                    "retry_count": attempt,
+                    "degrade_level": "AI_FULL",
+                    "response_timestamp": "",
+                    "summary": sections.get("summary") or raw_text,
+                    "most_important_risk": sections.get("most_important_risk") or "AI未明确输出该字段。",
+                    "best_action_today": sections.get("best_action_today") or "AI未明确输出该字段。",
+                    "avoid_action_today": sections.get("avoid_action_today") or "AI未明确输出该字段。",
+                    "one_sentence": sections.get("one_sentence") or "AI深度分析已生成。",
+                    "raw_text": raw_text,
+                    "model": model,
+                    "disclaimer": "仅供投资辅助，不构成投资建议；不自动交易，不承诺收益。",
+                }
+            except Exception as exc:  # noqa: BLE001
+                last_error = str(exc)
+                retryable = any(code in last_error for code in ["429", "500", "502", "503", "504", "rate_limit"])
+                write_log(f"OpenAI请求失败：{type(exc).__name__} retryable={retryable}", filename="openai_advisor.log")
+                if not retryable or attempt >= max_retries:
+                    break
+                time.sleep(min(8, 2**attempt))
+    except Exception as exc:  # noqa: BLE001
+        last_error = str(exc)
+
+    if "insufficient_quota" in last_error or "You exceeded your current quota" in last_error:
+        write_log("OpenAI unavailable: insufficient_quota", filename="openai_advisor.log")
+        return _fallback_result("OpenAI深度分析暂不可用：额度不足，系统已切换规则增强模式。", "insufficient_quota", max_retries)
+    if "rate_limit" in last_error or "429" in last_error:
+        write_log("OpenAI unavailable: rate_limit", filename="openai_advisor.log")
+        return _fallback_result("OpenAI深度分析暂不可用：遇到限流，系统已切换规则增强模式。", "rate_limit", max_retries)
+    reason = "network_or_timeout" if "timeout" in last_error.lower() else (last_error[:80] or "unknown_error")
+    write_log(f"OpenAI unavailable: {reason}", filename="openai_advisor.log")
+    return _fallback_result("AI深度分析暂不可用，系统已切换规则增强模式。", reason, max_retries)

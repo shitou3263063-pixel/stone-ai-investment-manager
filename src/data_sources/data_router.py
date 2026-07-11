@@ -7,12 +7,18 @@ from urllib.request import Request, urlopen
 
 from src.data_sources import alpha_vantage_client, finnhub_client, fred_client, yfinance_client
 from src.data_sources.data_cache import read_cache, write_cache
+from utils.data_loader import project_root
 from utils.logger import write_log
 
 
 MARKET_TICKERS = [
     "VOO",
     "QQQ",
+    "NVDA",
+    "GOOG",
+    "BABA",
+    "IBKR",
+    "XLF",
     "^GSPC",
     "^IXIC",
     "3067.HK",
@@ -27,7 +33,7 @@ MARKET_TICKERS = [
     "^VIX",
 ]
 
-US_ETF_TICKERS = {"VOO", "QQQ", "GLD", "TLT", "IEF", "UUP"}
+US_ETF_TICKERS = {"VOO", "QQQ", "NVDA", "GOOG", "BABA", "IBKR", "XLF", "GLD", "TLT", "IEF", "UUP"}
 HK_CN_TICKERS = {"3067.HK", "3033.HK", "2800.HK", "510300.SS"}
 YFINANCE_ONLY_TICKERS = {"^GSPC", "^IXIC", "DX-Y.NYB"}
 
@@ -111,11 +117,12 @@ def _official_vix_quote() -> dict[str, Any]:
 
 def get_market_quote(symbol: str) -> dict[str, Any]:
     errors: list[str] = []
+    candidates: list[dict[str, Any]] = []
 
     if symbol == "^VIX":
         data = _try_provider("cboe_official", lambda _: _official_vix_quote(), symbol, errors)
         if data:
-            return data
+            candidates.append(data)
 
     if symbol in US_ETF_TICKERS:
         for provider_name, fn in [
@@ -125,7 +132,7 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
         ]:
             data = _try_provider(provider_name, fn, symbol, errors)
             if data:
-                return data
+                candidates.append(data)
     elif symbol in HK_CN_TICKERS:
         for provider_name, fn in [
             ("finnhub", finnhub_client.get_quote),
@@ -133,14 +140,19 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
         ]:
             data = _try_provider(provider_name, fn, symbol, errors)
             if data:
-                return data
+                candidates.append(data)
     else:
         for provider_name, fn in [
             ("yfinance", yfinance_client.get_quote),
         ]:
             data = _try_provider(provider_name, fn, symbol, errors)
             if data:
-                return data
+                candidates.append(data)
+
+    if candidates:
+        selected = candidates[0]
+        selected = {**selected, "candidates": candidates, "source_count": len({item.get("source") for item in candidates})}
+        return selected
 
     cached = read_cache("quote", symbol)
     if cached:
@@ -321,7 +333,7 @@ def fetch_layered_market_data() -> dict[str, Any]:
     errors.extend(macro.get("errors", []))
     errors.extend(news.get("errors", []))
 
-    return {
+    snapshot = {
         "source": "layered_router",
         "fetched_at": datetime.now().isoformat(timespec="seconds"),
         "items": items,
@@ -330,3 +342,11 @@ def fetch_layered_market_data() -> dict[str, Any]:
         "data_quality": quality,
         "errors": errors,
     }
+    try:
+        cache_path = project_root() / "data" / "cache" / "market_snapshot.json"
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_log("统一市场快照已写入 data/cache/market_snapshot.json", filename="stone_ai.log")
+    except Exception as exc:  # noqa: BLE001
+        write_log(f"统一市场快照写入失败：{exc}", filename="stone_ai.log")
+    return snapshot
