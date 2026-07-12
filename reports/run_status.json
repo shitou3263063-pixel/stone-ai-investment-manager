@@ -1,0 +1,47 @@
+{
+  "run_time": "2026-07-12T14:30:13",
+  "data_cutoff_time": "2026-07-12T14:30:12",
+  "report_date": "2026-07-12",
+  "status": "warning",
+  "dqs": 48,
+  "risk_score": 59,
+  "total_assets": 2821100,
+  "total_cash": 220000,
+  "cash_safety_reserve": 225688,
+  "investable_cash": 0,
+  "today_action": {
+    "execute": false,
+    "action_type": "无操作",
+    "targets": "不适用",
+    "amount_yuan": 0.0,
+    "amount_or_range": "0元",
+    "funding_source": "今日不使用资金",
+    "manual_confirmation_required": true
+  },
+  "next_review_date": "2026-07-15",
+  "fund_classification": {
+    "confirmed_fact_total_cash": 220000,
+    "rule_engine_investable_cash": 0,
+    "conditional_plan_bond_to_equity": 30000,
+    "unsettled_bond_cash": 0,
+    "simulated_grid_cash": 0,
+    "real_executable_today": 0
+  },
+  "report_files": [
+    "reports/today_action.md",
+    "reports/daily_report.md",
+    "reports/weekly_report.md",
+    "reports/run_status.json"
+  ],
+  "email_status": "failed",
+  "email_error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)",
+  "warnings": [
+    "缺失数据：DGS10, CPIAUCSL, UNRATE, GDP",
+    "DGS10：数据缺失，不做激进判断。",
+    "CPIAUCSL：数据缺失，不做激进判断。",
+    "UNRATE：数据缺失，不做激进判断。",
+    "GDP：数据缺失，不做激进判断。",
+    "邮件发送失败：[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)"
+  ],
+  "errors": []
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from email.message import EmailMessage
 from html import escape
+import json
 from pathlib import Path
 import os
 import smtplib
@@ -17,6 +18,7 @@ DEFAULT_SMTP_HOST = "smtp.gmail.com"
 DEFAULT_SMTP_PORT = "465"
 DEFAULT_EMAIL_TO = "shitou3263063@gmail.com"
 REQUIRED_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"]
+DAILY_EMAIL_SUBJECT = "Stone AI CIO Daily - 10%-15% Target"
 
 
 def _load_env_file(env_path: Path) -> None:
@@ -77,7 +79,7 @@ def _html_body(title: str, body: str) -> str:
         </div>
         <div style="padding:20px 22px;font-size:15px;line-height:1.72;white-space:normal">{safe_body}</div>
         <div style="padding:14px 22px;border-top:1px solid #eaecf0;background:#f9fafb;color:#475467;font-size:13px;line-height:1.6">
-          完整日报、周报、月报和校验报告已放在附件中。所有操作必须由你人工确认后自行执行，不承诺收益。
+          今日执行单、完整日报、最近有效周报和运行状态已放在附件中。所有操作必须由你人工确认后自行执行，不承诺收益。
         </div>
       </div>
     </div>
@@ -103,10 +105,11 @@ def _send_email(
     for path in attachments:
         if not path.exists():
             continue
+        is_json = path.suffix.lower() == ".json"
         msg.add_attachment(
             path.read_bytes(),
-            maintype="text",
-            subtype="markdown",
+            maintype="application" if is_json else "text",
+            subtype="json" if is_json else "markdown",
             filename=path.name,
         )
 
@@ -121,7 +124,7 @@ def send_test_email(env_path: Path | None = None) -> dict[str, Any]:
     if not config:
         message = "邮件未配置，跳过发送"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message}
+        return {"sent": False, "skipped": True, "message": message, "error": ""}
 
     try:
         _send_email(
@@ -132,11 +135,11 @@ def send_test_email(env_path: Path | None = None) -> dict[str, Any]:
         )
         message = f"邮件测试已发送到 {config['EMAIL_TO']}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": True, "skipped": False, "message": message}
+        return {"sent": True, "skipped": False, "message": message, "error": ""}
     except Exception as exc:  # noqa: BLE001 - 邮件失败不能影响主程序
         message = f"邮件测试发送失败，已跳过：{exc}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": False, "message": message}
+        return {"sent": False, "skipped": False, "message": message, "error": str(exc)}
 
 
 def send_daily_reports(
@@ -148,48 +151,54 @@ def send_daily_reports(
     if not config:
         message = "邮件未配置，跳过发送"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message}
+        return {"sent": False, "skipped": True, "message": message, "error": ""}
 
     reports_path = reports_dir or PROJECT_ROOT / "reports"
     today_action_path = reports_path / "today_action.md"
     daily_path = reports_path / "daily_report.md"
-    if not daily_path.exists():
-        message = "daily_report.md 不存在，跳过邮件发送"
+    weekly_path = reports_path / "weekly_report.md"
+    run_status_path = reports_path / "run_status.json"
+    attachments = [today_action_path, daily_path, weekly_path, run_status_path]
+    missing = [path.name for path in attachments if not path.exists()]
+    if missing:
+        message = f"固定邮件附件缺失，跳过发送：{', '.join(missing)}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message}
-
-    send_date = subject_date or date.today()
-    title = f"Stone AI CIO Daily - {send_date.isoformat()}"
-    today_body = _read_text(
-        today_action_path,
-        fallback="今日行动摘要尚未生成，请查看附件 daily_report.md。",
-    )
-    plain_body = "\n".join(
-        [
-            title,
-            "",
-            _clip(today_body),
-            "",
-            "完整日报、周报、月报和校验报告已放在附件中。",
-            "声明：仅供投资辅助，不构成投资建议；系统不自动交易，不承诺收益。",
-        ]
-    )
-    attachments = [
-        today_action_path,
-        daily_path,
-        reports_path / "weekly_report.md",
-        reports_path / "monthly_report.md",
-        reports_path / "validation_report.md",
-        reports_path / "service_health.md",
-    ]
-    attachments = [path for path in attachments if path.exists()]
+        return {"sent": False, "skipped": True, "message": message, "error": message}
 
     try:
-        _send_email(config, title, plain_body, attachments, _html_body(title, _clip(today_body)))
+        run_status = json.loads(run_status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        message = f"run_status.json 无法读取，跳过发送：{exc}"
+        write_log(message, filename="email_notifier.log")
+        return {"sent": False, "skipped": True, "message": message, "error": str(exc)}
+
+    action = run_status.get("today_action", {}) or {}
+    has_issue = bool(run_status.get("warnings") or run_status.get("errors"))
+    plain_body = "\n".join(
+        [
+            f"报告日期：{run_status.get('report_date')}",
+            f"数据截止时间：{run_status.get('data_cutoff_time')}",
+            f"今日是否执行：{'是' if action.get('execute') else '否'}",
+            f"标的和金额：{action.get('targets', '不适用')} / {action.get('amount_or_range', '0元')}",
+            f"可投资现金：{run_status.get('investable_cash', 0):,.0f}元",
+            f"下一复核日期：{run_status.get('next_review_date') or action.get('next_review_date') or '暂无'}",
+            f"DQS：{run_status.get('dqs')}",
+            f"是否存在警告或错误：{'是' if has_issue else '否'}",
+        ]
+    )
+
+    try:
+        _send_email(
+            config,
+            DAILY_EMAIL_SUBJECT,
+            plain_body,
+            attachments,
+            _html_body(DAILY_EMAIL_SUBJECT, plain_body),
+        )
         message = f"邮件已发送到 {config['EMAIL_TO']}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": True, "skipped": False, "message": message}
+        return {"sent": True, "skipped": False, "message": message, "error": ""}
     except Exception as exc:  # noqa: BLE001 - 邮件失败不能影响报告生成
         message = f"邮件发送失败，已记录错误：{exc}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": False, "message": message}
+        return {"sent": False, "skipped": False, "message": message, "error": str(exc)}

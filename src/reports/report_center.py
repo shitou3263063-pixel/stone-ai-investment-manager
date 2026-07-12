@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from src.reports.grid_report import generate_grid_daily_section
@@ -55,35 +56,146 @@ def _amount_mode_text(decision: dict[str, Any], amount: int | float) -> str:
     return "0元"
 
 
-def generate_today_action(decision: dict[str, Any]) -> str:
+def _unique_text(values: list[Any]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        text = str(value).strip()
+        if text and text not in result:
+            result.append(text)
+    return result
+
+
+def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
     budget = decision.get("budget", {})
+    dqs = decision.get("dqs", {}) or {}
+    risk = decision.get("risk", {}) or {}
+    consistency = decision.get("consistency", {}) or {}
+    opportunity = decision.get("opportunity", []) or []
+    top_opportunity = opportunity[0] if opportunity else {}
+    today_amount = float(budget.get("today_total_yuan", 0) or 0)
+    account_cash = float(budget.get("account_total_cash_yuan", 0) or 0)
+    funding_source = str(decision.get("funding_source") or "不适用")
+    cash_funded_amount = today_amount if decision.get("today_trade") and "现金" in funding_source else 0
+    post_execution_cash = max(0, account_cash - cash_funded_amount)
+
+    anomalies: list[Any] = []
+    anomalies.extend(consistency.get("errors", []) or [])
+    anomalies.extend(consistency.get("warnings", []) or [])
+    anomalies.extend(dqs.get("blocking_errors", []) or [])
+    if dqs.get("missing_metrics"):
+        anomalies.append(f"缺失数据：{', '.join(dqs['missing_metrics'])}")
+    if dqs.get("conflicts"):
+        anomalies.append(f"数据冲突：{len(dqs['conflicts'])}项")
+    for row in decision.get("market_table", []) or []:
+        if not row.get("success"):
+            anomalies.append(f"{row.get('name', '关键数据')}：{row.get('error') or '数据拉取失败'}")
+        elif row.get("stale"):
+            anomalies.append(f"{row.get('name', '关键数据')}：使用过期数据")
+
+    return {
+        "report_date": decision.get("date"),
+        "data_cutoff_time": decision.get("data_cutoff"),
+        "execute": bool(decision.get("today_trade")),
+        "action_type": decision.get("trade_type") or "无操作",
+        "targets": decision.get("targets") or "不适用",
+        "amount_yuan": today_amount,
+        "amount_or_range": _amount_mode_text(decision, today_amount),
+        "funding_source": funding_source,
+        "post_execution_cash_yuan": post_execution_cash,
+        "cash_safety_reserve_yuan": float(budget.get("cash_safety_reserve_yuan", 0) or 0),
+        "dqs": dqs.get("score"),
+        "dqs_mode": dqs.get("mode_label"),
+        "risk_score": risk.get("score"),
+        "risk_level": risk.get("level"),
+        "opportunity_score": (
+            f"{top_opportunity.get('name')} {top_opportunity.get('score')}分（{top_opportunity.get('advice')}）"
+            if top_opportunity
+            else "暂无可靠评分"
+        ),
+        "next_review_date": decision.get("next_review_date"),
+        "no_execute_reasons": _unique_text((decision.get("no_trade_reasons") or [])[:3]),
+        "data_anomalies_or_baseline_conflicts": _unique_text(anomalies)[:5],
+    }
+
+
+def generate_today_action(decision: dict[str, Any]) -> str:
+    action = build_today_action_payload(decision)
+    no_execute = "；".join(action["no_execute_reasons"]) if not action["execute"] else "不适用"
+    anomalies = "；".join(action["data_anomalies_or_baseline_conflicts"]) or "无"
     return "\n".join(
         [
-            "# Stone CIO 今日行动摘要",
+            "# Stone CIO 今日执行单",
             "",
-            f"版本：{decision.get('version')}",
-            f"今日是否交易：{_yes_no(decision.get('today_trade'))}",
-            f"今日交易类型：{decision.get('trade_type')}",
-            f"今日建议金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
-            f"建议标的：{decision.get('targets')}",
-            f"资金来源：{decision.get('funding_source')}",
-            f"DQS：{decision.get('dqs', {}).get('score')}（{decision.get('dqs', {}).get('mode_label')}）",
-            f"风险评分：{decision.get('risk', {}).get('score')}（{decision.get('risk', {}).get('level')}）",
-            f"下一复核日期：{decision.get('next_review_date')}",
-            f"最大风险：{decision.get('max_risk')}",
-            f"最大机会：{decision.get('max_opportunity')}",
-            "",
-            "今日不操作原因：",
-            _items(decision.get("no_trade_reasons")),
-            "",
-            "下一触发条件：",
-            _items(decision.get("next_triggers")),
-            "",
-            f"一句话结论：{decision.get('one_sentence')}",
-            "",
-            decision.get("disclaimer", "仅供投资辅助，不构成投资建议。"),
+            f"- 报告日期：{action['report_date']}",
+            f"- 数据截止时间：{action['data_cutoff_time']}",
+            f"- 今日是否执行：{_yes_no(action['execute'])}",
+            f"- 操作类型：{action['action_type']}",
+            f"- 标的：{action['targets']}",
+            f"- 金额或金额区间：{action['amount_or_range']}",
+            f"- 资金来源：真实可执行资金口径；{action['funding_source']}",
+            f"- 执行后账户现金余额：{_yuan(action['post_execution_cash_yuan'])}",
+            f"- 现金安全线：{_yuan(action['cash_safety_reserve_yuan'])}",
+            f"- DQS：{action['dqs']}（{action['dqs_mode']}）",
+            f"- Risk Score：{action['risk_score']}（{action['risk_level']}）",
+            f"- Opportunity Score：{action['opportunity_score']}",
+            f"- 下一复核日期：{action['next_review_date']}",
+            f"- 不执行的核心原因：{no_execute}",
+            f"- 数据异常或资产基线冲突：{anomalies}",
         ]
     )
+
+
+def build_run_status(
+    decision: dict[str, Any],
+    *,
+    report_files: list[str],
+    email_status: str,
+    email_error: str = "",
+) -> dict[str, Any]:
+    action = build_today_action_payload(decision)
+    budget = decision.get("budget", {}) or {}
+    consistency = decision.get("consistency", {}) or {}
+    warnings = list(action["data_anomalies_or_baseline_conflicts"])
+    errors = _unique_text(consistency.get("errors", []) or [])
+    if email_status == "failed" and email_error:
+        warnings.append(f"邮件发送失败：{email_error}")
+    warnings = _unique_text(warnings)
+    status = "failed" if errors else ("warning" if warnings or email_status == "failed" else "success")
+    return {
+        "run_time": decision.get("generated_at"),
+        "data_cutoff_time": decision.get("data_cutoff"),
+        "report_date": decision.get("date"),
+        "status": status,
+        "dqs": decision.get("dqs", {}).get("score"),
+        "risk_score": decision.get("risk", {}).get("score"),
+        "total_assets": decision.get("portfolio_value_yuan"),
+        "total_cash": budget.get("account_total_cash_yuan"),
+        "cash_safety_reserve": budget.get("cash_safety_reserve_yuan"),
+        "investable_cash": budget.get("investable_cash_yuan"),
+        "today_action": {
+            "execute": action["execute"],
+            "action_type": action["action_type"],
+            "targets": action["targets"],
+            "amount_yuan": action["amount_yuan"],
+            "amount_or_range": action["amount_or_range"],
+            "funding_source": action["funding_source"],
+            "manual_confirmation_required": True,
+        },
+        "next_review_date": decision.get("next_review_date"),
+        "fund_classification": {
+            "confirmed_fact_total_cash": budget.get("account_total_cash_yuan"),
+            "rule_engine_investable_cash": budget.get("investable_cash_yuan"),
+            "conditional_plan_bond_to_equity": budget.get("conditional_bond_to_equity_month_yuan"),
+            "unsettled_bond_cash": budget.get("actual_bond_cash_arrived_yuan"),
+            "simulated_grid_cash": budget.get("paper_grid_cash_yuan"),
+            "real_executable_today": budget.get("today_total_yuan"),
+        },
+        "report_files": report_files,
+        "email_status": email_status,
+        "email_error": email_error,
+        "warnings": warnings,
+        "errors": errors,
+    }
 
 
 def _money_plan_table(decision: dict[str, Any]) -> list[str]:
@@ -419,10 +531,19 @@ def generate_daily_report(
 
 def generate_weekly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
+    try:
+        report_date = date.fromisoformat(str(decision.get("date")))
+    except (TypeError, ValueError):
+        report_date = date.today()
+    iso_year, iso_week, _ = report_date.isocalendar()
+    week_start = report_date - timedelta(days=report_date.weekday())
+    week_end = week_start + timedelta(days=6)
     return "\n".join(
         [
             "# Stone AI V12.5 Stable 周报",
             "",
+            f"- 报告所属周：{iso_year}-W{iso_week:02d}",
+            f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
             f"- 本周确认买入额度：{_yuan(budget.get('week_confirmed_yuan'))}",
             f"- 条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
             f"- 下一复核日：{decision.get('next_review_date')}",

@@ -84,6 +84,7 @@ python scripts/test_email.py
 reports/today_action.md
 reports/daily_report.md
 reports/weekly_report.md
+reports/run_status.json
 reports/monthly_report.md
 reports/grid_report.md
 reports/grid_weekly_report.md
@@ -97,6 +98,8 @@ reports/decision.json
 ```
 
 其中 `reports/decision.json` 是统一决策对象。今日行动、日报、周报、月报、网格报告和邮件正文都从同一份决策对象生成，避免互相矛盾。
+
+Codex—ChatGPT固定联动接口为`today_action.md`、`daily_report.md`、`weekly_report.md`和`run_status.json`。周报只在周日刷新，其他日期保留最近有效周报。邮件主题固定为`Stone AI CIO Daily - 10%-15% Target`，每次只附带上述四个文件。
 
 ## 智能网格模块
 

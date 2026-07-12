@@ -42,7 +42,7 @@ class ReportsAndAiTest(unittest.TestCase):
         today = generate_today_action(decision)
         daily = generate_daily_report(decision=decision)
 
-        self.assertIn("今日建议金额", today)
+        self.assertIn("金额或金额区间", today)
         self.assertIn("## 6. Opportunity Score", daily)
         self.assertIn("## 10. DQS数据质量", daily)
         self.assertIn("## 12. 三种市场情景", daily)

@@ -25,6 +25,7 @@ from src.macro.macro_calendar import analyze_macro_calendar
 from src.notifier.email_notifier import send_daily_reports
 from src.reports.grid_report import generate_grid_backtest_report, generate_grid_daily_section, generate_grid_weekly_report
 from src.reports.report_center import (
+    build_run_status,
     generate_daily_report,
     generate_monthly_report,
     generate_today_action,
@@ -135,6 +136,21 @@ def _system_check_report() -> str:
     return format_health_report(run_health_check(auto_fix=True))
 
 
+def write_weekly_report_if_due(reports_dir: Path, decision: dict[str, Any], run_date: date) -> dict[str, Any]:
+    """周日刷新周报；非周日保留最近有效文件。首次缺失时仅做初始化恢复。"""
+    weekly_path = reports_dir / "weekly_report.md"
+    should_update = run_date.weekday() == 6
+    initialized = False
+    if should_update or not weekly_path.exists():
+        initialized = not weekly_path.exists() and not should_update
+        weekly_path.write_text(generate_weekly_report(decision), encoding="utf-8")
+        reason = "周日例行更新" if should_update else "固定周报缺失，执行首次初始化"
+        write_log(f"周报状态：{reason}；路径={weekly_path}", filename="stone_ai.log")
+        return {"updated": True, "initialized": initialized, "path": str(weekly_path), "reason": reason}
+    write_log(f"周报状态：非周日保留最近有效周报；路径={weekly_path}", filename="stone_ai.log")
+    return {"updated": False, "initialized": False, "path": str(weekly_path), "reason": "非周日保留"}
+
+
 def run(*, send_email: bool = True) -> str:
     root = project_root()
     reports_dir = root / "reports"
@@ -153,11 +169,16 @@ def run(*, send_email: bool = True) -> str:
     write_service_health(reports_dir / "service_health.md")
     (reports_dir / "system_audit.md").write_text(build_system_audit_text(context, decision), encoding="utf-8")
 
-    (reports_dir / "today_action.md").write_text(generate_today_action(decision), encoding="utf-8")
+    today_action_path = reports_dir / "today_action.md"
+    daily_report_path = reports_dir / "daily_report.md"
+    weekly_report_path = reports_dir / "weekly_report.md"
+    run_status_path = reports_dir / "run_status.json"
+
+    today_action_path.write_text(generate_today_action(decision), encoding="utf-8")
     (reports_dir / "grid_report.md").write_text(generate_grid_daily_section(decision.get("grid", {})), encoding="utf-8")
     (reports_dir / "grid_weekly_report.md").write_text(generate_grid_weekly_report(decision.get("grid", {})), encoding="utf-8")
     (reports_dir / "grid_backtest_report.md").write_text(generate_grid_backtest_report(decision.get("grid", {})), encoding="utf-8")
-    (reports_dir / "daily_report.md").write_text(
+    daily_report_path.write_text(
         generate_daily_report(
             decision=decision,
             portfolio_result=context["portfolio_result"],
@@ -170,13 +191,46 @@ def run(*, send_email: bool = True) -> str:
         ),
         encoding="utf-8",
     )
-    (reports_dir / "weekly_report.md").write_text(generate_weekly_report(decision), encoding="utf-8")
+    weekly_result = write_weekly_report_if_due(reports_dir, decision, today)
     (reports_dir / "monthly_report.md").write_text(generate_monthly_report(decision), encoding="utf-8")
     (reports_dir / "system_check_report.md").write_text(_system_check_report(), encoding="utf-8")
 
-    email_result = {"message": "本次运行未发送邮件"}
+    fixed_report_files = [
+        "reports/today_action.md",
+        "reports/daily_report.md",
+        "reports/weekly_report.md",
+        "reports/run_status.json",
+    ]
+    pre_email_status = "sent" if send_email else "skipped"
+    run_status = build_run_status(
+        decision,
+        report_files=fixed_report_files,
+        email_status=pre_email_status,
+    )
+    if weekly_result.get("initialized"):
+        run_status["warnings"].append("weekly_report.md在非周日首次初始化；后续仅周日更新。")
+        run_status["status"] = "warning"
+    _write_json(run_status_path, run_status)
+    write_log(
+        "固定报告已生成："
+        f"{today_action_path}；{daily_report_path}；{weekly_report_path}；{run_status_path}",
+        filename="stone_ai.log",
+    )
+
+    email_result = {"sent": False, "skipped": True, "message": "本次运行未发送邮件", "error": ""}
     if send_email:
         email_result = send_daily_reports(reports_dir=reports_dir, subject_date=today)
+    final_email_status = "sent" if email_result.get("sent") else ("skipped" if email_result.get("skipped") else "failed")
+    run_status = build_run_status(
+        decision,
+        report_files=fixed_report_files,
+        email_status=final_email_status,
+        email_error=str(email_result.get("error") or ""),
+    )
+    if weekly_result.get("initialized"):
+        run_status["warnings"].append("weekly_report.md在非周日首次初始化；后续仅周日更新。")
+        run_status["status"] = "warning"
+    _write_json(run_status_path, run_status)
     write_log(f"邮件发送状态：{email_result['message']}", filename="stone_ai.log")
 
     budget = decision["budget"]
@@ -193,7 +247,7 @@ def run(*, send_email: bool = True) -> str:
             f"风险评分：{decision['risk']['score']}；等级：{decision['risk']['level']}",
             f"一致性校验：{'通过' if validation.get('ok') else '未通过'}",
             f"邮件通知：{email_result['message']}",
-            "已生成：reports/today_action.md、reports/daily_report.md、reports/weekly_report.md、reports/monthly_report.md、reports/grid_report.md、reports/grid_weekly_report.md、reports/grid_backtest_report.md、reports/system_audit.md、reports/decision.json",
+            "固定联动文件：reports/today_action.md、reports/daily_report.md、reports/weekly_report.md、reports/run_status.json",
             "声明：系统不自动交易，不接券商下单权限；仅供投资辅助，不构成投资建议，不承诺收益。",
         ]
     )
