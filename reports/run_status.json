@@ -1,10 +1,10 @@
 {
-  "run_time": "2026-07-12T14:30:13",
-  "data_cutoff_time": "2026-07-12T14:30:12",
+  "run_time": "2026-07-12T15:08:44",
+  "data_cutoff_time": "2026-07-12T15:08:43",
   "report_date": "2026-07-12",
   "status": "warning",
   "dqs": 48,
-  "risk_score": 59,
+  "risk_score": 58,
   "total_assets": 2821100,
   "total_cash": 220000,
   "cash_safety_reserve": 225688,

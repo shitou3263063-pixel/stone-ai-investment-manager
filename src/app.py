@@ -16,9 +16,15 @@ from agents.portfolio_agent import PortfolioAgent
 from scripts.build_daily_snapshot import write_snapshot
 from scripts.check_all_services import write_service_health
 from scripts.project_audit import write_project_audit
-from src.ai.openai_advisor import build_ai_context, generate_openai_advice
+from src.ai.openai_advisor import apply_openai_review, build_cio_review_context, generate_openai_advice
 from src.analysis.cross_asset_engine import analyze_cross_asset
-from src.decision.v12_1_decision import VERSION_NAME, build_system_audit_text, build_v12_1_decision
+from src.decision.v12_1_decision import (
+    VERSION_NAME,
+    apply_ai_explanation,
+    build_consistency_checks,
+    build_system_audit_text,
+    build_v12_1_decision,
+)
 from src.journal.investment_journal import build_log_row, upsert_investment_log
 from src.journal.review_engine import build_history_review
 from src.macro.macro_calendar import analyze_macro_calendar
@@ -38,6 +44,7 @@ from src.strategy.rebalance_engine import build_rebalance_plan
 from src.strategies.smart_grid_strategy import build_smart_grid_result
 from src.system.health_check import format_health_report, run_health_check
 from src.validators.decision_validator import write_validation_report
+from src.portfolio_snapshot import portfolio_rows_for_legacy_agents
 from utils.data_loader import load_config, load_market_data, load_portfolio, project_root
 from utils.logger import write_log
 
@@ -49,8 +56,11 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     root = project_root()
+    write_log("阶段：持仓加载与统一快照派生开始", filename="stone_ai.log")
     config = load_config(root / "data" / "config.yaml")
-    portfolio = load_portfolio(root / "data" / "portfolio.csv")
+    config["target_allocation"] = load_config(root / "config" / "strategy.yaml")["target_allocation"]
+    # Portfolio Snapshot 是唯一生产资产事实源；CSV仅保留为兼容和人工查看文件。
+    portfolio = portfolio_rows_for_legacy_agents()
     market_data = load_market_data(root / "data" / "market_data.csv")
     live_market_result = (snapshot or {}).get("market") or {}
     macro_result = analyze_macro_calendar()
@@ -58,6 +68,7 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
 
     market_result = MarketAgent(config, market_data).analyze()
     portfolio_result = PortfolioAgent(config, portfolio).analyze()
+    write_log("阶段：资产、DQS、风险、预算与规则引擎计算开始", filename="stone_ai.log")
     dca_result = build_dca_plan(market_data, vix_result, macro_result)
     allocation_rebalance_result = build_rebalance_plan(portfolio_result)
     execution_plan_result = build_execution_plan(
@@ -71,22 +82,11 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
         config,
     )
     cross_asset_result = analyze_cross_asset(live_market_result, market_data, portfolio_result)
-    ai_context = build_ai_context(
-        portfolio_result,
-        market_result,
-        live_market_result,
-        vix_result,
-        macro_result,
-        dca_result,
-        allocation_rebalance_result,
-        cross_asset_result,
-    )
-    ai_advice_result = generate_openai_advice(ai_context)
     decision = build_v12_1_decision(
         portfolio_result=portfolio_result,
         live_market_result=live_market_result,
         macro_result=macro_result,
-        ai_advice_result=ai_advice_result,
+        ai_advice_result={"ai_status": "rule_only", "fallback_reason": "pre_ai_rule_pass"},
     )
     try:
         grid_result = build_smart_grid_result(
@@ -102,6 +102,14 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
             "summary": "智能网格模块异常，主日报继续生成。",
         }
     decision["grid"] = grid_result
+    # 先完成规则与网格一致性校验，再允许OpenAI对已裁决结果做解释复核。
+    decision["consistency"] = build_consistency_checks(decision)
+    write_log(f"阶段：规则前置一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
+    ai_context = build_cio_review_context(decision, live_market_result, macro_result)
+    write_log("阶段：OpenAI可选解释复核开始", filename="stone_ai.log")
+    ai_advice_result = apply_openai_review(decision, generate_openai_advice(ai_context))
+    decision = apply_ai_explanation(decision, ai_advice_result)
+    write_log(f"阶段：OpenAI复核后一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
     today = date.today()
     log_row = build_log_row(
         today,
@@ -158,11 +166,13 @@ def run(*, send_email: bool = True) -> str:
     today = date.today()
 
     write_log("V12.5 Stable 正式运行开始", filename="stone_ai.log")
+    write_log("阶段：数据获取与每日统一快照开始", filename="stone_ai.log")
     snapshot = write_snapshot()
     context = _build_context(snapshot)
     decision = context["decision"]
     validation = context["validation"]
 
+    write_log("阶段：报告生成与文件落盘开始", filename="stone_ai.log")
     _write_json(reports_dir / "decision.json", decision)
     write_validation_report(reports_dir / "validation_report.md", validation, decision)
     write_project_audit(reports_dir / "project_audit.md")
@@ -266,4 +276,8 @@ def main() -> int:
 
     print("开始生成投资日报...")
     print(run(send_email=True))
-    return 0
+    try:
+        status = json.loads((project_root() / "reports" / "run_status.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 1
+    return 1 if status.get("status") == "failed" else 0

@@ -16,14 +16,14 @@ def validate_decision(decision: dict[str, Any]) -> dict[str, Any]:
     month = float(decision.get("month_buy_amount_yuan", 0) or 0)
     cash_available = float(decision.get("cash_available_wan", 0) or 0)
 
-    if dqs < 70 and (today > 0 or week > 0 or month > 0):
-        errors.append("DQS低于70时不得输出买入金额。")
-    if 70 <= dqs < 80 and (today > 0 or week > 0 or month > 0):
-        errors.append("DQS 70-79只能输出方向，不得输出具体金额。")
-    if 80 <= dqs < 90 and mode not in {"upper_limit", "blocked", "direction_only"}:
-        errors.append("DQS 80-89必须使用金额上限或方向模式，不得使用精确金额。")
-    if dqs < 90 and bool(decision.get("precise_amount_allowed")):
-        errors.append("DQS低于90时不得允许精确金额。")
+    if dqs < 60 and (today > 0 or week > 0 or month > 0):
+        errors.append("DQS低于60时不得输出新增仓位金额。")
+    if 60 <= dqs < 75 and (today > 0 or week > 0 or month > 0):
+        errors.append("DQS 60-74只能输出方向，不得输出具体金额。")
+    if 75 <= dqs < 85 and mode not in {"upper_limit", "range", "blocked", "direction_only"}:
+        errors.append("DQS 75-84必须使用金额区间、上限或方向模式，不得使用精确金额。")
+    if dqs < 85 and bool(decision.get("precise_amount_allowed")):
+        errors.append("DQS低于85时不得允许精确金额。")
     if cash_available <= 0 and today > 0:
         errors.append("可投资现金不足时不得安排今日现金买入。")
     if today > week and week > 0:
@@ -98,8 +98,8 @@ def format_validation_report(validation: dict[str, Any], decision: dict[str, Any
     lines = [
         "# Validation Report",
         "",
-        f"- 状态：{'通过' if validation.get('ok') else '未通过，已降级'}",
-        f"- 时间：{validation.get('validated_at')}",
+        f"- 状态：{validation.get('status') or ('PASS' if validation.get('ok') else 'FAILED_VALIDATION')}",
+        f"- 时间：{validation.get('validated_at') or validation.get('checked_at') or '暂无'}",
         f"- DQS：{dqs_text}",
         f"- 金额模式：{amount_text}",
         f"- 是否触发保守降级：{'是' if validation.get('fallback_applied') else '否'}",

@@ -1,6 +1,6 @@
 # Stone AI V12.5 Stable System Audit
 
-- 审计时间：2026-07-12T00:50:22
+- 审计时间：2026-07-12T15:08:55
 - 当前实际运行入口：根目录 `main.py`（V12.5 Stable冻结入口）。
 - GitHub Actions 应调用：`python main.py`。
 - 报告生成模块：`src/reports/report_center.py`。
@@ -23,7 +23,7 @@
 
 ## 关键运行快照
 
-- 旧数据质量分：45
+- 旧数据质量分：55
 - 旧执行计划：today=0.0万 week=0.0万 month=0.0万
-- 新DQS：45 / 禁止新增仓位建议
-- 新风险评分：59 / 中高风险
+- 新DQS：48 / 禁止新增仓位建议
+- 新风险评分：58 / 中高风险

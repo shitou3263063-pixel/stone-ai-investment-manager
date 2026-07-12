@@ -6,6 +6,10 @@ on:
     - cron: "30 0 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: stone-ai-daily-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   daily-report:
     runs-on: ubuntu-latest

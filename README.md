@@ -283,7 +283,7 @@ smart_grid:
 - yfinance：免费兜底行情源。
 - Yahoo chart API：网格历史回测数据源。
 - 本地缓存：`data/cache/`。
-- 手工资产台账：`data/portfolio.csv` 和 `data/portfolio_master.yaml`。
+- 手工资产权威台账：`data/portfolio_master.yaml`。`data/portfolio.csv`仅为兼容镜像，不参与生产决策事实维护。
 
 ## 环境变量与Secrets
 
@@ -301,12 +301,17 @@ EMAIL_TO
 
 ```text
 OPENAI_API_KEY
+OPENAI_MODEL
+OPENAI_TIMEOUT_SECONDS
+MAX_LLM_RETRIES
 FRED_API_KEY
 ALPHA_VANTAGE_API_KEY
 FINNHUB_API_KEY
 ```
 
-OpenAI是可选解释层。未配置、额度不足或请求失败时，Stone CIO规则增强分析仍会完整生成，不影响DQS、资金预算、风控和邮件日报。
+OpenAI是规则裁决后的可选解释层。系统先完成资产、预算、DQS、风险、规则和一致性校验，再提交精简结构化摘要给OpenAI；返回内容还会经过现金、DQS、事件、预算和ST股票约束复核。未配置、额度不足、超时、非JSON或越权时，Stone CIO规则增强分析仍会完整生成，不影响核心决策和邮件日报。
+
+宏观事件由`config/settings.yaml`人工维护。每项必须写明来源、时区和`confirmed`状态；未获官方确认的日期在日报中显示“日期待确认”，不得当作确定事件事实。
 
 ## 分支与版本冻结
 

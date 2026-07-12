@@ -45,6 +45,34 @@ MACRO_SERIES = {
     "UNRATE": "失业率",
     "GDP": "GDP",
 }
+SOURCE_LEVELS = {
+    "fred": 1,
+    "treasury": 1,
+    "cboe_official": 1,
+    "alpha_vantage": 2,
+    "finnhub": 2,
+    "yfinance": 3,
+    "unavailable": 99,
+}
+
+
+def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
+    """为行情和宏观点补齐统一审计字段，不用0替代缺失值。"""
+    source = str(item.get("source") or "unavailable")
+    source_key = source.split(":", 1)[1] if source.startswith("cache:") else source
+    status = str(item.get("status") or ("ok" if item.get("close", item.get("value")) is not None else "missing"))
+    stale = bool(item.get("cache_stale")) or item.get("freshness_status") == "stale"
+    timestamp = item.get("published_at") or item.get("date") or item.get("fetched_at")
+    return {
+        **item,
+        "value": item.get("close", item.get("value")),
+        "timestamp": timestamp,
+        "source": source,
+        "source_level": SOURCE_LEVELS.get(source_key, 99),
+        "status": status,
+        "stale": stale,
+        "fallback_used": bool(item.get("cache_used")) or source.startswith("cache:"),
+    }
 
 
 def _failed_item(symbol: str, errors: list[str]) -> dict[str, Any]:
@@ -150,17 +178,17 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
                 candidates.append(data)
 
     if candidates:
-        selected = candidates[0]
-        selected = {**selected, "candidates": candidates, "source_count": len({item.get("source") for item in candidates})}
-        return selected
+        normalized_candidates = [_normalize_point(item) for item in candidates]
+        selected = normalized_candidates[0]
+        return {**selected, "candidates": normalized_candidates, "source_count": len({item.get("source") for item in normalized_candidates})}
 
     cached = read_cache("quote", symbol)
     if cached:
         write_log(f"{symbol} 使用缓存行情：{cached.get('source')}", filename="data_router.log")
-        return _with_symbol(symbol, {**cached, "status": "ok", "source": f"cache:{cached.get('source', 'unknown')}"})
+        return _normalize_point(_with_symbol(symbol, {**cached, "status": "ok", "source": f"cache:{cached.get('source', 'unknown')}"}))
 
     write_log(f"{symbol} 行情全部失败，数据缺失，不做激进判断", filename="data_router.log")
-    return _failed_item(symbol, errors)
+    return _normalize_point(_failed_item(symbol, errors))
 
 
 def get_macro_snapshot() -> dict[str, Any]:
@@ -199,6 +227,7 @@ def get_macro_snapshot() -> dict[str, Any]:
                     "warning": "数据缺失，不做激进判断。",
                 }
 
+    items = {key: _normalize_point(value) for key, value in items.items()}
     return {
         "source": "fred_cache_router",
         "items": items,

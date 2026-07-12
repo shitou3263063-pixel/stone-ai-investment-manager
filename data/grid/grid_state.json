@@ -24,7 +24,7 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-12T00:50:20"
+      "updated_at": "2026-07-12T15:08:44"
     },
     "QQQ": {
       "symbol": "QQQ",
@@ -49,8 +49,8 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-12T00:50:20"
+      "updated_at": "2026-07-12T15:08:44"
     }
   },
-  "updated_at": "2026-07-12T00:50:20"
+  "updated_at": "2026-07-12T15:08:44"
 }

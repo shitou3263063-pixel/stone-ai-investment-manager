@@ -104,21 +104,29 @@ def generate_grid_daily_section(grid_result: dict[str, Any]) -> str:
         lines.append(f"- {symbol}：{'；'.join(str(reason) for reason in reasons)}")
 
     budget = grid_result.get("grid_budget", {}) or {}
+    per_symbol_cash = {
+        symbol: float((item.get("state", {}) or {}).get("available_grid_cash_yuan", 0) or 0)
+        for symbol, item in symbols.items()
+    }
+    allocation_text = "；".join(f"{symbol}模拟分配{_yuan(amount)}" for symbol, amount in per_symbol_cash.items()) or "暂无分配"
     lines.extend(
         [
             "",
             "## 6. 网格账户状态",
             "",
             f"- 网格总资金：{_yuan(budget.get('configured_total_yuan'))}",
+            f"- 模拟现金储备：{_yuan(budget.get('reserved_grid_cash_yuan'))}",
             f"- 可用模拟现金：{_yuan(budget.get('simulated_available_yuan'))}",
+            f"- 标的模拟分配：{allocation_text}",
             f"- 可用实盘现金：{_yuan(budget.get('live_available_yuan'))}",
+            "- 计算关系：网格总资金 = 模拟现金储备 + 可用模拟现金；标的分配合计与可用模拟现金的差额仅允许为整数四舍五入。以上均为SIMULATION，不计入真实资产或可投资现金。",
             f"- 累计已实现收益：{_yuan(sum((item.get('state', {}) or {}).get('realized_profit_yuan', 0) for item in symbols.values()))}",
             f"- 未实现收益：{_yuan(sum((item.get('state', {}) or {}).get('unrealized_profit_yuan', 0) for item in symbols.values()))}",
             f"- 本月交易次数：{sum((item.get('state', {}) or {}).get('month_trade_count', 0) for item in symbols.values())}",
             "- 本月资金使用率：模拟运行阶段仅记录，不占用真实资金。",
             "- 最大回撤：等待至少20个交易日模拟记录后统计。",
             "",
-            "## 7. 下一触发条件",
+            "## 7. 后续网格触发价",
             "",
         ]
     )

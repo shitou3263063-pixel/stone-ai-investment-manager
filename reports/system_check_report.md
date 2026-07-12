@@ -4,7 +4,8 @@ Stone AI Investment Manager Pro V12.5 Stable 系统自检
 [OK] Python版本：当前 Python 3.12.13。
 [OK] requirements依赖：requirements.txt 中的依赖已安装。
 [OK] 持仓文件：data/portfolio.csv 存在且格式可读取。
-[OK] 策略配置：config/settings.yaml 存在。
+[OK] 事件与兼容配置：config/settings.yaml 存在。
+[OK] 生产策略配置：config/strategy.yaml 存在，是目标配置与硬风控的唯一权威来源。
 [OK] 报告目录：reports 文件夹存在。
 [OK] .env.example：.env.example 存在。
 [OK] .env文件：.env 存在。

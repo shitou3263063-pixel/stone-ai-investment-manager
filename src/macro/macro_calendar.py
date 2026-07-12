@@ -93,7 +93,11 @@ def load_macro_events(settings_path: Path | None = None) -> list[dict[str, Any]]
             {
                 "name": str(item.get("name", "未命名事件")).strip(),
                 "date": event_date,
+                "time": str(item.get("time") or "待确认"),
+                "timezone": str(item.get("timezone") or "Asia/Shanghai"),
                 "level": str(item.get("level", "medium")).strip().lower(),
+                "source": str(item.get("source") or "config/settings.yaml（人工维护）"),
+                "confirmed": bool(item.get("confirmed", False)),
             }
         )
     return events
@@ -114,10 +118,15 @@ def analyze_macro_calendar(
         if current_date <= event["date"] <= window_end
     ]
     upcoming.sort(key=lambda item: item["date"])
-    high_events = [event for event in upcoming if event["level"] == "high"]
+    high_events = [event for event in upcoming if event["level"] == "high" and event.get("confirmed")]
+    unconfirmed_high_events = [event for event in upcoming if event["level"] == "high" and not event.get("confirmed")]
+    for event in upcoming:
+        event["status"] = "即将发生" if event.get("confirmed") else "日期待确认"
 
     if high_events:
         reminder = "未来7天有 high 级别宏观事件：重大事件前不追涨，定投可以继续，不建议一次性重仓买入。"
+    elif unconfirmed_high_events:
+        reminder = "未来7天有待官方确认的高等级事件日期；降低事件日历置信度，执行前必须复核官方时间。"
     elif upcoming:
         reminder = "未来7天有宏观事件，建议保持仓位纪律，避免临时冲动交易。"
     else:
@@ -129,6 +138,8 @@ def analyze_macro_calendar(
         "important_event_types": DEFAULT_EVENT_TYPES,
         "upcoming_events": upcoming,
         "has_high_event_next_7_days": bool(high_events),
+        "has_unconfirmed_high_event_next_7_days": bool(unconfirmed_high_events),
+        "calendar_confidence": "high" if upcoming and not unconfirmed_high_events else "low" if unconfirmed_high_events else "medium",
         "reminder": reminder,
         "discipline": [
             "重大事件前不追涨",
@@ -137,4 +148,3 @@ def analyze_macro_calendar(
             "所有操作必须人工确认，系统不自动交易",
         ],
     }
-

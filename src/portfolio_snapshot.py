@@ -66,6 +66,11 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
     value_cny = round(_to_float(holding.get("market_value_cny")))
     original_value = _to_float(holding.get("market_value_original"), value_cny)
     exchange_rate = _to_float(holding.get("exchange_rate"), 1.0)
+    confirmed_at = str(holding.get("last_confirmed_at") or holding.get("valuation_time") or date.today().isoformat())
+    valuation_method = str(
+        holding.get("valuation_method")
+        or ("manual_override" if holding.get("manual_override") else "user_confirmed_market_value")
+    )
     return {
         "snapshot_date": str(holding.get("valuation_time") or date.today().isoformat()),
         "asset_id": holding.get("asset_id", ""),
@@ -83,6 +88,9 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "exchange_rate": exchange_rate,
         "market_value_cny": value_cny,
         "data_source": holding.get("data_source") or "user_confirmed",
+        "source": holding.get("data_source") or "user_confirmed",
+        "last_confirmed_at": confirmed_at,
+        "valuation_method": valuation_method,
         "valuation_time": str(holding.get("valuation_time") or date.today().isoformat()),
         "confidence": holding.get("confidence") or "medium",
         "account": holding.get("account") or "",
@@ -125,10 +133,23 @@ def build_portfolio_snapshot() -> dict[str, Any]:
     investable_cash = max(0, account_cash - safety_reserve - live_grid_cash - other_reserved_cash)
 
     gold_detail_total = sum(int(item["market_value_cny"]) for item in holdings if item["asset_class"] == "黄金")
+    snapshot_date = str(master.get("as_of") or date.today().isoformat())
+    try:
+        holding_age_days = max(0, (date.today() - date.fromisoformat(snapshot_date[:10])).days)
+    except ValueError:
+        holding_age_days = 9999
+    holdings_stale = holding_age_days > 31
+    freshness_warning = "持仓市值可能滞后" if holdings_stale else "持仓数据在人工确认有效期内"
     return {
-        "snapshot_date": str(master.get("as_of") or date.today().isoformat()),
+        "snapshot_date": snapshot_date,
         "built_at": datetime.now().isoformat(timespec="seconds"),
         "source_file": str(master_path),
+        "source": str(master.get("source") or "user_confirmed"),
+        "last_confirmed_at": snapshot_date,
+        "valuation_method": "user_confirmed_portfolio_snapshot",
+        "holding_age_days": holding_age_days,
+        "holdings_stale": holdings_stale,
+        "freshness_warning": freshness_warning,
         "total_assets": total_assets,
         "asset_class_totals": configured_totals,
         "holding_class_totals": class_totals,

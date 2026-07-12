@@ -4,12 +4,24 @@ config_role: compatibility_macro_and_legacy_planning_inputs
 macro_events:
   - name: FOMC利率决议
     date: 2026-07-29
+    time: 待确认
+    timezone: Asia/Shanghai
+    source: user_configured_calendar
+    confirmed: false
     level: high
   - name: CPI数据
     date: 2026-07-15
+    time: 待确认
+    timezone: Asia/Shanghai
+    source: user_configured_calendar
+    confirmed: false
     level: high
   - name: 非农就业数据
     date: 2026-08-07
+    time: 待确认
+    timezone: Asia/Shanghai
+    source: user_configured_calendar
+    confirmed: false
     level: high
 
 dca_plan:
@@ -28,14 +40,6 @@ dca_plan:
     - symbol: 3067.HK
       name: 恒生科技ETF
       base_amount: 2000
-
-target_allocation:
-  us_stock: 30
-  hk_stock: 12
-  cn_stock: 10
-  bond: 25
-  gold: 15
-  cash: 8
 
 data_sources:
   fred:

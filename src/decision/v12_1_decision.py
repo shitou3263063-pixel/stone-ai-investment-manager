@@ -11,7 +11,6 @@ from utils.logger import write_log
 VERSION_NAME = "Stone AI Investment Manager Pro V12.5 Stable"
 
 DEFAULT_STRATEGY: dict[str, Any] = {
-    "target_allocation": {"美股": 0.30, "港股": 0.12, "A股": 0.10, "债券": 0.25, "黄金": 0.15, "现金": 0.08},
     "cash": {"safety_ratio": 0.08, "hard_floor_ratio": 0.05},
     "dqs_thresholds": {
         "exact_amount": 85,
@@ -88,12 +87,16 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 def load_strategy() -> dict[str, Any]:
     path = project_root() / "config" / "strategy.yaml"
     if not path.exists():
-        return DEFAULT_STRATEGY
+        raise FileNotFoundError("config/strategy.yaml 缺失，无法确认目标配置和硬风控参数。")
     try:
-        return _deep_merge(DEFAULT_STRATEGY, load_config(path))
+        loaded = _deep_merge(DEFAULT_STRATEGY, load_config(path))
+        target = loaded.get("target_allocation", {}) or {}
+        if set(target) != set(CATEGORY_KEYS) or abs(sum(float(value) for value in target.values()) - 1.0) > 0.0001:
+            raise ValueError("target_allocation必须包含六类资产且合计100%")
+        return loaded
     except Exception as exc:  # noqa: BLE001
-        write_log(f"strategy.yaml 读取失败，使用默认策略：{exc}", filename="stone_ai.log")
-        return DEFAULT_STRATEGY
+        write_log(f"strategy.yaml 读取失败：{exc}", filename="stone_ai.log")
+        raise
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -198,7 +201,11 @@ def build_market_table(live_market: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def compute_dqs(live_market: dict[str, Any], strategy: dict[str, Any]) -> dict[str, Any]:
+def compute_dqs(
+    live_market: dict[str, Any],
+    strategy: dict[str, Any],
+    macro_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     weights = strategy["dqs_weights"]
     items = _market_items(live_market)
     macro = _macro_items(live_market)
@@ -218,6 +225,9 @@ def compute_dqs(live_market: dict[str, Any], strategy: dict[str, Any]) -> dict[s
 
     market_score = round(sum(market_ok) / len(CRITICAL_MARKET) * weights["market_completeness"])
     macro_score = round(sum(macro_ok) / len(CRITICAL_MACRO) * weights["macro_completeness"])
+    calendar_confidence = str((macro_result or {}).get("calendar_confidence") or "unknown")
+    if calendar_confidence == "low":
+        macro_score = max(0, macro_score - 1)
     tier1_score = round((len(tier1_rows) / len(all_rows)) * weights["tier1_coverage"])
     dual_score = round((len(dual_rows) / len(all_rows)) * weights["dual_source"])
     freshness_score = round((len(fresh_rows) / len(all_rows)) * weights["freshness"]) if all_rows else 0
@@ -231,12 +241,16 @@ def compute_dqs(live_market: dict[str, Any], strategy: dict[str, Any]) -> dict[s
     dual_coverage = len(dual_rows) / len(all_rows) if all_rows else 0.0
 
     blocking_errors = []
+    snapshot = _portfolio_snapshot()
+    holdings_stale = bool(snapshot.get("holdings_stale"))
     if suspicious_zero:
         blocking_errors.append(f"关键数据出现异常0值：{', '.join(suspicious_zero)}")
     if conflicts:
         blocking_errors.append("关键数据存在来源冲突。")
     if not _is_ok_item(items.get("VOO", {})) or not _is_ok_item(items.get("^VIX", {})):
         blocking_errors.append("核心价格或VIX缺失。")
+    if holdings_stale:
+        blocking_errors.append("持仓市值可能滞后。")
 
     capped_score = raw_score
     if dual_coverage < strategy["dqs_thresholds"]["cap_when_dual_source_below"]:
@@ -246,10 +260,10 @@ def compute_dqs(live_market: dict[str, Any], strategy: dict[str, Any]) -> dict[s
 
     components = [
         {"item": "行情完整度", "score": market_score, "max": weights["market_completeness"], "reason": f"{sum(market_ok)}/{len(CRITICAL_MARKET)} 个核心行情可用"},
-        {"item": "宏观完整度", "score": macro_score, "max": weights["macro_completeness"], "reason": f"{sum(macro_ok)}/{len(CRITICAL_MACRO)} 个核心宏观指标可用"},
+        {"item": "宏观完整度", "score": macro_score, "max": weights["macro_completeness"], "reason": f"{sum(macro_ok)}/{len(CRITICAL_MACRO)} 个核心宏观指标可用；事件日历置信度={calendar_confidence}"},
         {"item": "一级来源", "score": tier1_score, "max": weights["tier1_coverage"], "reason": f"{len(tier1_rows)}/{len(all_rows)} 个关键指标来自一级来源"},
         {"item": "双源验证", "score": dual_score, "max": weights["dual_source"], "reason": f"{len(dual_rows)}/{len(all_rows)} 个关键指标通过双源验证"},
-        {"item": "数据时效性", "score": freshness_score, "max": weights["freshness"], "reason": f"{len(fresh_rows)}/{len(all_rows)} 个可用指标未过期"},
+        {"item": "数据时效性", "score": freshness_score, "max": weights["freshness"], "reason": f"{len(fresh_rows)}/{len(all_rows)} 个可用指标未过期；持仓确认距今{snapshot.get('holding_age_days', '未知')}天"},
         {"item": "数据一致性", "score": consistency_score, "max": weights["consistency"], "reason": "无异常0值或严重冲突" if consistency_score == weights["consistency"] else "存在冲突或异常0值"},
     ]
 
@@ -277,6 +291,9 @@ def compute_dqs(live_market: dict[str, Any], strategy: dict[str, Any]) -> dict[s
         "tier1_coverage": len(tier1_rows) / len(all_rows) if all_rows else 0.0,
         "dual_source_coverage": dual_coverage,
         "freshness_coverage": len(fresh_rows) / len(all_rows) if all_rows else 0.0,
+        "holding_freshness_ok": not holdings_stale,
+        "fx_available": _is_ok_item(items.get("DX-Y.NYB", {})),
+        "event_calendar_confidence": calendar_confidence,
         "blocking_errors": blocking_errors,
         "missing_metrics": [row["name"] for row in build_market_table(live_market) if not row["success"]],
         "conflicts": conflicts,
@@ -353,24 +370,40 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
     dgs10 = _to_float(macro.get("DGS10", {}).get("value"), default=0)
     spx_change = _to_float(items.get("^GSPC", {}).get("change_pct"), default=0)
     nasdaq_change = _to_float(items.get("^IXIC", {}).get("change_pct"), default=0)
+    snapshot = _portfolio_snapshot()
+    total_assets = float(snapshot.get("total_assets", 0) or 0)
+    class_totals = snapshot.get("asset_class_totals", {}) or {}
+    bond_ratio = float(class_totals.get("债券", 0) or 0) / total_assets if total_assets else 0
+    gold_ratio = float(class_totals.get("黄金", 0) or 0) / total_assets if total_assets else 0
+    investable_cash = float((snapshot.get("cash", {}) or {}).get("investable_cash_cny", 0) or 0)
+    single_stock_ratios = [
+        float(row.get("market_value_cny", 0) or 0) / total_assets
+        for row in snapshot.get("holdings", []) or []
+        if str(row.get("strategy_bucket", "")).startswith("single_stock") and total_assets
+    ]
+    max_single_stock_ratio = max(single_stock_ratios, default=0.0)
 
     valuation = 12 if dqs["market_coverage"] < 0.6 else 10
     volatility = 5 if 0 <= vix < 20 else 10 if vix < 30 else 15
+    if max_single_stock_ratio > 0.05:
+        volatility = min(weights["volatility"], volatility + 2)
     interest = 6 if dgs10 and dgs10 < 4 else 10 if dgs10 < 4.8 else 15
-    liquidity = 5 if dqs["market_coverage"] >= 0.7 else 8
+    if bond_ratio - float(strategy["target_allocation"]["债券"]) > 0.08:
+        interest = min(weights["interest_rate"], interest + 3)
+    liquidity = 10 if investable_cash <= 0 else (5 if dqs["market_coverage"] >= 0.7 else 8)
     macro_event = weights["macro_event"] if macro_result.get("has_high_event_next_7_days") else 5
     trend = 8 if (spx_change + nasdaq_change) < -2 else 5
-    policy_geo = 6
+    policy_geo = 7 if gold_ratio > float(strategy["target_allocation"]["黄金"]) else 6
     data_quality = round((100 - dqs["score"]) / 100 * weights["data_quality"])
 
     components = [
         {"item": "估值", "score": min(valuation, weights["valuation"]), "weight": weights["valuation"], "basis": "估值数据不完整时按中性偏高风险处理。"},
-        {"item": "波动率", "score": min(volatility, weights["volatility"]), "weight": weights["volatility"], "basis": f"VIX={vix if vix >= 0 else '暂无可靠数据'}。"},
-        {"item": "利率", "score": min(interest, weights["interest_rate"]), "weight": weights["interest_rate"], "basis": f"美国10年期收益率={dgs10 if dgs10 else '暂无可靠数据'}。"},
-        {"item": "流动性", "score": min(liquidity, weights["liquidity"]), "weight": weights["liquidity"], "basis": "按数据可得性和行情覆盖估计。"},
+        {"item": "波动率", "score": min(volatility, weights["volatility"]), "weight": weights["volatility"], "basis": f"VIX={vix if vix >= 0 else '暂无可靠数据'}；最大高风险/单股占比约{max_single_stock_ratio:.1%}。"},
+        {"item": "利率", "score": min(interest, weights["interest_rate"]), "weight": weights["interest_rate"], "basis": f"美国10年期收益率={dgs10 if dgs10 else '暂无可靠数据'}；债券占比{bond_ratio:.1%}，包含久期风险。"},
+        {"item": "流动性", "score": min(liquidity, weights["liquidity"]), "weight": weights["liquidity"], "basis": f"真实可投资现金={investable_cash:,.0f}元；安全储备不可用于投资。"},
         {"item": "宏观事件", "score": min(macro_event, weights["macro_event"]), "weight": weights["macro_event"], "basis": "未来7天存在高等级事件。" if macro_result.get("has_high_event_next_7_days") else "未来7天暂无高等级事件。"},
         {"item": "趋势", "score": min(trend, weights["trend"]), "weight": weights["trend"], "basis": f"标普和纳指当日变化合计约{spx_change + nasdaq_change:.2f}%。"},
-        {"item": "政策与地缘", "score": min(policy_geo, weights["policy_geo"]), "weight": weights["policy_geo"], "basis": "按默认中性偏谨慎处理。"},
+        {"item": "政策与地缘", "score": min(policy_geo, weights["policy_geo"]), "weight": weights["policy_geo"], "basis": f"按中性偏谨慎处理；黄金占比{gold_ratio:.1%}，超配提高组合对避险行情反转的敏感度。"},
         {"item": "数据质量", "score": min(data_quality, weights["data_quality"]), "weight": weights["data_quality"], "basis": f"DQS={dqs['score']}。"},
     ]
     score = int(sum(row["score"] for row in components))
@@ -758,12 +791,37 @@ def build_holding_diagnostics(live_market: dict[str, Any], allocation: list[dict
         reduce_condition = "基本面恶化、仓位过度集中、或组合风控触发"
         fundamental_status = "长期逻辑未单独异常；需结合最新财报复核" if category in {"美股", "港股", "A股"} else "防守或流动性资产"
 
+        if bucket in {"core_etf", "growth_etf"}:
+            fundamental_status = "核心宽基，重点复核估值、趋势与指数覆盖质量"
+            risk = "指数估值、趋势和组合配置偏离风险"
+            overlap = "与组合权益Beta重叠"
+            add_condition = "到计划定投日，且DQS、现金、预算和事件风控均通过"
+            reduce_condition = "资产类别严重超配、风险预算触发或长期目标变化"
+        elif bucket in {"sector_etf", "thematic_etf"}:
+            fundamental_status = "行业/主题工具，需复核行业周期与集中度"
+            risk = "行业集中度和高波动风险"
+            overlap = "与同类权益和主题持仓存在重叠"
+            add_condition = "行业逻辑、估值和仓位上限均通过人工复核"
+            reduce_condition = "行业逻辑恶化、主题仓位超限或流动性下降"
+        elif bucket == "single_stock":
+            fundamental_status = "普通个股，需结合最新财报、估值和公司风险人工复核"
+            risk = "公司特有风险、财报风险和单股集中度"
+            overlap = "计入所在行业及权益集中度"
+            add_condition = "DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量"
+            reduce_condition = "基本面恶化、估值风险过高、集中度超限或公司事件触发"
+
         if category == "黄金":
             advice = "继续持有，暂停新增"
             risk = "黄金已高于目标，实物金条流动性弱，避免追高"
             overlap = "组合防守资产，与权益相关性较低"
             add_condition = "仅当黄金回落至目标附近且组合需要防守时再评估"
             reduce_condition = "黄金显著超配且避险趋势转弱时，优先评估黄金ETF而非金条"
+            if str(row.get("market", "")) == "physical":
+                fundamental_status = "实物黄金；关注保管、买卖价差和变现成本"
+                risk = "流动性较弱、保管与变现成本；组合黄金已超配"
+            else:
+                fundamental_status = "黄金ETF；流动性优于实物金条，但统一计入黄金仓位"
+                risk = "黄金价格与跟踪误差风险；组合黄金已超配"
         if category == "债券":
             advice = "继续持有，暂停新增"
             risk = "债券总仓位超配，新增资金优先修复权益低配"
@@ -778,8 +836,19 @@ def build_holding_diagnostics(live_market: dict[str, Any], allocation: list[dict
         if "NVDA" in name:
             advice = "继续持有，暂停追高"
         if bucket == "single_stock_high_risk":
-            advice = "观察，暂停新增"
-            risk = "ST或高风险个股，必须人工复核"
+            advice = "高风险人工复核，永久禁止自动新增"
+            fundamental_status = "ST或高风险股票；退市、财务、监管和流动性风险待人工核查"
+            risk = "ST或高风险个股，禁止进入自动定投、机会加仓和网格候选"
+            add_condition = "系统不提供自动加仓条件；仅可记录用户明确人工批准的条件性计划"
+            reduce_condition = "退市、财务、监管或流动性风险恶化时优先人工复核"
+        if category == "现金":
+            advice = "保留安全储备"
+            fundamental_status = "流动性资产，不适用股票基本面模板"
+            market_state = "不适用"
+            risk = "账户总现金低于目标安全储备，当前可投资现金为0"
+            overlap = "不适用；用于安全储备和流动性管理"
+            add_condition = "通过新增现金或已到账资金恢复至安全线以上"
+            reduce_condition = "仅可使用安全储备以上且未被其他预算占用的现金"
         rows.append(
             {
                 "name": name,
@@ -803,19 +872,28 @@ def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], s
     actionable = [row for row in opportunity if row.get("advice") in {"优先加仓", "正常定投", "小额分批"}]
     targets = "、".join(row["name"] for row in actionable[:3]) if actionable else "VOO/QQQ、沪深300ETF"
     conditional_cap = budget["conditional_bond_to_equity_month_yuan"]
+    no_cash = float(budget.get("investable_cash_yuan", 0) or 0) <= 0
     return [
         {
             "scenario": "市场平稳",
             "trigger": "主要指数波动未触发回撤阈值，VIX低于20或维持正常区间",
             "action": "基础定投按计划日执行；非计划日不交易。",
-            "amount": f"确认现金买入上限 {budget['month_confirmed_yuan']} 元；债券到账后条件性上限 {conditional_cap} 元。",
+            "amount": (
+                f"真实可执行0元；债券到账后条件性上限{conditional_cap}元，到账前不可执行。"
+                if no_cash
+                else f"确认现金买入上限{budget['month_confirmed_yuan']}元；债券到账后条件性上限{conditional_cap}元。"
+            ),
             "targets": targets,
         },
         {
             "scenario": "指数回撤",
-            "trigger": "回撤约3%观察，约5%小额分批，约8%及以上才考虑机会加仓",
+            "trigger": "以最近确认交易日收盘价为参考：回撤约3%观察，约5%小额分批，约8%及以上才考虑机会加仓",
             "action": "只有DQS>=85、长期逻辑未破坏、且资金来源确认时，才启用机会加仓。",
-            "amount": f"单次不超过 {int(strategy['budget']['bond_to_equity_single_cap_yuan'])} 元，且不突破月度条件性上限。",
+            "amount": (
+                f"当前真实可执行0元；债券资金到账并通过复核后，单次条件性上限{int(strategy['budget']['bond_to_equity_single_cap_yuan'])}元。"
+                if no_cash
+                else f"单次不超过{int(strategy['budget']['bond_to_equity_single_cap_yuan'])}元，且不突破月度条件性上限。"
+            ),
             "targets": targets,
         },
         {
@@ -861,12 +939,17 @@ def build_ai_mode(ai_advice: dict[str, Any], dqs: dict[str, Any]) -> dict[str, A
         "openai_participated": ai_advice.get("ai_status") == "available",
         "fallback_reason": ai_advice.get("fallback_reason", ""),
         "retry_count": ai_advice.get("retry_count", 0),
+        "model": ai_advice.get("model", ""),
+        "validation_errors": ai_advice.get("validation_errors", []),
         "impact": "AI仅解释，不覆盖DQS、资金预算和风控硬门槛。",
-        "summary": ai_advice.get("summary", "Stone CIO规则引擎已完成分析。"),
-        "most_important_risk": ai_advice.get("most_important_risk", "以规则引擎识别的首要风险为准。"),
-        "best_action_today": ai_advice.get("best_action_today", "服从DQS、现金安全线与资金来源约束。"),
+        "market_regime": ai_advice.get("market_regime", "由规则引擎判断"),
+        "summary": ai_advice.get("cio_commentary") or ai_advice.get("summary", "Stone CIO规则引擎已完成分析。"),
+        "most_important_risk": ai_advice.get("key_risk_3_7_days") or ai_advice.get("most_important_risk", "以规则引擎识别的首要风险为准。"),
+        "best_action_today": ai_advice.get("portfolio_priority") or ai_advice.get("best_action_today", "服从DQS、现金安全线与资金来源约束。"),
         "avoid_action_today": ai_advice.get("avoid_action_today", "不绕过硬风控进行交易。"),
-        "one_sentence": ai_advice.get("one_sentence", "规则引擎已完成今日复核。"),
+        "required_trigger_conditions": ai_advice.get("required_trigger_conditions", []),
+        "best_opportunity": ai_advice.get("best_opportunity", "以Opportunity Score为观察线索"),
+        "one_sentence": ai_advice.get("one_sentence_conclusion") or ai_advice.get("one_sentence", "规则引擎已完成今日复核。"),
     }
 
 
@@ -894,9 +977,12 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
                 f"{overweight.get('category', '超配资产')}为{overweight.get('status', '待复核')}。"
                 f"当前DQS={dqs.get('score')}、风险评分={risk.get('score')}，规则结论为{trade_text}。"
             ),
+            "market_regime": f"规则风险等级为{risk.get('level')}，DQS={dqs.get('score')}，结论置信度服从数据质量门槛。",
             "most_important_risk": decision.get("max_risk", "暂无可靠风险结论"),
             "best_action_today": (
                 f"{trade_text}；可投资现金为{investable_cash:,.0f}元。"
+                + ("当前没有真实可执行买入预算。" if investable_cash <= 0 else "")
+                +
                 f"下一复核日为{decision.get('next_review_date')}，只在DQS、资金到账和事件纪律同时满足后执行。"
             ),
             "avoid_action_today": (
@@ -904,6 +990,8 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
                 "不要把未到账债券资金或模拟网格资金当作真实可用现金。"
             ),
             "one_sentence": decision.get("one_sentence", "规则引擎已完成今日复核。"),
+            "best_opportunity": decision.get("max_opportunity", "暂无可执行机会"),
+            "required_trigger_conditions": decision.get("next_triggers", []),
             "impact": "OpenAI是可选解释层；本次由规则引擎完成全部核心分析，DQS、预算和风控结论不受影响。",
         }
     )
@@ -938,6 +1026,9 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     holding_class_totals = snapshot.get("holding_class_totals", {}) or {}
     budget = decision["budget"]
     dqs = decision["dqs"]
+    target_sum = sum(float(row.get("target_ratio", 0) or 0) for row in decision["allocation"])
+    if abs(target_sum - 1.0) > 0.0001:
+        errors.append(f"目标资产占比合计为{target_sum:.2%}，不等于100%。")
     if abs(allocation_sum - 1.0) > 0.01:
         errors.append(f"资产占比合计为{allocation_sum:.2%}，不接近100%。")
     if abs(allocation_total - snapshot_total) > 10:
@@ -998,9 +1089,32 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
         errors.append("存在重复budget_id，同一资金可能被重复使用。")
     if budget.get("paper_grid_cash_yuan", 0):
         errors.append("网格模拟现金不得进入真实资金预算。")
+    if not decision.get("today_trade") and any(
+        float(budget.get(key, 0) or 0) > 0
+        for key in ["today_total_yuan", "week_confirmed_yuan", "month_confirmed_yuan"]
+    ):
+        errors.append("今日结论为不交易，但真实执行额度不为0。")
+    if float(budget.get("actual_bond_cash_arrived_yuan", 0) or 0) <= 0 and float(budget.get("approved_bond_to_equity_month_yuan", 0) or 0) > 0:
+        errors.append("未到账债券资金被计入已批准额度。")
+    if snapshot.get("holdings_stale"):
+        warnings.append("持仓市值可能滞后，需人工更新Portfolio Snapshot。")
+    grid = decision.get("grid", {}) or {}
+    grid_budget = grid.get("grid_budget", {}) or {}
+    if grid.get("paper_mode", True) and float(grid_budget.get("live_available_yuan", 0) or 0) > 0:
+        errors.append("模拟网格出现真实可用预算。")
+    if grid.get("paper_mode", True) and bool(grid.get("live_advice_enabled")):
+        errors.append("模拟网格不得启用实盘建议。")
+    if dqs.get("score", 0) < 85 and float(grid_budget.get("live_available_yuan", 0) or 0) > 0:
+        errors.append("DQS不足却生成真实网格金额。")
+    for event in decision.get("events", []) or []:
+        try:
+            if event.get("date") and date.fromisoformat(str(event["date"])[:10]) < date.today():
+                errors.append(f"未来事件列表包含已过期事件：{event.get('name', '未命名事件')}。")
+        except ValueError:
+            warnings.append(f"事件日期无法验证：{event.get('name', '未命名事件')}。")
     if decision["macro_event_high_next_7_days"] and decision["budget"]["today_total_yuan"] > 0:
         warnings.append("重大事件前仍有买入计划，需人工复核。")
-    status = "PASS" if not errors and not warnings else "WARNING" if not errors else "FAIL"
+    status = "PASS" if not errors and not warnings else "PASS_WITH_WARNINGS" if not errors else "FAILED_VALIDATION"
     return {
         "ok": not errors,
         "status": status,
@@ -1020,7 +1134,7 @@ def build_v12_1_decision(
     strategy = load_strategy()
     snapshot = _portfolio_snapshot()
     allocation = enrich_allocation(portfolio_result, strategy)
-    dqs = compute_dqs(live_market_result, strategy)
+    dqs = compute_dqs(live_market_result, strategy, macro_result)
     risk = compute_risk_score(live_market_result, macro_result, dqs, strategy)
     opportunity = apply_dqs_to_opportunity(build_opportunity_scores(allocation, live_market_result, strategy), dqs)
     budget = build_budget_plan(allocation, dqs, risk, macro_result, opportunity, strategy)
@@ -1073,7 +1187,7 @@ def build_v12_1_decision(
         "no_trade_reasons": no_trade_reasons,
         "next_triggers": build_next_triggers(budget, dqs),
         "next_review_date": budget["next_dca_date"],
-        "max_risk": risk["components"][0]["basis"] if risk["components"] else "暂无",
+        "max_risk": max(risk["components"], key=lambda row: row.get("score", 0))["basis"] if risk["components"] else "暂无",
         "max_opportunity": describe_max_opportunity(opportunity, dqs, today_trade),
         "one_sentence": "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。",
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不自动交易，不接券商下单权限，不承诺收益。",
@@ -1090,6 +1204,23 @@ def build_v12_1_decision(
         decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
     decision["ai"] = build_rule_enhanced_analysis(decision)
     write_log(f"V12.5 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
+    return decision
+
+
+def apply_ai_explanation(decision: dict[str, Any], ai_advice: dict[str, Any]) -> dict[str, Any]:
+    """在规则裁决后挂载AI解释，并执行第二次硬一致性校验。"""
+    decision["ai"] = build_ai_mode(ai_advice, decision["dqs"])
+    decision["ai"] = build_rule_enhanced_analysis(decision)
+    decision["consistency"] = build_consistency_checks(decision)
+    if not decision["consistency"].get("ok"):
+        decision["today_trade"] = False
+        decision["trade_type"] = "无操作"
+        decision["today_amount_yuan"] = 0
+        decision["targets"] = "不适用"
+        decision["funding_source"] = "不适用"
+        for key in ["today_total_yuan", "week_confirmed_yuan", "month_confirmed_yuan"]:
+            decision["budget"][key] = 0
+        decision["one_sentence"] = "数据或规则一致性校验失败，今日不操作；等待人工排查。"
     return decision
 
 

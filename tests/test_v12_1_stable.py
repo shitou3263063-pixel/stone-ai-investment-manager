@@ -185,7 +185,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         report = generate_daily_report(decision=decision)
-        self.assertIn("## 15. 一致性验证", report)
+        self.assertIn("## 18. 一致性验证", report)
         self.assertNotIn("|  |", report)
 
     def test_suggestion_does_not_violate_dqs(self) -> None:

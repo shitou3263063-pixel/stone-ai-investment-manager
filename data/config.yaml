@@ -12,14 +12,6 @@ investor_profile:
   long_term_target_return: 10%-15%
   max_drawdown_tolerance: 25%-35%
 
-target_allocation:
-  美股: 0.30
-  港股: 0.12
-  A股: 0.10
-  债券: 0.25
-  黄金: 0.15
-  现金: 0.08
-
 rules:
   deviation_threshold: 0.05
   deviation_watch_threshold: 0.05

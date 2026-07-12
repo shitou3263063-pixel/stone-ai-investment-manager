@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from src.strategy.dca_engine import load_strategy_settings
+from utils.data_loader import load_config, project_root
 
 
 TARGET_CATEGORY_MAP = {
@@ -46,7 +47,11 @@ def build_rebalance_plan(
 ) -> dict[str, Any]:
     """根据当前资产占比和目标配置生成再平衡建议。"""
     settings = load_strategy_settings(settings_path)
-    target_allocation = settings.get("target_allocation", {}) or {}
+    target_allocation = (
+        (settings.get("target_allocation", {}) or {})
+        if settings_path
+        else (load_config(project_root() / "config" / "strategy.yaml").get("target_allocation", {}) or {})
+    )
     total_assets = float(portfolio_result.get("total_assets_wan", 0.0) or 0.0)
     category_amounts = portfolio_result.get("category_amounts", {}) or {}
     unvalued_assets = portfolio_result.get("unvalued_assets", []) or []

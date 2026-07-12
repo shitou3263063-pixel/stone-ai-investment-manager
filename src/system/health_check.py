@@ -64,14 +64,6 @@ dca_plan:
       name: 恒生科技ETF
       base_amount: 2000
 
-target_allocation:
-  us_stock: 30
-  hk_stock: 12
-  cn_stock: 10
-  bond: 25
-  gold: 15
-  cash: 8
-
 data_sources:
   fred:
     enabled: true
@@ -229,13 +221,19 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
     if settings_path.exists():
         items.append(
             HealthItem(
-                "策略配置",
+                "事件与兼容配置",
                 "OK" if not created else "WARN",
                 "config/settings.yaml 存在。" if not created else "config/settings.yaml 缺失，已创建默认模板。",
             )
         )
     else:
-        items.append(HealthItem("策略配置", "ERROR", "config/settings.yaml 不存在。", "请创建或恢复策略配置。"))
+        items.append(HealthItem("事件与兼容配置", "ERROR", "config/settings.yaml 不存在。", "请创建或恢复事件配置。"))
+
+    strategy_path = root / "config" / "strategy.yaml"
+    if strategy_path.exists():
+        items.append(HealthItem("生产策略配置", "OK", "config/strategy.yaml 存在，是目标配置与硬风控的唯一权威来源。"))
+    else:
+        items.append(HealthItem("生产策略配置", "ERROR", "config/strategy.yaml 不存在。", "请从稳定版恢复该文件，不要自动编造目标配置。"))
 
     reports_dir = root / "reports"
     if auto_fix:

@@ -1,6 +1,6 @@
 # Stone AI Project Audit
 
-- 生成时间：2026-07-12T00:50:22
+- 生成时间：2026-07-12T15:08:55
 - 正式版本：Stone AI Investment Manager Pro V12.5 Stable
 - 唯一正式入口：`python main.py`
 
@@ -44,10 +44,12 @@ flowchart TD
 
 ## 6. 测试覆盖
 - `tests/__init__.py`
+- `tests/test_chatgpt_link_interface.py`
 - `tests/test_reliability.py`
 - `tests/test_smart_grid.py`
 - `tests/test_source_audit.py`
 - `tests/test_v12_1_stable.py`
+- `tests/test_v12_5_final_hardening.py`
 - `tests/test_v12_5_freeze.py`
 - `tests/test_v12_5_stable.py`
 - `tests/test_v12_decision_gates.py`
@@ -56,7 +58,7 @@ flowchart TD
 
 ## 7. 文件概览
 
-- Python文件数量：84
+- Python文件数量：86
 - main.py文件：main.py
 - workflow/config文件数量：8
 - report文件数量：13
