@@ -1,6 +1,6 @@
-config_version: V12.5_STABLE
+config_version: V12.6_STABLE
 config_role: production_strategy_authority
-version: V12.5 Stable
+version: V12.6 Stable
 
 target_allocation:
   美股: 0.30
@@ -41,11 +41,50 @@ risk_weights:
   data_quality: 5
 
 opportunity_weights:
-  valuation: 0.25
-  fundamentals: 0.25
-  trend: 0.15
-  risk_reward: 0.20
-  portfolio_fit: 0.15
+  valuation: 0.20
+  trend_breadth: 0.15
+  fundamentals: 0.20
+  macro: 0.10
+  flow: 0.10
+  portfolio_fit: 0.20
+  data_confidence: 0.05
+
+opportunity_scoring:
+  cross_section_max_adjustment: 8
+  missing_data_penalty: 12
+  stale_data_penalty: 6
+  single_source_penalty: 3
+  overweight_5pct_penalty: 10
+  overweight_8pct_penalty: 15
+  single_stock_constraint: 5
+  sector_constraint: 4
+  thematic_constraint: 5
+  st_constraint: 40
+
+scenario_stress:
+  max_drawdown_tolerance_low: 0.25
+  max_drawdown_tolerance_high: 0.35
+  equity_bull:
+    美股: 0.20
+    港股: 0.15
+    A股: 0.12
+    债券: -0.03
+    黄金: -0.05
+    现金: 0.00
+  range_market:
+    美股: 0.05
+    港股: 0.00
+    A股: 0.03
+    债券: 0.02
+    黄金: 0.03
+    现金: 0.00
+  risk_shock:
+    美股: -0.25
+    港股: -0.30
+    A股: -0.20
+    债券: 0.05
+    黄金: 0.10
+    现金: 0.00
 
 budget:
   monthly_base_dca_yuan: 10000

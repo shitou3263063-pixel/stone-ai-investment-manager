@@ -52,7 +52,7 @@ def test_asset_total_consistency() -> None:
 
 def test_target_weight_sum() -> None:
     strategy = yaml.safe_load((PROJECT_ROOT / "config" / "strategy.yaml").read_text(encoding="utf-8"))
-    assert strategy["config_version"] == "V12.5_STABLE"
+    assert strategy["config_version"] == "V12.6_STABLE"
     assert abs(sum(strategy["target_allocation"].values()) - 1.0) < 1e-9
 
 

@@ -24,6 +24,9 @@ jobs:
       EMAIL_TO: ${{ secrets.EMAIL_TO }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_ENABLED: ${{ secrets.OPENAI_ENABLED }}
+      OPENAI_MAX_RETRIES: ${{ secrets.OPENAI_MAX_RETRIES }}
+      OPENAI_TIMEOUT_SECONDS: ${{ secrets.OPENAI_TIMEOUT_SECONDS }}
       MAX_LLM_RETRIES: ${{ secrets.MAX_LLM_RETRIES }}
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -50,7 +53,7 @@ jobs:
       - name: Run tests
         run: pytest
 
-      - name: Run Stone AI Investment Manager Pro V12.5 Stable
+      - name: Run Stone AI Investment Manager Pro V12.6 Stable
         run: python main.py
 
       - name: Upload reports and logs artifact

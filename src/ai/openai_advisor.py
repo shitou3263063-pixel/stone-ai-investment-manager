@@ -24,6 +24,30 @@ AI_FIELDS = [
 ]
 
 
+def _env_bool(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _error_category(exc: Exception | str) -> str:
+    text = str(exc).lower()
+    if "insufficient_quota" in text or "exceeded your current quota" in text:
+        return "insufficient_quota"
+    if "authentication" in text or "incorrect api key" in text or "401" in text:
+        return "authentication_error"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    if "429" in text or "rate_limit" in text or "rate limit" in text:
+        return "rate_limit"
+    if any(token in text for token in ["connection", "network", "dns", "ssl", "eof"]):
+        return "network_error"
+    if "invalid_json_or_schema" in text or "json" in text or "字段" in str(exc):
+        return "invalid_response"
+    return "network_error"
+
+
 def _load_env_file(env_path: Path) -> None:
     if not env_path.exists():
         return
@@ -40,13 +64,33 @@ def _safe_json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, default=str, separators=(",", ":"))
 
 
-def _fallback_result(reason: str = "rule_only", retry_count: int = 0, model: str = "") -> dict[str, Any]:
+def _fallback_result(
+    reason: str = "rule_only",
+    retry_count: int = 0,
+    model: str = "",
+    *,
+    enabled: bool = False,
+    called: bool = False,
+    error_category: str = "",
+) -> dict[str, Any]:
     neutral = "Stone CIO规则引擎已完成完整分析；OpenAI可选复核本次未参与，不影响核心风控与决策。"
     return {
-        "enabled": False,
+        "enabled": enabled,
+        "called": called,
+        "success": False,
         "ai_status": "rule_only",
         "actual_provider": "stone_rule_engine",
         "fallback_reason": reason,
+        "error_category": error_category or (reason if reason in {
+            "insufficient_quota",
+            "rate_limit",
+            "timeout",
+            "authentication_error",
+            "network_error",
+            "invalid_response",
+        } else ""),
+        "conflict_with_rules": False,
+        "review_summary": "OpenAI未参与最终裁决；规则引擎已独立完成预算、DQS、风险与决策。",
         "retry_count": retry_count,
         "degrade_level": "RULE_ENHANCED",
         "response_timestamp": "",
@@ -144,7 +188,7 @@ def build_cio_review_context(
 
 def _build_prompt(context: dict[str, Any]) -> str:
     return (
-        "你是Stone AI Investment Manager Pro V12.5 Stable的CIO解释与复核层。"
+        "你是Stone AI Investment Manager Pro V12.6 Stable的CIO解释与复核层。"
         "规则引擎已经完成交易裁决；你不得修改金额、标的、资金来源或硬风控。"
         "不自动交易、不承诺收益、不预测具体点位。只返回一个JSON对象，不要Markdown。"
         f"JSON必须且只能包含这些字段：{','.join(AI_FIELDS)}。"
@@ -201,23 +245,29 @@ def validate_openai_advice(advice: dict[str, Any], decision: dict[str, Any]) -> 
 
 def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None) -> dict[str, Any]:
     _load_env_file(env_path or PROJECT_ROOT / ".env")
+    enabled = _env_bool("OPENAI_ENABLED", True)
+    model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    if not enabled:
+        return _fallback_result("disabled", model=model, enabled=False, called=False)
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        return _fallback_result("missing_openai_key")
+        return _fallback_result("missing_openai_key", model=model, enabled=True, called=False)
 
     try:
         from openai import OpenAI  # type: ignore
     except ImportError:
         write_log("OpenAI SDK not installed", filename="openai_advisor.log")
-        return _fallback_result("openai_sdk_missing")
+        return _fallback_result("openai_sdk_missing", model=model, enabled=True, called=False)
 
-    model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
-    max_retries = min(2, max(0, int(os.getenv("MAX_LLM_RETRIES", "2") or 2)))
+    retries_raw = os.getenv("OPENAI_MAX_RETRIES", os.getenv("MAX_LLM_RETRIES", "2"))
+    max_retries = min(2, max(0, int(retries_raw or 2)))
     timeout_seconds = max(5.0, min(60.0, float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30") or 30)))
     prompt = _build_prompt(context)
     if len(prompt) > 18000:
         prompt = prompt[:18000] + "\n[输入已按长度上限截断]"
     last_error = ""
+    last_category = ""
+    retries_used = 0
     try:
         client = OpenAI(api_key=api_key, timeout=timeout_seconds)
         for attempt in range(max_retries + 1):
@@ -235,9 +285,14 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
                 return {
                     **parsed,
                     "enabled": True,
+                    "called": True,
+                    "success": True,
                     "ai_status": "available",
                     "actual_provider": "openai",
                     "fallback_reason": "",
+                    "error_category": "",
+                    "conflict_with_rules": False,
+                    "review_summary": parsed["cio_commentary"],
                     "retry_count": attempt,
                     "degrade_level": "AI_FULL",
                     "response_timestamp": "",
@@ -256,29 +311,38 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
                     if isinstance(exc, (json.JSONDecodeError, ValueError))
                     else str(exc)
                 )
-                retryable = any(code in last_error.lower() for code in ["429", "500", "502", "503", "504", "rate_limit", "timeout"])
-                write_log(f"OpenAI请求失败：{type(exc).__name__} retryable={retryable}", filename="openai_advisor.log")
+                last_category = _error_category(last_error)
+                retryable = last_category in {"rate_limit", "timeout", "network_error"} or any(
+                    code in last_error.lower() for code in ["500", "502", "503", "504"]
+                )
+                write_log(
+                    f"OpenAI请求失败：category={last_category} retryable={retryable} attempt={attempt + 1}",
+                    filename="openai_advisor.log",
+                )
                 if not retryable or attempt >= max_retries:
                     break
+                retries_used += 1
                 time.sleep(min(8, 2**attempt))
     except Exception as exc:  # noqa: BLE001
         last_error = str(exc)
+        last_category = _error_category(last_error)
 
-    lowered = last_error.lower()
-    if "insufficient_quota" in lowered or "exceeded your current quota" in lowered:
-        reason = "insufficient_quota"
-    elif "429" in lowered or "rate_limit" in lowered:
-        reason = "rate_limit"
-    elif "timeout" in lowered:
-        reason = "network_or_timeout"
-    elif "invalid_json_or_schema" in lowered or "json" in lowered or "字段" in last_error:
-        reason = "invalid_json_or_schema"
-    elif "401" in lowered or "authentication" in lowered:
-        reason = "authentication_failed"
-    else:
-        reason = "openai_request_failed"
-    write_log(f"OpenAI unavailable: {reason}", filename="openai_advisor.log")
-    return _fallback_result(reason, max_retries, model)
+    category = last_category or _error_category(last_error)
+    legacy_reason = {
+        "timeout": "network_or_timeout",
+        "network_error": "network_or_timeout",
+        "invalid_response": "invalid_json_or_schema",
+        "authentication_error": "authentication_failed",
+    }.get(category, category)
+    write_log(f"OpenAI unavailable: {category}", filename="openai_advisor.log")
+    return _fallback_result(
+        legacy_reason,
+        retries_used,
+        model,
+        enabled=True,
+        called=True,
+        error_category=category,
+    )
 
 
 def apply_openai_review(decision: dict[str, Any], advice: dict[str, Any]) -> dict[str, Any]:
@@ -288,6 +352,14 @@ def apply_openai_review(decision: dict[str, Any], advice: dict[str, Any]) -> dic
     if valid:
         return advice
     write_log(f"OPENAI_VALIDATION_REJECTED: {'; '.join(errors)}", filename="openai_advisor.log")
-    fallback = _fallback_result("OPENAI_VALIDATION_REJECTED", int(advice.get("retry_count", 0) or 0), str(advice.get("model", "")))
+    fallback = _fallback_result(
+        "OPENAI_VALIDATION_REJECTED",
+        int(advice.get("retry_count", 0) or 0),
+        str(advice.get("model", "")),
+        enabled=True,
+        called=True,
+    )
     fallback["validation_errors"] = errors
+    fallback["conflict_with_rules"] = True
+    fallback["review_summary"] = "AI复核存在分歧，规则风控优先。"
     return fallback

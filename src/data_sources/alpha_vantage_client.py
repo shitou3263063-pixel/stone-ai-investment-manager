@@ -40,6 +40,8 @@ def get_quote(symbol: str) -> dict[str, Any]:
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
         "change_pct": round(change_pct, 2),
+        "volume": float(quote.get("06. volume")) if quote.get("06. volume") else None,
+        "volume_ratio": None,
         "status": "ok",
         "source": "alpha_vantage",
         "published_at": quote.get("07. latest trading day"),

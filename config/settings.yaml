@@ -1,4 +1,4 @@
-config_version: V12.5_STABLE
+config_version: V12.6_STABLE
 config_role: compatibility_macro_and_legacy_planning_inputs
 
 macro_events:

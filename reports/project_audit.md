@@ -1,7 +1,7 @@
 # Stone AI Project Audit
 
-- 生成时间：2026-07-12T15:08:55
-- 正式版本：Stone AI Investment Manager Pro V12.5 Stable
+- 生成时间：2026-07-12T19:54:37
+- 正式版本：Stone AI Investment Manager Pro V12.6 Stable
 - 唯一正式入口：`python main.py`
 
 ## 1. 入口审计
@@ -20,7 +20,7 @@ flowchart TD
   A["portfolio.csv / portfolio_master.yaml"] --> B["每日快照"]
   C["FRED / Alpha Vantage / Finnhub / yfinance"] --> B
   B --> D["Portfolio / Market / Risk / DCA / Rebalance"]
-  D --> E["V12.5 CIO + Smart Grid Decision Engine"]
+  D --> E["V12.6 CIO + Smart Grid Decision Engine"]
   E --> F["Consistency Validator"]
   F --> G["decision.json"]
   G --> H["Report Center"]
@@ -52,13 +52,14 @@ flowchart TD
 - `tests/test_v12_5_final_hardening.py`
 - `tests/test_v12_5_freeze.py`
 - `tests/test_v12_5_stable.py`
+- `tests/test_v12_6_stable.py`
 - `tests/test_v12_decision_gates.py`
 - `tests/test_v12_entrypoint.py`
 - `tests/test_v12_reports_and_ai.py`
 
 ## 7. 文件概览
 
-- Python文件数量：86
+- Python文件数量：88
 - main.py文件：main.py
 - workflow/config文件数量：8
 - report文件数量：13

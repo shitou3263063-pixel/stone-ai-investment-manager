@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from src.analysis.scenario_analysis import calculate_portfolio_stress_scenarios
 from src.portfolio_snapshot import build_portfolio_snapshot
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
 
 
-VERSION_NAME = "Stone AI Investment Manager Pro V12.5 Stable"
+VERSION_NAME = "Stone AI Investment Manager Pro V12.6 Stable"
 
 DEFAULT_STRATEGY: dict[str, Any] = {
     "cash": {"safety_ratio": 0.08, "hard_floor_ratio": 0.05},
@@ -38,11 +39,13 @@ DEFAULT_STRATEGY: dict[str, Any] = {
         "data_quality": 5,
     },
     "opportunity_weights": {
-        "valuation": 0.25,
-        "fundamentals": 0.25,
-        "trend": 0.15,
-        "risk_reward": 0.20,
-        "portfolio_fit": 0.15,
+        "valuation": 0.20,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.20,
+        "macro": 0.10,
+        "flow": 0.10,
+        "portfolio_fit": 0.20,
+        "data_confidence": 0.05,
     },
     "budget": {
         "monthly_base_dca_yuan": 10000,
@@ -179,7 +182,7 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "name": name,
         "value": value if _is_ok_item(item) else None,
         "display_value": display,
-        "previous": item.get("previous_close"),
+        "previous": item.get("previous_close", item.get("previous_value")),
         "change_pct": item.get("change_pct"),
         "timestamp": item.get("published_at") or item.get("fetched_at") or item.get("date") or "暂无数据",
         "retrieved_at": item.get("retrieved_at") or item.get("fetched_at") or "暂无数据",
@@ -452,32 +455,48 @@ def _holding_amounts() -> dict[str, float]:
 
 def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict[str, Any], strategy: dict[str, Any]) -> list[dict[str, Any]]:
     items = _market_items(live_market)
+    macro_items = _macro_items(live_market)
     amounts = _holding_amounts()
     asset_defs = [
-        {"name": "VOO", "category": "美股", "symbol": "VOO", "holding_key": "VOO", "type": "core_etf", "reason": "核心宽基ETF，优先用于修复美股低配"},
-        {"name": "QQQ", "category": "美股", "symbol": "QQQ", "holding_key": "QQQ", "type": "growth_etf", "reason": "成长宽基ETF，需控制估值和波动"},
-        {"name": "NVDA", "category": "美股", "symbol": "NVDA", "holding_key": "NVDA", "type": "single_stock", "reason": "单股科技暴露较高，不因美股低配自动加仓"},
-        {"name": "GOOG", "category": "美股", "symbol": "GOOG", "holding_key": "GOOG", "type": "single_stock", "reason": "大型科技股，需等待估值和财报确认"},
-        {"name": "BABA", "category": "美股", "symbol": "BABA", "holding_key": "BABA", "type": "single_stock", "reason": "中概股风险与港股风险相关，不机械补仓"},
-        {"name": "IBKR", "category": "美股", "symbol": "IBKR", "holding_key": "IBKR", "type": "single_stock", "reason": "券商周期股，需基本面和估值同时满足"},
-        {"name": "XLF", "category": "美股", "symbol": "XLF", "holding_key": "XLF", "type": "sector_etf", "reason": "行业ETF，不优先于核心宽基"},
-        {"name": "TLT", "category": "债券", "symbol": "TLT", "holding_key": "TLT", "type": "duration_bond_etf", "reason": "美国长期国债ETF，高久期利率资产"},
+        {"name": "VOO", "category": "美股", "symbol": "VOO", "holding_key": "VOO", "type": "core_etf", "reason": "核心宽基ETF，优先用于长期修复美股低配"},
+        {"name": "QQQ", "category": "美股", "symbol": "QQQ", "holding_key": "QQQ", "type": "growth_etf", "reason": "成长宽基ETF，需兼顾估值、波动与科技重叠"},
+        {"name": "NVDA", "category": "美股", "symbol": "NVDA", "holding_key": "NVDA", "type": "single_stock", "reason": "科技单股，不因美股低配自动加仓"},
+        {"name": "GOOG", "category": "美股", "symbol": "GOOG", "holding_key": "GOOG", "type": "single_stock", "reason": "大型科技个股，需财报、估值与集中度共同确认"},
+        {"name": "BABA", "category": "美股", "symbol": "BABA", "holding_key": "BABA", "type": "single_stock", "reason": "中概个股，与港股风险存在重叠"},
+        {"name": "IBKR", "category": "美股", "symbol": "IBKR", "holding_key": "IBKR", "type": "single_stock", "reason": "券商周期个股，需盈利和估值数据确认"},
+        {"name": "XLF", "category": "美股", "symbol": "XLF", "holding_key": "XLF", "type": "sector_etf", "reason": "行业ETF，不因美股低配获得宽基同等优先级"},
+        {"name": "TLT", "category": "债券", "symbol": "TLT", "holding_key": "TLT", "type": "duration_bond_etf", "reason": "美国长期国债ETF，承受高久期利率风险"},
         {"name": "沪深300ETF", "category": "A股", "symbol": "510300.SS", "holding_key": "510300", "type": "core_etf", "reason": "A股核心宽基ETF"},
-        {"name": "恒生科技ETF", "category": "港股", "symbol": "3067.HK", "holding_key": "03033", "type": "core_etf", "reason": "港股成长宽基，03033为实际持仓，3067.HK仅作行情代理"},
-        {"name": "恒生医疗ETF", "category": "港股", "symbol": "513060.SS", "holding_key": "513060", "type": "thematic_etf", "reason": "主题ETF，只适合小额观察"},
+        {"name": "恒生科技ETF", "category": "港股", "symbol": "3067.HK", "holding_key": "03033", "type": "core_etf", "reason": "03033为真实持仓，3067.HK仅为行情代理"},
+        {"name": "恒生医疗ETF", "category": "港股", "symbol": "513060.SS", "holding_key": "513060", "type": "thematic_etf", "reason": "主题ETF，受行业周期和集中度约束"},
         {"name": "香港证券ETF", "category": "港股", "symbol": "513090.SS", "holding_key": "513090", "type": "thematic_etf", "reason": "高弹性主题ETF，不作为优先补仓资产"},
-        {"name": "黄金", "category": "黄金", "symbol": "GLD", "holding_key": "黄金", "type": "defensive_gold", "reason": "组合防守资产，当前超配时暂停新增"},
-        {"name": "现金", "category": "现金", "symbol": "", "holding_key": "现金", "type": "cash", "reason": "流动性和安全垫"},
+        {"name": "巨人网络", "category": "A股", "symbol": "002558.SZ", "holding_key": "002558", "type": "single_stock", "reason": "A股个股，需公司数据和集中度复核"},
+        {"name": "*ST闻泰", "category": "A股", "symbol": "", "holding_key": "*ST闻泰", "type": "st_stock", "reason": "高风险ST持仓，永久禁止自动新增"},
+        {"name": "中国债券", "category": "债券", "symbol": "", "holding_key": "中国债券组合（不含10年地债）", "type": "defensive_bond", "reason": "防守资产，当前债券超配时暂停新增"},
+        {"name": "10年地债", "category": "债券", "symbol": "", "holding_key": "CN_LOCAL_BOND_10Y", "type": "defensive_bond", "reason": "已包含在中国债券总额中，不重复计算"},
+        {"name": "黄金", "category": "黄金", "symbol": "GLD", "holding_key": "黄金", "type": "defensive_gold", "reason": "实物金和黄金ETF合并看待，超配时暂停新增"},
+        {"name": "现金", "category": "现金", "symbol": "", "holding_key": "现金", "type": "cash", "reason": "用于安全储备与流动性，不等于可投资现金"},
     ]
-    rows = []
+    rows: list[dict[str, Any]] = []
+    configured_weights = strategy.get("opportunity_weights", {}) or {}
     weights = {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5,
+        "valuation": float(configured_weights.get("valuation", 0.20)),
+        "trend_breadth": float(configured_weights.get("trend_breadth", 0.15)),
+        "fundamentals": float(configured_weights.get("fundamentals", 0.20)),
+        "macro": float(configured_weights.get("macro", 0.10)),
+        "flow": float(configured_weights.get("flow", 0.10)),
+        "portfolio_fit": float(configured_weights.get("portfolio_fit", 0.20)),
+        "data_confidence": float(configured_weights.get("data_confidence", 0.05)),
+    }
+    scoring = strategy.get("opportunity_scoring", {}) or {}
+    total_yuan = sum(_to_float(row.get("current_amount_yuan")) for row in allocation)
+    dgs10 = _to_float(macro_items.get("DGS10", {}).get("value"), default=-1)
+    vix = _to_float(items.get("^VIX", {}).get("close"), default=-1)
+    base_by_type = {
+        "core_etf": (58, 74), "growth_etf": (52, 68), "sector_etf": (50, 60),
+        "thematic_etf": (46, 54), "single_stock": (48, 56), "st_stock": (20, 10),
+        "duration_bond_etf": (50, 58), "defensive_bond": (45, 64),
+        "defensive_gold": (48, 58), "cash": (62, 78),
     }
     for asset in asset_defs:
         name = asset["name"]
@@ -486,44 +505,67 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
         asset_type = asset["type"]
         cat_row = next((row for row in allocation if row["category"] == category), {})
         deviation = _to_float(cat_row.get("deviation_ratio"))
-        portfolio_fit = 65
+        portfolio_fit = 60
         if deviation < -0.08:
-            portfolio_fit = 90
+            portfolio_fit = 88
         elif deviation < -0.05:
-            portfolio_fit = 80
+            portfolio_fit = 78
         elif deviation > 0.08:
-            portfolio_fit = 15
+            portfolio_fit = 12
         elif deviation > 0.05:
-            portfolio_fit = 30
+            portfolio_fit = 28
         item = items.get(symbol, {}) if symbol else {}
         data_ok = _is_ok_item(item) if symbol else True
         change = _to_float(item.get("change_pct")) if data_ok else 0.0
-
-        valuation = 60 + (8 if change < -3 else 4 if change < -1 else -8 if change > 3 else 0)
-        fundamentals = 72 if asset_type in {"core_etf", "growth_etf"} else 65 if asset_type in {"sector_etf", "thematic_etf"} else 58
-        trend = 55 + (8 if change > 0 else -8 if change < -2 else 0)
-        macro = 60
-        flow = 55
-        data_confidence = 80 if data_ok else 35
+        holding_amount = round(amounts.get(asset["holding_key"], amounts.get(name, amounts.get(symbol, 0))))
+        holding_ratio = holding_amount / total_yuan if total_yuan else 0.0
+        valuation_base, fundamentals = base_by_type[asset_type]
+        valuation = valuation_base + (10 if change <= -3 else 5 if change <= -1 else -8 if change >= 3 else -3 if change >= 1 else 0)
+        trend = 62 + max(-22, min(18, change * 5)) if data_ok else 22
+        macro = 58
+        if asset_type == "growth_etf" or (asset_type == "single_stock" and name in {"NVDA", "GOOG"}):
+            macro += 6 if 0 <= dgs10 < 4 else -8 if dgs10 >= 4.8 else 0
+        elif asset_type == "duration_bond_etf":
+            macro += 10 if 0 <= dgs10 < 4 else -12 if dgs10 >= 4.8 else -3
+        elif asset_type == "defensive_gold":
+            macro += 6 if vix >= 25 else -3 if 0 <= vix < 15 else 0
+        volume_ratio = item.get("volume_ratio")
+        flow = max(20, min(80, 50 + (_to_float(volume_ratio, 1.0) - 1.0) * 35)) if volume_ratio is not None else 24
+        source_count = int(item.get("source_count", len(_candidate_values(item))) or 0) if symbol else 0
+        if not symbol:
+            data_confidence = 48
+        elif not data_ok:
+            data_confidence = 12
+        elif not _fresh(item):
+            data_confidence = 30
+        elif source_count >= 2 and _verified_dual_source(item):
+            data_confidence = 88
+        elif _source_tier(item.get("source")) <= 2:
+            data_confidence = 68
+        else:
+            data_confidence = 52
 
         if asset_type == "single_stock":
             portfolio_fit = min(portfolio_fit, 45)
-            macro -= 5
-            flow -= 5
+            if holding_ratio > 0.05:
+                portfolio_fit -= 12
+            fundamentals -= 8 if not item.get("fundamental_data_available") else 0
+        if asset_type == "st_stock":
+            portfolio_fit = 0
+            valuation = min(valuation, 20)
+            trend = min(trend, 20)
+            macro = 15
+            flow = 10
+            data_confidence = min(data_confidence, 20)
         if asset_type == "duration_bond_etf":
             portfolio_fit = min(portfolio_fit, 35)
-            fundamentals = 55
-            macro = 45
         if category in {"黄金", "债券"} and deviation > 0:
-            portfolio_fit = min(portfolio_fit, 25)
-            valuation -= 5
+            portfolio_fit = min(portfolio_fit, 22)
         if category == "现金" and deviation < 0:
             portfolio_fit = 90
         if not data_ok and symbol:
-            valuation -= 12
-            trend -= 12
-            macro -= 5
-            flow -= 5
+            valuation -= 15
+            macro -= 8
 
         component_scores = {
             "估值吸引力": max(0, min(100, valuation)),
@@ -534,62 +576,116 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             "组合适配度": max(0, min(100, portfolio_fit)),
             "数据置信度": max(0, min(100, data_confidence)),
         }
-        raw_score = round(
-            component_scores["估值吸引力"] * weights["valuation"] / 100
-            + component_scores["趋势与市场宽度"] * weights["trend"] / 100
-            + component_scores["基本面或盈利质量"] * weights["fundamentals"] / 100
-            + component_scores["宏观环境适配"] * weights["macro"] / 100
-            + component_scores["资金流或成交结构"] * weights["flow"] / 100
-            + component_scores["组合适配度"] * weights["portfolio_fit"] / 100
-            + component_scores["数据置信度"] * weights["data_confidence"] / 100
-        )
-        data_adjustment = 0 if data_ok or not symbol else -10
-        score = max(0, min(100, raw_score + data_adjustment))
+        raw_score = round(sum(component_scores[label] * weights[key] for label, key in [
+            ("估值吸引力", "valuation"), ("趋势与市场宽度", "trend_breadth"),
+            ("基本面或盈利质量", "fundamentals"), ("宏观环境适配", "macro"),
+            ("资金流或成交结构", "flow"), ("组合适配度", "portfolio_fit"),
+            ("数据置信度", "data_confidence"),
+        ]))
+        data_adjustment = 0
+        if symbol and not data_ok:
+            data_adjustment -= int(scoring.get("missing_data_penalty", 12))
+        elif symbol and not _fresh(item):
+            data_adjustment -= int(scoring.get("stale_data_penalty", 6))
+        elif symbol and source_count < 2:
+            data_adjustment -= int(scoring.get("single_source_penalty", 3))
+        portfolio_adjustment = 0
+        if deviation > 0.08:
+            portfolio_adjustment -= int(scoring.get("overweight_8pct_penalty", 15))
+        elif deviation > 0.05:
+            portfolio_adjustment -= int(scoring.get("overweight_5pct_penalty", 10))
+        elif deviation > 0 and category in {"黄金", "债券"}:
+            portfolio_adjustment -= 5
+        if asset_type == "single_stock":
+            portfolio_adjustment -= int(scoring.get("single_stock_constraint", 5))
+        elif asset_type == "sector_etf":
+            portfolio_adjustment -= int(scoring.get("sector_constraint", 4))
+        elif asset_type == "thematic_etf":
+            portfolio_adjustment -= int(scoring.get("thematic_constraint", 5))
+        elif asset_type == "st_stock":
+            portfolio_adjustment -= int(scoring.get("st_constraint", 40))
 
         limitations: list[str] = []
         if category in {"黄金", "债券"} and deviation > 0:
             limitations.append("资产类别已高于目标，占比修复优先于市场机会")
         if asset_type == "single_stock":
             limitations.append("个股不得仅因资产类别低配而加仓")
+        if asset_type == "st_stock":
+            limitations.append("ST高风险股票永久禁止自动新增，必须人工风险复核")
         if not data_ok and symbol:
             limitations.append("行情数据不足，仅供观察")
-
-        if category in {"黄金", "债券"} and deviation > 0:
-            advice = "暂停新增"
-        elif asset_type == "duration_bond_etf":
-            advice = "继续持有，暂停新增"
-        elif asset_type == "single_stock":
-            advice = "继续持有" if data_ok else "观察"
-        elif category == "现金":
-            advice = "维持现金安全垫" if deviation >= -0.03 else "优先补现金"
-        elif score >= 78 and asset_type in {"core_etf", "growth_etf"} and deviation < -0.05:
-            advice = "正常定投"
-        elif score >= 68 and asset_type in {"core_etf", "growth_etf"} and deviation < -0.03:
-            advice = "小额分批"
-        else:
-            advice = "继续持有"
-        if asset_type in {"sector_etf", "thematic_etf"} and advice in {"正常定投", "小额分批"}:
-            advice = "观察"
-
-        holding_amount = round(amounts.get(asset["holding_key"], amounts.get(name, amounts.get(symbol, 0))))
+        if volume_ratio is None and symbol:
+            limitations.append("可靠ETF资金流未接入，成交结构项按低置信度处理")
         rows.append(
             {
                 "symbol": symbol or name,
                 "name": name,
                 "category": category,
-                "score": score,
                 "raw_score": raw_score,
                 "data_quality_adjustment": data_adjustment,
+                "portfolio_constraint_adjustment": portfolio_adjustment,
+                "cross_section_adjustment": 0,
                 "components": component_scores,
                 "weights": weights,
                 "current_holding_yuan": holding_amount,
                 "portfolio_fit": portfolio_fit,
-                "advice": advice,
                 "limitations": limitations or ["无硬性限制"],
-                "reason": f"{asset['reason']}；{category}当前偏离{deviation * 100:.1f}个百分点；数据状态：{'可用' if data_ok else '暂无可靠行情'}。",
+                "positive_factors": [asset["reason"], f"{category}偏离目标{deviation * 100:+.1f}个百分点"],
+                "negative_factors": limitations or ["暂无额外硬性扣分"],
+                "data_ok": data_ok,
+                "asset_type": asset_type,
+                "deviation": deviation,
             }
         )
-    return sorted(rows, key=lambda row: row["score"], reverse=True)
+
+    ranked = sorted(rows, key=lambda row: row["raw_score"] + row["data_quality_adjustment"] + row["portfolio_constraint_adjustment"], reverse=True)
+    max_adjustment = int(scoring.get("cross_section_max_adjustment", 8))
+    count = len(ranked)
+    for index, row in enumerate(ranked):
+        percentile = 0.5 if count <= 1 else 1 - index / (count - 1)
+        cross_adjustment = round((percentile - 0.5) * 2 * max_adjustment)
+        row["cross_section_adjustment"] = cross_adjustment
+        score = max(0, min(100, row["raw_score"] + row["data_quality_adjustment"] + row["portfolio_constraint_adjustment"] + cross_adjustment))
+        row["score"] = score
+        if score >= 80:
+            band = "80—100：高优先级机会，但仍需通过预算和风控"
+        elif score >= 70:
+            band = "70—79：可分批关注"
+        elif score >= 60:
+            band = "60—69：持有或等待"
+        elif score >= 50:
+            band = "50—59：低优先级"
+        elif score >= 40:
+            band = "40—49：暂停新增"
+        else:
+            band = "0—39：风险复核或回避"
+        row["advice_band"] = band
+        if row["asset_type"] == "st_stock":
+            advice = "风险复核或回避"
+        elif row["category"] in {"黄金", "债券"} and row["deviation"] > 0:
+            advice = "暂停新增"
+        elif row["asset_type"] == "single_stock":
+            advice = "继续持有" if row["data_ok"] and score >= 50 else "观察"
+        elif not row["data_ok"] and row["symbol"] not in {"现金", "中国债券", "10年地债"}:
+            advice = "观察"
+        elif row["category"] == "现金":
+            advice = "维持现金安全垫" if row["deviation"] >= -0.03 else "优先补现金"
+        elif score >= 80 and row["asset_type"] in {"core_etf", "growth_etf"} and row["deviation"] < -0.05:
+            advice = "优先加仓"
+        elif score >= 70 and row["asset_type"] in {"core_etf", "growth_etf"} and row["deviation"] < -0.03:
+            advice = "小额分批"
+        elif score >= 60:
+            advice = "继续持有"
+        elif score >= 40:
+            advice = "暂停新增"
+        else:
+            advice = "风险复核或回避"
+        row["advice"] = advice
+        row["reason"] = (
+            f"{row['positive_factors'][0]}；原始分{row['raw_score']}，横截面{row['cross_section_adjustment']:+d}，"
+            f"数据调整{row['data_quality_adjustment']:+d}，组合约束{row['portfolio_constraint_adjustment']:+d}。"
+        )
+    return sorted(ranked, key=lambda row: row["score"], reverse=True)
 
 
 def _week_of_month(day: date) -> int:
@@ -916,9 +1012,13 @@ def build_next_triggers(budget: dict[str, Any], dqs: dict[str, Any]) -> list[str
 
 
 def describe_max_opportunity(opportunity: list[dict[str, Any]], dqs: dict[str, Any], today_trade: bool) -> str:
-    if not opportunity:
+    candidates = [
+        row for row in opportunity
+        if row.get("category") != "现金" and row.get("advice") not in {"暂停新增", "风险复核或回避"}
+    ]
+    if not candidates:
         return "暂无可排序机会。"
-    top = opportunity[0]
+    top = candidates[0]
     if not today_trade:
         return f"{top['name']}是长期配置优先方向，但当前{dqs.get('mode_label')}，短期不追涨，等待资金和数据条件确认。"
     return f"{top['name']}：{top.get('advice')}，评分{top.get('score')}，需继续服从资金预算和DQS门槛。"
@@ -936,8 +1036,14 @@ def build_ai_mode(ai_advice: dict[str, Any], dqs: dict[str, Any]) -> dict[str, A
     return {
         "mode": mode,
         "provider": ai_advice.get("actual_provider", "stone_rule_engine"),
+        "enabled": bool(ai_advice.get("enabled", False)),
+        "called": bool(ai_advice.get("called", False)),
+        "success": bool(ai_advice.get("success", False)),
         "openai_participated": ai_advice.get("ai_status") == "available",
         "fallback_reason": ai_advice.get("fallback_reason", ""),
+        "error_category": ai_advice.get("error_category", ""),
+        "conflict_with_rules": bool(ai_advice.get("conflict_with_rules", False)),
+        "review_summary": ai_advice.get("review_summary", ""),
         "retry_count": ai_advice.get("retry_count", 0),
         "model": ai_advice.get("model", ""),
         "validation_errors": ai_advice.get("validation_errors", []),
@@ -1004,7 +1110,7 @@ def apply_dqs_to_opportunity(opportunity: list[dict[str, Any]], dqs: dict[str, A
     adjusted: list[dict[str, Any]] = []
     for row in opportunity:
         item = dict(row)
-        if item.get("advice") in {"优先加仓", "正常定投", "小额分批"}:
+        if item.get("asset_type") in {"core_etf", "growth_etf", "sector_etf", "thematic_etf"} and item.get("advice") not in {"暂停新增", "风险复核或回避"}:
             item["advice"] = "观察，等待数据质量恢复"
             limitations = list(item.get("limitations", []) or [])
             limitations.append(f"DQS={dqs.get('score')}，当前不允许新增仓位建议")
@@ -1141,6 +1247,7 @@ def build_v12_1_decision(
     migration = build_migration_plan(allocation, budget)
     holding_diagnostics = build_holding_diagnostics(live_market_result, allocation)
     scenarios = build_scenarios(budget, opportunity, strategy)
+    stress_scenarios = calculate_portfolio_stress_scenarios(allocation, strategy.get("scenario_stress", {}))
     ai_mode = build_ai_mode(ai_advice_result, dqs)
     market_table = build_market_table(live_market_result)
     total_yuan = sum(row["current_amount_yuan"] for row in allocation)
@@ -1175,6 +1282,8 @@ def build_v12_1_decision(
         "migration_plan": migration,
         "holding_diagnostics": holding_diagnostics,
         "scenarios": scenarios,
+        "stress_scenarios": stress_scenarios,
+        "market_context_status": live_market_result.get("market_context_status", {}),
         "market_table": market_table,
         "ai": ai_mode,
         "macro_event_high_next_7_days": bool(macro_result.get("has_high_event_next_7_days")),
@@ -1203,7 +1312,7 @@ def build_v12_1_decision(
         decision["no_trade_reasons"] = ["数据对账失败，今日不操作"] + decision.get("no_trade_reasons", [])
         decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
     decision["ai"] = build_rule_enhanced_analysis(decision)
-    write_log(f"V12.5 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
+    write_log(f"V12.6 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
     return decision
 
 
@@ -1230,10 +1339,10 @@ def build_system_audit_text(context: dict[str, Any], decision: dict[str, Any]) -
     market_result = context.get("market_result", {}) or {}
     execution = context.get("execution_plan_result", {}) or {}
     lines = [
-        "# Stone AI V12.5 Stable System Audit",
+        "# Stone AI V12.6 Stable System Audit",
         "",
         f"- 审计时间：{datetime.now().isoformat(timespec='seconds')}",
-        "- 当前实际运行入口：根目录 `main.py`（V12.5 Stable冻结入口）。",
+        "- 当前实际运行入口：根目录 `main.py`（V12.6 Stable唯一入口）。",
         "- GitHub Actions 应调用：`python main.py`。",
         "- 报告生成模块：`src/reports/report_center.py`。",
         "- 决策核心模块：`src/decision/v12_1_decision.py`。",
@@ -1245,13 +1354,13 @@ def build_system_audit_text(context: dict[str, Any], decision: dict[str, Any]) -
         "",
         "## 当前旧报告问题原因",
         "",
-        f"- 美股/A股/港股/黄金显示0.00：旧市场摘要使用 `market_data.csv` 默认变化值，缺失行情没有区分失败和真实0；V12.5继续保持“暂无可靠数据/请求失败/缓存”表达。",
-        f"- 双源验证覆盖率：旧路由拿到第一个成功源就返回，导致候选源不足；V12.5按候选源和Source Audit区分覆盖率。",
+        f"- 美股/A股/港股/黄金显示0.00：旧市场摘要使用 `market_data.csv` 默认变化值，缺失行情没有区分失败和真实0；V12.6继续保持“暂无可靠数据/请求失败/缓存”表达。",
+        f"- 双源验证覆盖率：旧路由拿到第一个成功源就返回，导致候选源不足；V12.6按候选源和Source Audit区分覆盖率。",
         f"- 一级来源覆盖率：取决于本次实际成功来源，不再把配置占位算作成功。",
         f"- 分析状态：{decision['ai']['mode']}，来源：{decision['ai'].get('provider')}；OpenAI仅为可选解释层。",
-        f"- 本周0元、本月金额、债券转权益冲突：旧逻辑把现金预算和未到账债券资金混用；V12.5拆成账户总现金、可投资现金和条件性债券到账计划。",
-        f"- 基础定投无金额：V12.5在资金计划中明确计划日、金额、资金来源和不执行原因。",
-        f"- 风险评分明细：旧评分来自 MarketAgent 汇总值 {market_result.get('market_risk_score', '暂无')}；V12.5继续输出八项风险分解。",
+        f"- 本周0元、本月金额、债券转权益冲突：旧逻辑把现金预算和未到账债券资金混用；V12.6拆成账户总现金、可投资现金和条件性债券到账计划。",
+        f"- 基础定投无金额：V12.6在资金计划中明确计划日、金额、资金来源和不执行原因。",
+        f"- 风险评分明细：旧评分来自 MarketAgent 汇总值 {market_result.get('market_risk_score', '暂无')}；V12.6继续输出八项风险分解。",
         "",
         "## 关键运行快照",
         "",

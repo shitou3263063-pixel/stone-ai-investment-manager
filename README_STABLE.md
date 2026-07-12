@@ -1,4 +1,4 @@
-# Stone AI Investment Manager Pro V12.5 Stable
+# Stone AI Investment Manager Pro V12.6 Stable
 
 这是当前项目的最终稳定版收尾版本。系统定位是个人投资辅助与风险复核工具，不自动交易，不连接券商下单权限，不承诺收益。
 
@@ -27,7 +27,7 @@ python main.py
 
 ## 版本冻结
 
-V12.5 Stable 后，主分支只建议接受三类修改：
+V12.6 Stable 后，主分支只建议接受三类修改：
 
 1. 严重 Bug 修复。
 2. 数据源接口失效或第三方 API 变化修复。

@@ -309,7 +309,10 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
             )
         )
 
-    if env_values.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"):
+    openai_enabled = str(env_values.get("OPENAI_ENABLED") or os.getenv("OPENAI_ENABLED") or "true").strip().lower() in {"1", "true", "yes", "on"}
+    if not openai_enabled:
+        items.append(HealthItem("OpenAI可选复核", "OK", "OPENAI_ENABLED=false；已按配置跳过调用，规则引擎完整运行。"))
+    elif env_values.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"):
         items.append(HealthItem("OpenAI API Key", "OK", "OPENAI_API_KEY 已配置。"))
     else:
         items.append(
@@ -333,7 +336,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
 def format_health_report(result: dict[str, object]) -> str:
     items = result.get("items", [])
     lines = [
-        "Stone AI Investment Manager Pro V12.5 Stable 系统自检",
+        "Stone AI Investment Manager Pro V12.6 Stable 系统自检",
         f"总体状态：{result.get('status', 'UNKNOWN')}",
         "",
     ]

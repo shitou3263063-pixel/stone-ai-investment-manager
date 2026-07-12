@@ -1,4 +1,4 @@
-# Stone AI V12.5 Stable 月报
+# Stone AI V12.6 Stable 月报
 
 - 本月确认买入额度：0元
 - 本月条件性债券转权益额度：30,000元

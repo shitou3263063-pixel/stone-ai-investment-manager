@@ -165,7 +165,7 @@ def run(*, send_email: bool = True) -> str:
     reports_dir.mkdir(exist_ok=True)
     today = date.today()
 
-    write_log("V12.5 Stable 正式运行开始", filename="stone_ai.log")
+    write_log("V12.6 Stable 正式运行开始", filename="stone_ai.log")
     write_log("阶段：数据获取与每日统一快照开始", filename="stone_ai.log")
     snapshot = write_snapshot()
     context = _build_context(snapshot)

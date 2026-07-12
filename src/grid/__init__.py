@@ -1,4 +1,4 @@
-"""Smart Grid module for Stone AI Investment Manager Pro V12.5 Stable."""
+"""Smart Grid module for Stone AI Investment Manager Pro V12.6 Stable."""
 
 from .grid_engine import run_smart_grid
 

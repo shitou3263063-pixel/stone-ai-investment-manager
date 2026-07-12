@@ -24,10 +24,16 @@ def get_quote(symbol: str) -> dict[str, Any]:
     last_index = closes.index[-1]
     published_at = last_index.isoformat() if hasattr(last_index, "isoformat") else str(last_index)
     retrieved_at = datetime.now().isoformat(timespec="seconds")
+    volumes = history["Volume"].dropna() if "Volume" in history.columns else []
+    volume = float(volumes.iloc[-1]) if len(volumes) else None
+    prior_volume_average = float(volumes.iloc[:-1].mean()) if len(volumes) >= 2 else None
+    volume_ratio = volume / prior_volume_average if volume is not None and prior_volume_average else None
     return {
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
         "change_pct": round(change_pct, 2),
+        "volume": volume,
+        "volume_ratio": round(volume_ratio, 4) if volume_ratio is not None else None,
         "status": "ok",
         "source": "yfinance",
         "published_at": published_at,

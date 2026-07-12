@@ -1,14 +1,14 @@
 {
-  "version": "Stone AI Investment Manager Pro V12.5 Stable",
+  "version": "Stone AI Investment Manager Pro V12.6 Stable",
   "date": "2026-07-12",
-  "generated_at": "2026-07-12T15:08:44",
-  "data_cutoff": "2026-07-12T15:08:43",
+  "generated_at": "2026-07-12T19:54:35",
+  "data_cutoff": "2026-07-12T19:54:35",
   "trading_day_status": "周末/非交易时段需以下一交易日为准",
   "portfolio_value_yuan": 2821100,
   "portfolio_value_wan": 282.11,
   "portfolio_snapshot": {
     "snapshot_date": "2026-07-11",
-    "built_at": "2026-07-12T15:08:43",
+    "built_at": "2026-07-12T19:54:35",
     "source_file": "C:\\Users\\1\\Documents\\New project\\investment_ai_manager\\data\\portfolio_master.yaml",
     "source": "user_confirmed",
     "last_confirmed_at": "2026-07-11",
@@ -759,468 +759,846 @@
   },
   "opportunity": [
     {
+      "symbol": "现金",
+      "name": "现金",
+      "category": "现金",
+      "raw_score": 66,
+      "data_quality_adjustment": 0,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 8,
+      "components": {
+        "估值吸引力": 62,
+        "趋势与市场宽度": 62.0,
+        "基本面或盈利质量": 78,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
+        "组合适配度": 90,
+        "数据置信度": 48
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 220000,
+      "portfolio_fit": 90,
+      "limitations": [
+        "无硬性限制"
+      ],
+      "positive_factors": [
+        "用于安全储备与流动性，不等于可投资现金",
+        "现金偏离目标-0.2个百分点"
+      ],
+      "negative_factors": [
+        "暂无额外硬性扣分"
+      ],
+      "data_ok": true,
+      "asset_type": "cash",
+      "deviation": -0.002016234802027575,
+      "score": 74,
+      "advice_band": "70—79：可分批关注",
+      "advice": "维持现金安全垫",
+      "reason": "用于安全储备与流动性，不等于可投资现金；原始分66，横截面+8，数据调整+0，组合约束+0。"
+    },
+    {
       "symbol": "VOO",
       "name": "VOO",
       "category": "美股",
-      "score": 69,
-      "raw_score": 69,
-      "data_quality_adjustment": 0,
+      "raw_score": 67,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 7,
       "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 63,
-        "基本面或盈利质量": 72,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 90,
-        "数据置信度": 80
+        "估值吸引力": 58,
+        "趋势与市场宽度": 64.3,
+        "基本面或盈利质量": 74,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 49.2755,
+        "组合适配度": 88,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 130000,
-      "portfolio_fit": 90,
-      "advice": "观察，等待数据质量恢复",
+      "portfolio_fit": 88,
       "limitations": [
         "无硬性限制",
         "DQS=48，当前不允许新增仓位建议"
       ],
-      "reason": "核心宽基ETF，优先用于修复美股低配；美股当前偏离-16.4个百分点；数据状态：可用。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+      "positive_factors": [
+        "核心宽基ETF，优先用于长期修复美股低配",
+        "美股偏离目标-16.4个百分点"
+      ],
+      "negative_factors": [
+        "暂无额外硬性扣分"
+      ],
+      "data_ok": true,
+      "asset_type": "core_etf",
+      "deviation": -0.16352841090354825,
+      "score": 71,
+      "advice_band": "70—79：可分批关注",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "核心宽基ETF，优先用于长期修复美股低配；原始分67，横截面+7，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "QQQ",
       "name": "QQQ",
       "category": "美股",
-      "score": 69,
-      "raw_score": 69,
-      "data_quality_adjustment": 0,
+      "raw_score": 64,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 6,
       "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 63,
-        "基本面或盈利质量": 72,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 90,
-        "数据置信度": 80
+        "估值吸引力": 52,
+        "趋势与市场宽度": 63.55,
+        "基本面或盈利质量": 68,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 41.0085,
+        "组合适配度": 88,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 0,
-      "portfolio_fit": 90,
-      "advice": "观察，等待数据质量恢复",
+      "portfolio_fit": 88,
       "limitations": [
         "无硬性限制",
         "DQS=48，当前不允许新增仓位建议"
       ],
-      "reason": "成长宽基ETF，需控制估值和波动；美股当前偏离-16.4个百分点；数据状态：可用。 当前仅代表长期配置优先方向，不代表今日买入机会。"
-    },
-    {
-      "symbol": "XLF",
-      "name": "XLF",
-      "category": "美股",
-      "score": 68,
-      "raw_score": 68,
-      "data_quality_adjustment": 0,
-      "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 63,
-        "基本面或盈利质量": 65,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 90,
-        "数据置信度": 80
-      },
-      "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
-      },
-      "current_holding_yuan": 42000,
-      "portfolio_fit": 90,
-      "advice": "继续持有",
-      "limitations": [
-        "无硬性限制"
+      "positive_factors": [
+        "成长宽基ETF，需兼顾估值、波动与科技重叠",
+        "美股偏离目标-16.4个百分点"
       ],
-      "reason": "行业ETF，不优先于核心宽基；美股当前偏离-16.4个百分点；数据状态：可用。"
-    },
-    {
-      "symbol": "现金",
-      "name": "现金",
-      "category": "现金",
-      "score": 65,
-      "raw_score": 65,
-      "data_quality_adjustment": 0,
-      "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 58,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 90,
-        "数据置信度": 80
-      },
-      "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
-      },
-      "current_holding_yuan": 220000,
-      "portfolio_fit": 90,
-      "advice": "维持现金安全垫",
-      "limitations": [
-        "无硬性限制"
+      "negative_factors": [
+        "暂无额外硬性扣分"
       ],
-      "reason": "流动性和安全垫；现金当前偏离-0.2个百分点；数据状态：可用。"
+      "data_ok": true,
+      "asset_type": "growth_etf",
+      "deviation": -0.16352841090354825,
+      "score": 67,
+      "advice_band": "60—69：持有或等待",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "成长宽基ETF，需兼顾估值、波动与科技重叠；原始分64，横截面+6，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "510300.SS",
       "name": "沪深300ETF",
       "category": "A股",
-      "score": 64,
-      "raw_score": 64,
-      "data_quality_adjustment": 0,
+      "raw_score": 61,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 5,
       "components": {
-        "估值吸引力": 64,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 72,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 65,
-        "数据置信度": 80
+        "估值吸引力": 63,
+        "趋势与市场宽度": 53.15,
+        "基本面或盈利质量": 74,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 56.853,
+        "组合适配度": 60,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 206000,
-      "portfolio_fit": 65,
-      "advice": "继续持有",
+      "portfolio_fit": 60,
       "limitations": [
-        "无硬性限制"
+        "无硬性限制",
+        "DQS=48，当前不允许新增仓位建议"
       ],
-      "reason": "A股核心宽基ETF；A股当前偏离-0.6个百分点；数据状态：可用。"
+      "positive_factors": [
+        "A股核心宽基ETF",
+        "A股偏离目标-0.6个百分点"
+      ],
+      "negative_factors": [
+        "暂无额外硬性扣分"
+      ],
+      "data_ok": true,
+      "asset_type": "core_etf",
+      "deviation": -0.005533302612456145,
+      "score": 63,
+      "advice_band": "60—69：持有或等待",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "A股核心宽基ETF；原始分61，横截面+5，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "3067.HK",
       "name": "恒生科技ETF",
       "category": "港股",
-      "score": 63,
-      "raw_score": 63,
-      "data_quality_adjustment": 0,
+      "raw_score": 61,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 4,
       "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 72,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 65,
-        "数据置信度": 80
+        "估值吸引力": 58,
+        "趋势与市场宽度": 61.5,
+        "基本面或盈利质量": 74,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 47.004,
+        "组合适配度": 60,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 140400,
-      "portfolio_fit": 65,
-      "advice": "继续持有",
+      "portfolio_fit": 60,
+      "limitations": [
+        "无硬性限制",
+        "DQS=48，当前不允许新增仓位建议"
+      ],
+      "positive_factors": [
+        "03033为真实持仓，3067.HK仅为行情代理",
+        "港股偏离目标-2.3个百分点"
+      ],
+      "negative_factors": [
+        "暂无额外硬性扣分"
+      ],
+      "data_ok": true,
+      "asset_type": "core_etf",
+      "deviation": -0.023371025486512348,
+      "score": 62,
+      "advice_band": "60—69：持有或等待",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "03033为真实持仓，3067.HK仅为行情代理；原始分61，横截面+4，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+    },
+    {
+      "symbol": "XLF",
+      "name": "XLF",
+      "category": "美股",
+      "raw_score": 62,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -4,
+      "cross_section_adjustment": 3,
+      "components": {
+        "估值吸引力": 50,
+        "趋势与市场宽度": 63.55,
+        "基本面或盈利质量": 60,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 41.425,
+        "组合适配度": 88,
+        "数据置信度": 52
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 42000,
+      "portfolio_fit": 88,
       "limitations": [
         "无硬性限制"
       ],
-      "reason": "港股成长宽基，03033为实际持仓，3067.HK仅作行情代理；港股当前偏离-2.3个百分点；数据状态：可用。"
-    },
-    {
-      "symbol": "BABA",
-      "name": "BABA",
-      "category": "美股",
-      "score": 57,
-      "raw_score": 57,
-      "data_quality_adjustment": 0,
-      "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 63,
-        "基本面或盈利质量": 58,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
-        "组合适配度": 45,
-        "数据置信度": 80
-      },
-      "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
-      },
-      "current_holding_yuan": 28000,
-      "portfolio_fit": 45,
-      "advice": "继续持有",
-      "limitations": [
-        "个股不得仅因资产类别低配而加仓"
+      "positive_factors": [
+        "行业ETF，不因美股低配获得宽基同等优先级",
+        "美股偏离目标-16.4个百分点"
       ],
-      "reason": "中概股风险与港股风险相关，不机械补仓；美股当前偏离-16.4个百分点；数据状态：可用。"
-    },
-    {
-      "symbol": "IBKR",
-      "name": "IBKR",
-      "category": "美股",
-      "score": 56,
-      "raw_score": 56,
-      "data_quality_adjustment": 0,
-      "components": {
-        "估值吸引力": 64,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 58,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
-        "组合适配度": 45,
-        "数据置信度": 80
-      },
-      "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
-      },
-      "current_holding_yuan": 40000,
-      "portfolio_fit": 45,
-      "advice": "继续持有",
-      "limitations": [
-        "个股不得仅因资产类别低配而加仓"
+      "negative_factors": [
+        "暂无额外硬性扣分"
       ],
-      "reason": "券商周期股，需基本面和估值同时满足；美股当前偏离-16.4个百分点；数据状态：可用。"
+      "data_ok": true,
+      "asset_type": "sector_etf",
+      "deviation": -0.16352841090354825,
+      "score": 58,
+      "advice_band": "50—59：低优先级",
+      "advice": "暂停新增",
+      "reason": "行业ETF，不因美股低配获得宽基同等优先级；原始分62，横截面+3，数据调整-3，组合约束-4。"
     },
     {
       "symbol": "NVDA",
       "name": "NVDA",
       "category": "美股",
-      "score": 55,
-      "raw_score": 55,
-      "data_quality_adjustment": 0,
+      "raw_score": 53,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": 2,
       "components": {
-        "估值吸引力": 52,
-        "趋势与市场宽度": 63,
-        "基本面或盈利质量": 58,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
+        "估值吸引力": 40,
+        "趋势与市场宽度": 80,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 55.452999999999996,
         "组合适配度": 45,
-        "数据置信度": 80
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 68000,
       "portfolio_fit": 45,
-      "advice": "继续持有",
       "limitations": [
         "个股不得仅因资产类别低配而加仓"
       ],
-      "reason": "单股科技暴露较高，不因美股低配自动加仓；美股当前偏离-16.4个百分点；数据状态：可用。"
+      "positive_factors": [
+        "科技单股，不因美股低配自动加仓",
+        "美股偏离目标-16.4个百分点"
+      ],
+      "negative_factors": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "data_ok": true,
+      "asset_type": "single_stock",
+      "deviation": -0.16352841090354825,
+      "score": 47,
+      "advice_band": "40—49：暂停新增",
+      "advice": "观察",
+      "reason": "科技单股，不因美股低配自动加仓；原始分53，横截面+2，数据调整-3，组合约束-5。"
+    },
+    {
+      "symbol": "BABA",
+      "name": "BABA",
+      "category": "美股",
+      "raw_score": 51,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": 1,
+      "components": {
+        "估值吸引力": 45,
+        "趋势与市场宽度": 67.35,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 46.3215,
+        "组合适配度": 45,
+        "数据置信度": 52
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 28000,
+      "portfolio_fit": 45,
+      "limitations": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "positive_factors": [
+        "中概个股，与港股风险存在重叠",
+        "美股偏离目标-16.4个百分点"
+      ],
+      "negative_factors": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "data_ok": true,
+      "asset_type": "single_stock",
+      "deviation": -0.16352841090354825,
+      "score": 44,
+      "advice_band": "40—49：暂停新增",
+      "advice": "观察",
+      "reason": "中概个股，与港股风险存在重叠；原始分51，横截面+1，数据调整-3，组合约束-5。"
+    },
+    {
+      "symbol": "IBKR",
+      "name": "IBKR",
+      "category": "美股",
+      "raw_score": 50,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": 0,
+      "components": {
+        "估值吸引力": 53,
+        "趋势与市场宽度": 55.75,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 36.7595,
+        "组合适配度": 45,
+        "数据置信度": 52
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 40000,
+      "portfolio_fit": 45,
+      "limitations": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "positive_factors": [
+        "券商周期个股，需盈利和估值数据确认",
+        "美股偏离目标-16.4个百分点"
+      ],
+      "negative_factors": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "data_ok": true,
+      "asset_type": "single_stock",
+      "deviation": -0.16352841090354825,
+      "score": 42,
+      "advice_band": "40—49：暂停新增",
+      "advice": "观察",
+      "reason": "券商周期个股，需盈利和估值数据确认；原始分50，横截面+0，数据调整-3，组合约束-5。"
     },
     {
       "symbol": "GOOG",
       "name": "GOOG",
       "category": "美股",
-      "score": 55,
-      "raw_score": 55,
-      "data_quality_adjustment": 0,
+      "raw_score": 49,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": 0,
       "components": {
-        "估值吸引力": 60,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 58,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
+        "估值吸引力": 48,
+        "趋势与市场宽度": 60.3,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 37.883,
         "组合适配度": 45,
-        "数据置信度": 80
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 22000,
       "portfolio_fit": 45,
-      "advice": "继续持有",
       "limitations": [
         "个股不得仅因资产类别低配而加仓"
       ],
-      "reason": "大型科技股，需等待估值和财报确认；美股当前偏离-16.4个百分点；数据状态：可用。"
+      "positive_factors": [
+        "大型科技个股，需财报、估值与集中度共同确认",
+        "美股偏离目标-16.4个百分点"
+      ],
+      "negative_factors": [
+        "个股不得仅因资产类别低配而加仓"
+      ],
+      "data_ok": true,
+      "asset_type": "single_stock",
+      "deviation": -0.16352841090354825,
+      "score": 41,
+      "advice_band": "40—49：暂停新增",
+      "advice": "观察",
+      "reason": "大型科技个股，需财报、估值与集中度共同确认；原始分49，横截面+0，数据调整-3，组合约束-5。"
     },
     {
       "symbol": "GLD",
       "name": "黄金",
       "category": "黄金",
-      "score": 51,
-      "raw_score": 51,
-      "data_quality_adjustment": 0,
+      "raw_score": 48,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": -1,
       "components": {
-        "估值吸引力": 55,
-        "趋势与市场宽度": 55,
+        "估值吸引力": 48,
+        "趋势与市场宽度": 60.45,
         "基本面或盈利质量": 58,
-        "宏观环境适配": 60,
-        "资金流或成交结构": 55,
-        "组合适配度": 25,
-        "数据置信度": 80
+        "宏观环境适配": 58,
+        "资金流或成交结构": 51.001,
+        "组合适配度": 22,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 547000,
-      "portfolio_fit": 25,
-      "advice": "暂停新增",
+      "portfolio_fit": 22,
       "limitations": [
         "资产类别已高于目标，占比修复优先于市场机会"
       ],
-      "reason": "组合防守资产，当前超配时暂停新增；黄金当前偏离4.4个百分点；数据状态：可用。"
+      "positive_factors": [
+        "实物金和黄金ETF合并看待，超配时暂停新增",
+        "黄金偏离目标+4.4个百分点"
+      ],
+      "negative_factors": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "data_ok": true,
+      "asset_type": "defensive_gold",
+      "deviation": 0.04389599801495872,
+      "score": 39,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "暂停新增",
+      "reason": "实物金和黄金ETF合并看待，超配时暂停新增；原始分48，横截面-1，数据调整-3，组合约束-5。"
+    },
+    {
+      "symbol": "中国债券",
+      "name": "中国债券",
+      "category": "债券",
+      "raw_score": 44,
+      "data_quality_adjustment": 0,
+      "portfolio_constraint_adjustment": -15,
+      "cross_section_adjustment": -2,
+      "components": {
+        "估值吸引力": 45,
+        "趋势与市场宽度": 62.0,
+        "基本面或盈利质量": 64,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
+        "组合适配度": 12,
+        "数据置信度": 48
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 997800,
+      "portfolio_fit": 12,
+      "limitations": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "positive_factors": [
+        "防守资产，当前债券超配时暂停新增",
+        "债券偏离目标+15.1个百分点"
+      ],
+      "negative_factors": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "data_ok": true,
+      "asset_type": "defensive_bond",
+      "deviation": 0.1505529757895856,
+      "score": 27,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "暂停新增",
+      "reason": "防守资产，当前债券超配时暂停新增；原始分44，横截面-2，数据调整+0，组合约束-15。"
+    },
+    {
+      "symbol": "10年地债",
+      "name": "10年地债",
+      "category": "债券",
+      "raw_score": 44,
+      "data_quality_adjustment": 0,
+      "portfolio_constraint_adjustment": -15,
+      "cross_section_adjustment": -3,
+      "components": {
+        "估值吸引力": 45,
+        "趋势与市场宽度": 62.0,
+        "基本面或盈利质量": 64,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
+        "组合适配度": 12,
+        "数据置信度": 48
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 132200,
+      "portfolio_fit": 12,
+      "limitations": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "positive_factors": [
+        "已包含在中国债券总额中，不重复计算",
+        "债券偏离目标+15.1个百分点"
+      ],
+      "negative_factors": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "data_ok": true,
+      "asset_type": "defensive_bond",
+      "deviation": 0.1505529757895856,
+      "score": 26,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "暂停新增",
+      "reason": "已包含在中国债券总额中，不重复计算；原始分44，横截面-3，数据调整+0，组合约束-15。"
     },
     {
       "symbol": "TLT",
       "name": "TLT",
       "category": "债券",
-      "score": 47,
-      "raw_score": 47,
-      "data_quality_adjustment": 0,
+      "raw_score": 45,
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -15,
+      "cross_section_adjustment": -4,
       "components": {
-        "估值吸引力": 55,
-        "趋势与市场宽度": 55,
-        "基本面或盈利质量": 55,
-        "宏观环境适配": 45,
-        "资金流或成交结构": 55,
-        "组合适配度": 15,
-        "数据置信度": 80
+        "估值吸引力": 50,
+        "趋势与市场宽度": 61.9,
+        "基本面或盈利质量": 58,
+        "宏观环境适配": 55,
+        "资金流或成交结构": 38.191,
+        "组合适配度": 12,
+        "数据置信度": 52
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 55000,
-      "portfolio_fit": 15,
-      "advice": "暂停新增",
+      "portfolio_fit": 12,
       "limitations": [
         "资产类别已高于目标，占比修复优先于市场机会"
       ],
-      "reason": "美国长期国债ETF，高久期利率资产；债券当前偏离15.1个百分点；数据状态：可用。"
+      "positive_factors": [
+        "美国长期国债ETF，承受高久期利率风险",
+        "债券偏离目标+15.1个百分点"
+      ],
+      "negative_factors": [
+        "资产类别已高于目标，占比修复优先于市场机会"
+      ],
+      "data_ok": true,
+      "asset_type": "duration_bond_etf",
+      "deviation": 0.1505529757895856,
+      "score": 23,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "暂停新增",
+      "reason": "美国长期国债ETF，承受高久期利率风险；原始分45，横截面-4，数据调整-3，组合约束-15。"
     },
     {
       "symbol": "513060.SS",
       "name": "恒生医疗ETF",
       "category": "港股",
-      "score": 43,
-      "raw_score": 53,
-      "data_quality_adjustment": -10,
+      "raw_score": 40,
+      "data_quality_adjustment": -12,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": -5,
       "components": {
-        "估值吸引力": 48,
-        "趋势与市场宽度": 43,
-        "基本面或盈利质量": 65,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
-        "组合适配度": 65,
-        "数据置信度": 35
+        "估值吸引力": 31,
+        "趋势与市场宽度": 22,
+        "基本面或盈利质量": 54,
+        "宏观环境适配": 50,
+        "资金流或成交结构": 24,
+        "组合适配度": 60,
+        "数据置信度": 12
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 99000,
-      "portfolio_fit": 65,
-      "advice": "继续持有",
+      "portfolio_fit": 60,
       "limitations": [
-        "行情数据不足，仅供观察"
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理",
+        "DQS=48，当前不允许新增仓位建议"
       ],
-      "reason": "主题ETF，只适合小额观察；港股当前偏离-2.3个百分点；数据状态：暂无可靠行情。"
+      "positive_factors": [
+        "主题ETF，受行业周期和集中度约束",
+        "港股偏离目标-2.3个百分点"
+      ],
+      "negative_factors": [
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ],
+      "data_ok": false,
+      "asset_type": "thematic_etf",
+      "deviation": -0.023371025486512348,
+      "score": 18,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "主题ETF，受行业周期和集中度约束；原始分40，横截面-5，数据调整-12，组合约束-5。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "513090.SS",
       "name": "香港证券ETF",
       "category": "港股",
-      "score": 43,
-      "raw_score": 53,
-      "data_quality_adjustment": -10,
+      "raw_score": 40,
+      "data_quality_adjustment": -12,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": -6,
       "components": {
-        "估值吸引力": 48,
-        "趋势与市场宽度": 43,
-        "基本面或盈利质量": 65,
-        "宏观环境适配": 55,
-        "资金流或成交结构": 50,
-        "组合适配度": 65,
-        "数据置信度": 35
+        "估值吸引力": 31,
+        "趋势与市场宽度": 22,
+        "基本面或盈利质量": 54,
+        "宏观环境适配": 50,
+        "资金流或成交结构": 24,
+        "组合适配度": 60,
+        "数据置信度": 12
       },
       "weights": {
-        "valuation": 25,
-        "trend": 15,
-        "fundamentals": 15,
-        "macro": 10,
-        "flow": 10,
-        "portfolio_fit": 20,
-        "data_confidence": 5
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
       },
       "current_holding_yuan": 33200,
-      "portfolio_fit": 65,
-      "advice": "继续持有",
+      "portfolio_fit": 60,
       "limitations": [
-        "行情数据不足，仅供观察"
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理",
+        "DQS=48，当前不允许新增仓位建议"
       ],
-      "reason": "高弹性主题ETF，不作为优先补仓资产；港股当前偏离-2.3个百分点；数据状态：暂无可靠行情。"
+      "positive_factors": [
+        "高弹性主题ETF，不作为优先补仓资产",
+        "港股偏离目标-2.3个百分点"
+      ],
+      "negative_factors": [
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ],
+      "data_ok": false,
+      "asset_type": "thematic_etf",
+      "deviation": -0.023371025486512348,
+      "score": 17,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "观察，等待数据质量恢复",
+      "reason": "高弹性主题ETF，不作为优先补仓资产；原始分40，横截面-6，数据调整-12，组合约束-5。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+    },
+    {
+      "symbol": "002558.SZ",
+      "name": "巨人网络",
+      "category": "A股",
+      "raw_score": 36,
+      "data_quality_adjustment": -12,
+      "portfolio_constraint_adjustment": -5,
+      "cross_section_adjustment": -7,
+      "components": {
+        "估值吸引力": 33,
+        "趋势与市场宽度": 22,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 50,
+        "资金流或成交结构": 24,
+        "组合适配度": 45,
+        "数据置信度": 12
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 41000,
+      "portfolio_fit": 45,
+      "limitations": [
+        "个股不得仅因资产类别低配而加仓",
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ],
+      "positive_factors": [
+        "A股个股，需公司数据和集中度复核",
+        "A股偏离目标-0.6个百分点"
+      ],
+      "negative_factors": [
+        "个股不得仅因资产类别低配而加仓",
+        "行情数据不足，仅供观察",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ],
+      "data_ok": false,
+      "asset_type": "single_stock",
+      "deviation": -0.005533302612456145,
+      "score": 12,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "观察",
+      "reason": "A股个股，需公司数据和集中度复核；原始分36，横截面-7，数据调整-12，组合约束-5。"
+    },
+    {
+      "symbol": "*ST闻泰",
+      "name": "*ST闻泰",
+      "category": "A股",
+      "raw_score": 12,
+      "data_quality_adjustment": 0,
+      "portfolio_constraint_adjustment": -40,
+      "cross_section_adjustment": -8,
+      "components": {
+        "估值吸引力": 20,
+        "趋势与市场宽度": 20,
+        "基本面或盈利质量": 10,
+        "宏观环境适配": 15,
+        "资金流或成交结构": 10,
+        "组合适配度": 0,
+        "数据置信度": 20
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 19500,
+      "portfolio_fit": 0,
+      "limitations": [
+        "ST高风险股票永久禁止自动新增，必须人工风险复核"
+      ],
+      "positive_factors": [
+        "高风险ST持仓，永久禁止自动新增",
+        "A股偏离目标-0.6个百分点"
+      ],
+      "negative_factors": [
+        "ST高风险股票永久禁止自动新增，必须人工风险复核"
+      ],
+      "data_ok": true,
+      "asset_type": "st_stock",
+      "deviation": -0.005533302612456145,
+      "score": 0,
+      "advice_band": "0—39：风险复核或回避",
+      "advice": "风险复核或回避",
+      "reason": "高风险ST持仓，永久禁止自动新增；原始分12，横截面-8，数据调整+0，组合约束-40。"
     }
   ],
   "budget": {
@@ -1670,6 +2048,322 @@
       "targets": "核心ETF继续观察"
     }
   ],
+  "stress_scenarios": [
+    {
+      "key": "equity_bull",
+      "name": "情景A：权益牛市",
+      "assumptions": {
+        "美股": 0.2,
+        "港股": 0.15,
+        "A股": 0.12,
+        "债券": -0.03,
+        "黄金": -0.05,
+        "现金": 0.0
+      },
+      "portfolio_return": 0.031413,
+      "portfolio_change_yuan": 88620,
+      "contributions": [
+        {
+          "category": "美股",
+          "assumption": 0.2,
+          "impact_yuan": 77000
+        },
+        {
+          "category": "债券",
+          "assumption": -0.03,
+          "impact_yuan": -33900
+        },
+        {
+          "category": "黄金",
+          "assumption": -0.05,
+          "impact_yuan": -27350
+        },
+        {
+          "category": "港股",
+          "assumption": 0.15,
+          "impact_yuan": 40890
+        },
+        {
+          "category": "A股",
+          "assumption": 0.12,
+          "impact_yuan": 31980
+        },
+        {
+          "category": "现金",
+          "assumption": 0.0,
+          "impact_yuan": 0
+        }
+      ],
+      "largest_contributors": [
+        {
+          "category": "美股",
+          "assumption": 0.2,
+          "impact_yuan": 77000
+        },
+        {
+          "category": "港股",
+          "assumption": 0.15,
+          "impact_yuan": 40890
+        },
+        {
+          "category": "债券",
+          "assumption": -0.03,
+          "impact_yuan": -33900
+        }
+      ],
+      "exceeds_tolerance_low": false,
+      "exceeds_tolerance_high": false,
+      "note": "静态假设测算，不是预测，不直接形成自动交易指令。"
+    },
+    {
+      "key": "range_market",
+      "name": "情景B：震荡市场",
+      "assumptions": {
+        "美股": 0.05,
+        "港股": 0.0,
+        "A股": 0.03,
+        "债券": 0.02,
+        "黄金": 0.03,
+        "现金": 0.0
+      },
+      "portfolio_return": 0.023486,
+      "portfolio_change_yuan": 66255,
+      "contributions": [
+        {
+          "category": "美股",
+          "assumption": 0.05,
+          "impact_yuan": 19250
+        },
+        {
+          "category": "债券",
+          "assumption": 0.02,
+          "impact_yuan": 22600
+        },
+        {
+          "category": "黄金",
+          "assumption": 0.03,
+          "impact_yuan": 16410
+        },
+        {
+          "category": "港股",
+          "assumption": 0.0,
+          "impact_yuan": 0
+        },
+        {
+          "category": "A股",
+          "assumption": 0.03,
+          "impact_yuan": 7995
+        },
+        {
+          "category": "现金",
+          "assumption": 0.0,
+          "impact_yuan": 0
+        }
+      ],
+      "largest_contributors": [
+        {
+          "category": "债券",
+          "assumption": 0.02,
+          "impact_yuan": 22600
+        },
+        {
+          "category": "美股",
+          "assumption": 0.05,
+          "impact_yuan": 19250
+        },
+        {
+          "category": "黄金",
+          "assumption": 0.03,
+          "impact_yuan": 16410
+        }
+      ],
+      "exceeds_tolerance_low": false,
+      "exceeds_tolerance_high": false,
+      "note": "静态假设测算，不是预测，不直接形成自动交易指令。"
+    },
+    {
+      "key": "risk_shock",
+      "name": "情景C：风险冲击",
+      "assumptions": {
+        "美股": -0.25,
+        "港股": -0.3,
+        "A股": -0.2,
+        "债券": 0.05,
+        "黄金": 0.1,
+        "现金": 0.0
+      },
+      "portfolio_return": -0.042583,
+      "portfolio_change_yuan": -120130,
+      "contributions": [
+        {
+          "category": "美股",
+          "assumption": -0.25,
+          "impact_yuan": -96250
+        },
+        {
+          "category": "债券",
+          "assumption": 0.05,
+          "impact_yuan": 56500
+        },
+        {
+          "category": "黄金",
+          "assumption": 0.1,
+          "impact_yuan": 54700
+        },
+        {
+          "category": "港股",
+          "assumption": -0.3,
+          "impact_yuan": -81780
+        },
+        {
+          "category": "A股",
+          "assumption": -0.2,
+          "impact_yuan": -53300
+        },
+        {
+          "category": "现金",
+          "assumption": 0.0,
+          "impact_yuan": 0
+        }
+      ],
+      "largest_contributors": [
+        {
+          "category": "美股",
+          "assumption": -0.25,
+          "impact_yuan": -96250
+        },
+        {
+          "category": "港股",
+          "assumption": -0.3,
+          "impact_yuan": -81780
+        },
+        {
+          "category": "债券",
+          "assumption": 0.05,
+          "impact_yuan": 56500
+        }
+      ],
+      "exceeds_tolerance_low": false,
+      "exceeds_tolerance_high": false,
+      "note": "静态假设测算，不是预测，不直接形成自动交易指令。"
+    }
+  ],
+  "market_context_status": {
+    "indicators": [
+      {
+        "name": "VIX",
+        "value": 15.03,
+        "previous_value": 15.84,
+        "timestamp": "2026-07-12 11:53:23",
+        "source": "cboe_official",
+        "source_level": 1,
+        "status": "ok",
+        "stale": false,
+        "verified_by_second_source": true,
+        "note": "Cboe优先，其他行情源仅用于交叉验证。"
+      },
+      {
+        "name": "Put/Call Ratio",
+        "value": null,
+        "previous_value": null,
+        "timestamp": null,
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "not_connected",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "未找到当前流程可稳定复用的官方接口，本版不接入。"
+      },
+      {
+        "name": "上涨/下跌家数与新高/新低",
+        "value": null,
+        "previous_value": null,
+        "timestamp": null,
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "not_connected",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "市场宽度未接入；不得以指数涨跌替代。"
+      },
+      {
+        "name": "ETF资金流",
+        "value": null,
+        "previous_value": null,
+        "timestamp": null,
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "not_connected",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "未接入可靠许可数据；不得以价格或成交量替代净申赎。"
+      },
+      {
+        "name": "AAII情绪",
+        "value": null,
+        "previous_value": null,
+        "timestamp": null,
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "not_connected",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "未接入稳定自动数据源，仅保留状态说明。"
+      },
+      {
+        "name": "美国10年国债收益率",
+        "value": null,
+        "previous_value": null,
+        "timestamp": "2026-07-12T19:54:35",
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "missing",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "FRED官方宏观序列。"
+      },
+      {
+        "name": "美国2年国债收益率",
+        "value": null,
+        "previous_value": null,
+        "timestamp": "2026-07-12T19:54:35",
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "missing",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "FRED官方宏观序列。"
+      },
+      {
+        "name": "美国10年减2年利差",
+        "value": null,
+        "previous_value": null,
+        "timestamp": "2026-07-12T19:54:35",
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "missing",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "FRED官方宏观序列。"
+      },
+      {
+        "name": "美国高收益债利差",
+        "value": null,
+        "previous_value": null,
+        "timestamp": "2026-07-12T19:54:35",
+        "source": "unavailable",
+        "source_level": 99,
+        "status": "missing",
+        "stale": false,
+        "verified_by_second_source": false,
+        "note": "FRED官方宏观序列。"
+      }
+    ],
+    "breadth_status": "not_connected",
+    "fund_flow_status": "not_connected",
+    "sentiment_status": "partial",
+    "note": "仅列出本次真实接通的数据；未接入项不参与高确定性买入判断。"
+  },
   "market_table": [
     {
       "name": "VOO",
@@ -1678,7 +2372,7 @@
       "previous": 690.69,
       "change_pct": 0.46,
       "timestamp": "2026-07-10T00:00:00-04:00",
-      "retrieved_at": "2026-07-12T15:08:36",
+      "retrieved_at": "2026-07-12T19:54:28",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1694,7 +2388,7 @@
       "previous": 723.28,
       "change_pct": 0.31,
       "timestamp": "2026-07-10T00:00:00-04:00",
-      "retrieved_at": "2026-07-12T15:08:37",
+      "retrieved_at": "2026-07-12T19:54:29",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1710,7 +2404,7 @@
       "previous": 84.49,
       "change_pct": -0.02,
       "timestamp": "2026-07-10T00:00:00-04:00",
-      "retrieved_at": "2026-07-12T15:08:40",
+      "retrieved_at": "2026-07-12T19:54:32",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1726,7 +2420,7 @@
       "previous": 378.18,
       "change_pct": -0.31,
       "timestamp": "2026-07-10T00:00:00-04:00",
-      "retrieved_at": "2026-07-12T15:08:40",
+      "retrieved_at": "2026-07-12T19:54:32",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1741,8 +2435,8 @@
       "display_value": "15.03",
       "previous": 15.84,
       "change_pct": -5.11,
-      "timestamp": "2026-07-12 07:08:10",
-      "retrieved_at": "2026-07-12T15:08:42",
+      "timestamp": "2026-07-12 11:53:23",
+      "retrieved_at": "2026-07-12T19:54:34",
       "source": "cboe_official",
       "source_tier": 1,
       "success": true,
@@ -1758,7 +2452,7 @@
       "previous": 9.965,
       "change_pct": -0.1,
       "timestamp": "2026-07-10T00:00:00+08:00",
-      "retrieved_at": "2026-07-12T15:08:39",
+      "retrieved_at": "2026-07-12T19:54:31",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1774,7 +2468,7 @@
       "previous": 4.916,
       "change_pct": -1.77,
       "timestamp": "2026-07-10T00:00:00+08:00",
-      "retrieved_at": "2026-07-12T15:08:40",
+      "retrieved_at": "2026-07-12T19:54:32",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1790,7 +2484,7 @@
       "previous": 100.94,
       "change_pct": 0.03,
       "timestamp": "2026-07-10T00:00:00-04:00",
-      "retrieved_at": "2026-07-12T15:08:41",
+      "retrieved_at": "2026-07-12T19:54:33",
       "source": "yfinance",
       "source_tier": 3,
       "success": true,
@@ -1805,8 +2499,8 @@
       "display_value": "暂无可靠数据",
       "previous": null,
       "change_pct": null,
-      "timestamp": "2026-07-12T15:08:43",
-      "retrieved_at": "2026-07-12T15:08:43",
+      "timestamp": "2026-07-12T19:54:35",
+      "retrieved_at": "2026-07-12T19:54:35",
       "source": "unavailable",
       "source_tier": 99,
       "success": false,
@@ -1821,8 +2515,8 @@
       "display_value": "暂无可靠数据",
       "previous": null,
       "change_pct": null,
-      "timestamp": "2026-07-12T15:08:43",
-      "retrieved_at": "2026-07-12T15:08:43",
+      "timestamp": "2026-07-12T19:54:35",
+      "retrieved_at": "2026-07-12T19:54:35",
       "source": "unavailable",
       "source_tier": 99,
       "success": false,
@@ -1837,8 +2531,8 @@
       "display_value": "暂无可靠数据",
       "previous": null,
       "change_pct": null,
-      "timestamp": "2026-07-12T15:08:43",
-      "retrieved_at": "2026-07-12T15:08:43",
+      "timestamp": "2026-07-12T19:54:35",
+      "retrieved_at": "2026-07-12T19:54:35",
       "source": "unavailable",
       "source_tier": 99,
       "success": false,
@@ -1853,8 +2547,8 @@
       "display_value": "暂无可靠数据",
       "previous": null,
       "change_pct": null,
-      "timestamp": "2026-07-12T15:08:43",
-      "retrieved_at": "2026-07-12T15:08:43",
+      "timestamp": "2026-07-12T19:54:35",
+      "retrieved_at": "2026-07-12T19:54:35",
       "source": "unavailable",
       "source_tier": 99,
       "success": false,
@@ -1867,10 +2561,16 @@
   "ai": {
     "mode": "SAFE_MODE",
     "provider": "Stone CIO规则引擎",
+    "enabled": true,
+    "called": false,
+    "success": false,
     "openai_participated": false,
     "fallback_reason": "missing_openai_key",
+    "error_category": "",
+    "conflict_with_rules": false,
+    "review_summary": "OpenAI未参与最终裁决；规则引擎已独立完成预算、DQS、风险与决策。",
     "retry_count": 0,
-    "model": "",
+    "model": "gpt-4o-mini",
     "validation_errors": [],
     "impact": "OpenAI是可选解释层；本次由规则引擎完成全部核心分析，DQS、预算和风控结论不受影响。",
     "market_regime": "规则风险等级为中高风险，DQS=48，结论置信度服从数据质量门槛。",
@@ -1926,11 +2626,11 @@
     "status": "PASS",
     "errors": [],
     "warnings": [],
-    "checked_at": "2026-07-12T15:08:54"
+    "checked_at": "2026-07-12T19:54:37"
   },
   "grid": {
     "enabled": true,
-    "version": "Stone AI Investment Manager Pro V12.5 Stable",
+    "version": "Stone AI Investment Manager Pro V12.6 Stable",
     "paper_mode": true,
     "live_advice_enabled": false,
     "auto_trade": false,
@@ -1974,7 +2674,7 @@
           "market_regime": "uptrend",
           "last_signal_key": "",
           "processed_trade_ids": [],
-          "updated_at": "2026-07-12T15:08:44"
+          "updated_at": "2026-07-12T19:54:35"
         },
         "regime": {
           "symbol": "VOO",
@@ -2051,7 +2751,7 @@
           "market_regime": "uptrend",
           "last_signal_key": "",
           "processed_trade_ids": [],
-          "updated_at": "2026-07-12T15:08:44"
+          "updated_at": "2026-07-12T19:54:35"
         },
         "regime": {
           "symbol": "QQQ",

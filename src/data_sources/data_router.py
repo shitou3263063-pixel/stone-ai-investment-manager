@@ -39,6 +39,9 @@ YFINANCE_ONLY_TICKERS = {"^GSPC", "^IXIC", "DX-Y.NYB"}
 
 MACRO_SERIES = {
     "DGS10": "美国10年国债收益率",
+    "DGS2": "美国2年国债收益率",
+    "T10Y2Y": "美国10年减2年利差",
+    "BAMLH0A0HYM2": "美国高收益债利差",
     "CPIAUCSL": "CPI",
     "PPIACO": "PPI",
     "PCEPI": "PCE",
@@ -66,13 +69,30 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
     return {
         **item,
         "value": item.get("close", item.get("value")),
+        "previous_value": item.get("previous_close", item.get("previous_value")),
         "timestamp": timestamp,
         "source": source,
         "source_level": SOURCE_LEVELS.get(source_key, 99),
         "status": status,
         "stale": stale,
         "fallback_used": bool(item.get("cache_used")) or source.startswith("cache:"),
+        "verified_by_second_source": bool(item.get("verified_by_second_source", False)),
     }
+
+
+def _dual_source_verified(candidates: list[dict[str, Any]], tolerance_pct: float = 1.0) -> bool:
+    values: list[float] = []
+    sources: set[str] = set()
+    for candidate in candidates:
+        raw = candidate.get("close", candidate.get("value"))
+        try:
+            values.append(float(raw))
+            sources.add(str(candidate.get("source", "")))
+        except (TypeError, ValueError):
+            continue
+    if len(sources) < 2 or len(values) < 2 or min(values) == 0:
+        return False
+    return (max(values) / min(values) - 1) * 100 <= tolerance_pct
 
 
 def _failed_item(symbol: str, errors: list[str]) -> dict[str, Any]:
@@ -180,7 +200,13 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
     if candidates:
         normalized_candidates = [_normalize_point(item) for item in candidates]
         selected = normalized_candidates[0]
-        return {**selected, "candidates": normalized_candidates, "source_count": len({item.get("source") for item in normalized_candidates})}
+        verified = _dual_source_verified(normalized_candidates)
+        return {
+            **selected,
+            "candidates": normalized_candidates,
+            "source_count": len({item.get("source") for item in normalized_candidates}),
+            "verified_by_second_source": verified,
+        }
 
     cached = read_cache("quote", symbol)
     if cached:
@@ -249,6 +275,67 @@ def get_news_and_earnings(symbols: list[str] | None = None) -> dict[str, Any]:
             errors.append(f"{symbol} 新闻/财报获取失败：{exc}")
             write_log(errors[-1], filename="data_router.log")
     return {"source": "finnhub", "items": results, "errors": errors, "optional": True}
+
+
+def _status_point(
+    name: str,
+    *,
+    value: Any = None,
+    previous_value: Any = None,
+    timestamp: Any = None,
+    source: str = "unavailable",
+    source_level: int = 99,
+    status: str = "not_connected",
+    stale: bool = False,
+    verified: bool = False,
+    note: str = "",
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "value": value,
+        "previous_value": previous_value,
+        "timestamp": timestamp,
+        "source": source,
+        "source_level": source_level,
+        "status": status,
+        "stale": stale,
+        "verified_by_second_source": verified,
+        "note": note,
+    }
+
+
+def _build_market_context_status(items: dict[str, Any], macro: dict[str, Any]) -> dict[str, Any]:
+    vix = items.get("^VIX", {}) or {}
+    macro_items = macro.get("items", {}) or {}
+    indicators = [
+        _status_point("VIX", value=vix.get("close"), previous_value=vix.get("previous_close"),
+                      timestamp=vix.get("timestamp"), source=str(vix.get("source", "unavailable")),
+                      source_level=int(vix.get("source_level", 99) or 99), status=str(vix.get("status", "missing")),
+                      stale=bool(vix.get("stale")), verified=bool(vix.get("verified_by_second_source")),
+                      note="Cboe优先，其他行情源仅用于交叉验证。"),
+        _status_point("Put/Call Ratio", note="未找到当前流程可稳定复用的官方接口，本版不接入。"),
+        _status_point("上涨/下跌家数与新高/新低", note="市场宽度未接入；不得以指数涨跌替代。"),
+        _status_point("ETF资金流", note="未接入可靠许可数据；不得以价格或成交量替代净申赎。"),
+        _status_point("AAII情绪", note="未接入稳定自动数据源，仅保留状态说明。"),
+    ]
+    for series_id in ["DGS10", "DGS2", "T10Y2Y", "BAMLH0A0HYM2"]:
+        point = macro_items.get(series_id, {}) or {}
+        indicators.append(
+            _status_point(
+                str(point.get("name") or series_id), value=point.get("value"),
+                previous_value=point.get("previous_value"), timestamp=point.get("timestamp"),
+                source=str(point.get("source", "unavailable")), source_level=int(point.get("source_level", 99) or 99),
+                status=str(point.get("status", "missing")), stale=bool(point.get("stale")),
+                verified=bool(point.get("verified_by_second_source")), note="FRED官方宏观序列。",
+            )
+        )
+    return {
+        "indicators": indicators,
+        "breadth_status": "available" if any(row["name"] == "上涨/下跌家数与新高/新低" and row["status"] == "ok" for row in indicators) else "not_connected",
+        "fund_flow_status": "not_connected",
+        "sentiment_status": "partial" if vix.get("status") == "ok" else "missing",
+        "note": "仅列出本次真实接通的数据；未接入项不参与高确定性买入判断。",
+    }
 
 
 def _quality_score(items: dict[str, dict[str, Any]], macro: dict[str, Any]) -> int:
@@ -368,6 +455,7 @@ def fetch_layered_market_data() -> dict[str, Any]:
         "items": items,
         "macro": macro,
         "news": news,
+        "market_context_status": _build_market_context_status(items, macro),
         "data_quality": quality,
         "errors": errors,
     }

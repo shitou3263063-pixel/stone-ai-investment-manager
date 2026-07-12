@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 import json
 import os
 from typing import Any
@@ -9,6 +9,17 @@ from urllib.request import urlopen
 
 
 BASE_URL = "https://api.stlouisfed.org/fred"
+FRESHNESS_DAYS = {
+    "DGS10": 10,
+    "DGS2": 10,
+    "T10Y2Y": 10,
+    "BAMLH0A0HYM2": 10,
+    "CPIAUCSL": 60,
+    "PPIACO": 60,
+    "PCEPI": 60,
+    "UNRATE": 60,
+    "GDP": 150,
+}
 
 
 def _api_key() -> str:
@@ -30,7 +41,7 @@ def get_series_latest(series_id: str) -> dict[str, Any]:
         {
             "series_id": series_id,
             "sort_order": "desc",
-            "limit": "1",
+            "limit": "2",
         },
     )
     observations = payload.get("observations") or []
@@ -41,16 +52,28 @@ def get_series_latest(series_id: str) -> dict[str, Any]:
     if value in (None, "", "."):
         raise RuntimeError(f"FRED {series_id} 最新值不可用")
     retrieved_at = datetime.now().isoformat(timespec="seconds")
+    previous_value = None
+    if len(observations) > 1 and observations[1].get("value") not in (None, "", "."):
+        previous_value = float(observations[1]["value"])
+    published_date = observation.get("date")
+    try:
+        age_days = max(0, (date.today() - date.fromisoformat(str(published_date))).days)
+    except (TypeError, ValueError):
+        age_days = 9999
+    stale = age_days > FRESHNESS_DAYS.get(series_id, 60)
     return {
         "series_id": series_id,
         "value": float(value),
-        "date": observation.get("date"),
+        "previous_value": previous_value,
+        "date": published_date,
         "status": "ok",
         "source": "fred",
-        "published_at": observation.get("date"),
+        "published_at": published_date,
         "retrieved_at": retrieved_at,
         "fetched_at": retrieved_at,
-        "freshness_status": "fresh",
+        "freshness_status": "stale" if stale else "fresh",
+        "stale": stale,
+        "age_days": age_days,
         "is_realtime": False,
         "cache_used": False,
         "cache_stale": False,

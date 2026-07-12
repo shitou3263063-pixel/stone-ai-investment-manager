@@ -71,7 +71,11 @@ def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
     risk = decision.get("risk", {}) or {}
     consistency = decision.get("consistency", {}) or {}
     opportunity = decision.get("opportunity", []) or []
-    top_opportunity = opportunity[0] if opportunity else {}
+    ranked_candidates = [
+        row for row in opportunity
+        if row.get("category") != "现金" and row.get("advice") not in {"暂停新增", "风险复核或回避"}
+    ]
+    top_opportunity = ranked_candidates[0] if ranked_candidates else {}
     today_amount = float(budget.get("today_total_yuan", 0) or 0)
     account_cash = float(budget.get("account_total_cash_yuan", 0) or 0)
     funding_source = str(decision.get("funding_source") or "不适用")
@@ -262,18 +266,19 @@ def _cash_table(decision: dict[str, Any]) -> list[str]:
 
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 标的 | 最终分 | 原始分 | 数据调整 | 当前持仓 | 组合适配 | 建议 | 分项得分 | 限制条件 | 原因 |",
-        "| -- | ---: | ---: | ---: | ---: | ---- | -- | -- | -- | -- |",
+        "| 标的 | 最终分 | 原始分 | 横截面 | 数据调整 | 组合约束 | 建议区间 | 建议 | 当前持仓 | 分项得分 | 主要加分项 | 主要扣分项 |",
+        "| -- | ---: | ---: | ---: | ---: | ---: | -- | -- | ---: | -- | -- | -- |",
     ]
     for item in decision.get("opportunity", []) or []:
-        components = item.get("components", {}) or {}
-        component_text = "；".join(f"{key}{value}" for key, value in components.items()) or "暂无"
-        limitations = "；".join(item.get("limitations", []) or ["无"])
         rows.append(
             "| "
             f"{item['name']} | {item['score']} | {item.get('raw_score', item['score'])} | "
-            f"{item.get('data_quality_adjustment', 0)} | {_yuan(item['current_holding_yuan'])} | "
-            f"{item['portfolio_fit']} | {item['advice']} | {component_text} | {limitations} | {item['reason']} |"
+            f"{item.get('cross_section_adjustment', 0):+d} | {item.get('data_quality_adjustment', 0):+d} | "
+            f"{item.get('portfolio_constraint_adjustment', 0):+d} | {item.get('advice_band', '暂无')} | "
+            f"{item['advice']} | {_yuan(item['current_holding_yuan'])} | "
+            f"{'；'.join(f'{key}{value}' for key, value in (item.get('components', {}) or {}).items()) or '暂无'} | "
+            f"{'；'.join(item.get('positive_factors', []) or ['暂无'])} | "
+            f"{'；'.join(item.get('negative_factors', []) or ['暂无'])} |"
         )
     return rows
 
@@ -362,6 +367,45 @@ def _scenarios(decision: dict[str, Any]) -> list[str]:
     return lines or ["- 暂无情景分析。"]
 
 
+def _stress_scenarios(decision: dict[str, Any]) -> list[str]:
+    rows = [
+        "| 情景 | 组合估算变化 | 估算金额 | 主要贡献项 | 是否超过25%—35%回撤容忍区间 |",
+        "| -- | --: | --: | -- | -- |",
+    ]
+    for item in decision.get("stress_scenarios", []) or []:
+        contributors = "；".join(
+            f"{row['category']} {row['impact_yuan']:+,.0f}元" for row in item.get("largest_contributors", [])
+        ) or "暂无"
+        tolerance = "超过" if item.get("exceeds_tolerance_low") else "未超过"
+        rows.append(
+            f"| {item.get('name')} | {float(item.get('portfolio_return', 0)):.2%} | "
+            f"{float(item.get('portfolio_change_yuan', 0)):+,.0f}元 | {contributors} | {tolerance} |"
+        )
+    rows.append("")
+    rows.append("- 说明：以上均为静态假设测算，不是预测，不直接形成自动交易指令。")
+    return rows
+
+
+def _market_context_status(decision: dict[str, Any]) -> list[str]:
+    status = decision.get("market_context_status", {}) or {}
+    rows = [
+        "| 数据项 | 当前值 | 前值 | 时间 | 来源 | 等级 | 状态 | 双源验证 | 说明 |",
+        "| -- | --: | --: | -- | -- | --: | -- | -- | -- |",
+    ]
+    for item in status.get("indicators", []) or []:
+        value = "暂无可靠数据" if item.get("value") is None else str(item.get("value"))
+        previous = "暂无可靠数据" if item.get("previous_value") is None else str(item.get("previous_value"))
+        rows.append(
+            f"| {item.get('name')} | {value} | {previous} | {item.get('timestamp') or '暂无'} | "
+            f"{item.get('source') or 'unavailable'} | {item.get('source_level', 99)} | "
+            f"{item.get('status', 'missing')} | {'是' if item.get('verified_by_second_source') else '否'} | "
+            f"{item.get('note') or '暂无'} |"
+        )
+    if len(rows) == 2:
+        rows.append("| 市场宽度/资金流/情绪 | 暂无可靠数据 | 暂无可靠数据 | 暂无 | unavailable | 99 | 未接入 | 否 | 本次输入未提供状态数据。 |")
+    return rows or ["- 市场宽度、资金流和情绪状态暂不可用。"]
+
+
 def _source_lines(decision: dict[str, Any]) -> list[str]:
     rows = []
     for item in decision.get("market_table", []) or []:
@@ -391,7 +435,7 @@ def generate_daily_report(
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 15. Stone Smart Grid", 1)
     lines = [
-        "# Stone AI Investment Manager Pro V12.5 Stable 日报",
+        "# Stone AI Investment Manager Pro V12.6 Stable 日报",
         "",
         "## 0. 报告状态",
         "",
@@ -469,6 +513,9 @@ def generate_daily_report(
         "",
         "## 8. Opportunity Score",
         "",
+        "- 权重：估值20%、趋势与市场宽度15%、基本面20%、宏观10%、资金流与成交结构10%、组合适配20%、数据置信度5%。",
+        "- 最终分 = 原始绝对分 + 温和横截面调整 + 数据质量调整 + 组合约束调整；评分不覆盖现金、预算、DQS和硬风控。",
+        "",
         *_opportunity_table(decision),
         "",
         "## 9. 持仓健康检查",
@@ -478,6 +525,10 @@ def generate_daily_report(
         "## 10. 市场与宏观",
         "",
         *_market_table(decision),
+        "",
+        "### 市场宽度、资金流与情绪数据状态",
+        "",
+        *_market_context_status(decision),
         "",
         "## 11. 市场风险评分",
         "",
@@ -505,6 +556,9 @@ def generate_daily_report(
         "## 14. 三种市场情景",
         "",
         *_scenarios(decision),
+        "### 组合情景压力测试",
+        "",
+        *_stress_scenarios(decision),
         grid_section,
         "",
         "## 16. OpenAI状态与回退说明",
@@ -512,10 +566,16 @@ def generate_daily_report(
         f"- 分析模式：{ai.get('mode')}",
         f"- 分析来源：{ai.get('provider')}",
         f"- OpenAI可选复核：{'已参与' if ai.get('openai_participated') else '本次未参与，规则引擎已完成完整分析'}",
+        f"- 是否启用：{'是' if ai.get('enabled') else '否'}",
+        f"- 是否实际调用：{'是' if ai.get('called') else '否'}",
+        f"- 是否调用成功：{'是' if ai.get('success') else '否'}",
         f"- 模型：{ai.get('model') or '不适用'}",
         f"- 是否回退：{'否' if ai.get('openai_participated') else '是'}",
         f"- 回退原因：{ai.get('fallback_reason') or '无'}",
+        f"- 失败类别：{ai.get('error_category') or '无'}",
         f"- 重试次数：{ai.get('retry_count', 0)}",
+        f"- 是否与规则结论冲突：{'是，AI复核存在分歧，规则风控优先' if ai.get('conflict_with_rules') else '否'}",
+        f"- AI复核摘要：{ai.get('review_summary') or ai.get('summary') or '规则引擎独立完成复核'}",
         f"- 验证拒绝原因：{'；'.join(ai.get('validation_errors', [])) or '无'}",
         f"- 可靠性说明：{ai.get('impact')}",
         f"- 规则触发：DQS={dqs.get('score')}，风险={risk.get('score')}，现金可用={_yuan(budget.get('confirmed_cash_available_yuan'))}",
@@ -548,7 +608,7 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
     week_end = week_start + timedelta(days=6)
     return "\n".join(
         [
-            "# Stone AI V12.5 Stable 周报",
+            "# Stone AI V12.6 Stable 周报",
             "",
             f"- 报告所属周：{iso_year}-W{iso_week:02d}",
             f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
@@ -568,7 +628,7 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.5 Stable 月报",
+            "# Stone AI V12.6 Stable 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
             f"- 本月条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
