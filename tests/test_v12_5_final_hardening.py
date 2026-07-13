@@ -49,6 +49,7 @@ def _install_fake_openai(monkeypatch, outcomes):
 
     monkeypatch.setitem(__import__("sys").modules, "openai", SimpleNamespace(OpenAI=Client))
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("OPENAI_ENABLED", "true")
     monkeypatch.setenv("MAX_LLM_RETRIES", "2")
     monkeypatch.setattr("src.ai.openai_advisor.time.sleep", lambda _: None)
 
