@@ -4,6 +4,7 @@ import csv
 import json
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 from src.grid.backtest import run_symbol_backtest
@@ -32,7 +33,7 @@ def _decision(dqs: int = 90, cash: int = 50000, us_status: str = "严重低配",
         "dqs": {"score": dqs, "mode": "exact" if dqs >= 85 else "safe", "mode_label": "test"},
         "budget": {"confirmed_cash_available_yuan": cash},
         "allocation": [{"category": "美股", "status": us_status}],
-        "events": [{"date": "2026-07-12", "level": "high", "name": "CPI"}] if high_event else [],
+        "events": [{"date": date.today().isoformat(), "level": "high", "name": "CPI"}] if high_event else [],
     }
 
 
