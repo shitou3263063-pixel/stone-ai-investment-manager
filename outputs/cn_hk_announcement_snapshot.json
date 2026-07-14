@@ -1,33 +1,25 @@
 {
-  "fetched_at": "2026-07-15T02:24:57+08:00",
-  "status": "ok",
+  "fetched_at": "2026-07-15T03:10:34+08:00",
+  "status": "partial",
   "cn": {
-    "status": "ok",
+    "status": "failed",
     "source": "cninfo_official",
     "source_level": 1,
     "source_type": "official_disclosure_platform",
-    "fetched_at": "2026-07-15T02:24:57+08:00",
-    "market_date": "2026-07-15",
+    "fetched_at": "2026-07-15T03:10:34+08:00",
+    "market_date": null,
     "timezone": "Asia/Shanghai",
-    "records": [
-      {
-        "symbol": "002558",
-        "title": "<em>巨人网络</em>：<em>巨人网络集团股份有限公司</em>2026年半年度业绩预告",
-        "published_at": 1783440000000,
-        "document_url": "finalpage/2026-07-08/1225413627.PDF",
-        "source": "cninfo_official"
-      }
-    ],
-    "record_count": 1,
+    "records": [],
+    "record_count": 0,
     "fallback_used": false,
-    "error_message": ""
+    "error_message": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)>"
   },
   "hk": {
     "status": "framework_ready",
     "source": "hkex_official",
     "source_level": 1,
     "source_type": "official_exchange_disclosure",
-    "fetched_at": "2026-07-15T02:24:57+08:00",
+    "fetched_at": "2026-07-15T03:10:34+08:00",
     "market_date": null,
     "timezone": "Asia/Hong_Kong",
     "symbols": [

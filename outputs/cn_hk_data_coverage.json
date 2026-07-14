@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-15T02:22:48+08:00",
+  "generated_at": "2026-07-15T03:08:42+08:00",
   "scope": "CN_HK_P0_PLUS_P1A",
   "p0_market_completeness": {
     "cn_data_completeness": {
@@ -21,7 +21,7 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "yfinance",
+          "source": "cache:yfinance",
           "market_date": "2026-07-13",
           "fetched_at": "2026-07-15T02:22:44",
           "freshness": "stale",
@@ -47,7 +47,7 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "yfinance",
+          "source": "cache:yfinance",
           "market_date": "2026-07-13",
           "fetched_at": "2026-07-15T02:22:45",
           "freshness": "stale",
@@ -87,7 +87,7 @@
           "currency": "HKD",
           "timezone": "Asia/Hong_Kong",
           "data_status": "VALID",
-          "source": "yfinance",
+          "source": "cache:yfinance",
           "market_date": "2026-07-13",
           "fetched_at": "2026-07-15T02:22:44",
           "freshness": "stale",
@@ -113,7 +113,7 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "yfinance",
+          "source": "cache:yfinance",
           "market_date": "2026-07-13",
           "fetched_at": "2026-07-15T02:22:45",
           "freshness": "stale",
@@ -139,7 +139,7 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "yfinance",
+          "source": "cache:yfinance",
           "market_date": "2026-07-13",
           "fetched_at": "2026-07-15T02:22:45",
           "freshness": "stale",
@@ -167,7 +167,7 @@
   },
   "cn_analysis_completeness": {
     "market": "A股",
-    "score_pct": 90,
+    "score_pct": 85,
     "confidence": "usable",
     "decision_restricted": false,
     "high_confidence_buy_allowed": true,
@@ -177,7 +177,7 @@
       "002558个股估值": false,
       "沪深300基准估值": true,
       "002558财务报表": true,
-      "A股官方公告": true
+      "A股官方公告": false
     },
     "weights": {
       "P0真实持仓基础行情": 45,
@@ -188,7 +188,8 @@
       "A股官方公告": 5
     },
     "missing_fields": [
-      "002558个股估值"
+      "002558个股估值",
+      "A股官方公告"
     ]
   },
   "hk_analysis_completeness": {

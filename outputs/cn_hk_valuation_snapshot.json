@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-07-15T02:22:48+08:00",
+  "generated_at": "2026-07-15T03:08:42+08:00",
   "items": {
     "002558.SZ": {
       "api_name": "daily_basic",
       "source": "tushare_pro",
       "source_type": "authorized_api",
       "source_level": 2,
-      "fetched_at": "2026-07-15T02:22:48+08:00",
+      "fetched_at": "2026-07-15T03:08:42+08:00",
       "market_date": null,
       "timezone": "Asia/Shanghai",
       "currency": "CNY",
@@ -46,7 +46,7 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "csindex_official",
-      "fetched_at": "2026-07-15T02:23:31+08:00",
+      "fetched_at": "2026-07-15T03:09:28+08:00",
       "market_date": "2026-07-14",
       "reporting_period": null,
       "currency": "CNY",

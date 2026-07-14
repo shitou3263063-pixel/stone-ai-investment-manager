@@ -45,7 +45,11 @@ def review_grid_signal(
         reasons.append("现金低于或接近安全线，禁止新增买入。")
     if grid_budget.get("live_available_yuan", 0) <= 0 and signal.action == "BUY" and not paper_mode:
         reasons.append("实盘网格预算不足。")
-    decision_as_of = date.fromisoformat(str(decision.get("date"))) if decision.get("date") else date.today()
+    decision_as_of: date | datetime
+    try:
+        decision_as_of = datetime.fromisoformat(str(decision.get("generated_at")).replace("Z", "+00:00")) if decision.get("generated_at") else date.fromisoformat(str(decision.get("date")))
+    except (TypeError, ValueError):
+        decision_as_of = date.today()
     if _event_within_48h(decision.get("events", []), decision_as_of):
         reasons.append("未来48小时内存在高等级宏观事件，进入谨慎模式。")
     if signal.action == "BUY" and state.month_trade_count >= int(risk_cfg.get("max_monthly_trades_per_symbol", 8)):

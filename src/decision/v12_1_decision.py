@@ -193,7 +193,11 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "change_pct": item.get("change_pct"),
         "timestamp": item.get("observed_at") or item.get("published_at") or item.get("date") or "暂无数据",
         "observed_at": item.get("observed_at") or item.get("published_at") or item.get("date"),
+        "observed_at_utc": item.get("observed_at_utc"),
         "fetched_at": item.get("fetched_at") or item.get("retrieved_at"),
+        "received_at_utc": item.get("received_at_utc"),
+        "source_timezone": item.get("source_timezone") or item.get("market_timezone") or "unknown",
+        "time_status": item.get("time_status") or "ok",
         "market_timezone": item.get("market_timezone") or "unknown",
         "data_frequency": item.get("data_frequency") or "unknown",
         "data_session": item.get("data_session") or ("unavailable" if not _is_ok_item(item) else "unknown"),
@@ -1524,7 +1528,7 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     event_errors: list[str] = []
     event_warnings: list[str] = []
     try:
-        as_of_raw = decision.get("date") or decision.get("generated_at") or date.today().isoformat()
+        as_of_raw = decision.get("generated_at") or decision.get("date") or date.today().isoformat()
         as_of = datetime.fromisoformat(str(as_of_raw))
         events = decision.get("events", []) or []
         actual_48h = bool(get_upcoming_high_risk_events(as_of, hours=48, events=events))
@@ -1781,7 +1785,9 @@ def build_v12_1_decision(
         "macro_event_high_next_48_hours": bool(macro_result.get("has_high_event_next_48_hours")),
         "high_risk_events_48h": macro_result.get("high_risk_events_48h", []) or [],
         "high_risk_events_7d": macro_result.get("high_risk_events_7d", []) or [],
-        "events": macro_result.get("upcoming_events", []) or [],
+        "events": macro_result.get("events", []) or [],
+        "upcoming_events": macro_result.get("upcoming_events", []) or [],
+        "released_events": macro_result.get("released_events", []) or [],
         "today_trade": today_trade,
         "trade_type": "无操作" if not today_trade else "基础定投/机会加仓/再平衡",
         "today_amount_yuan": budget["today_total_yuan"],
@@ -1790,6 +1796,7 @@ def build_v12_1_decision(
         "no_trade_reasons": no_trade_reasons,
         "next_triggers": build_next_triggers(budget, dqs),
         "next_review_date": next_review_date,
+        "next_review_reason": macro_result.get("next_review_reason") or "按下一基础定投复核时间执行。",
         "max_risk": max(risk["components"], key=lambda row: row.get("score", 0))["basis"] if risk["components"] else "暂无",
         "max_opportunity": describe_max_opportunity(opportunity, dqs, today_trade),
         "one_sentence": "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。",

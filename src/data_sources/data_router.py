@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from src.data_sources import alpha_vantage_client, finnhub_client, fred_client, yfinance_client
 from src.data_sources.cn_hk_p1a import build_cn_hk_p1a_snapshot
 from src.data_sources.data_cache import read_cache, write_cache
+from src.data_sources.time_normalization import TIMEZONE_UNKNOWN, calculate_age_hours, normalize_to_utc
 from utils.data_loader import project_root
 from utils.logger import write_log
 
@@ -130,6 +131,15 @@ SOURCE_LEVELS = {
     "unavailable": 99,
 }
 
+SOURCE_TIMEZONES = {
+    # Cboe delayed quote API timestamps are emitted in UTC without an offset.
+    "cboe_official": "UTC",
+    "alpha_vantage": "America/New_York",
+    "finnhub": "America/New_York",
+    "fred": "America/New_York",
+    "hkma_official": "Asia/Hong_Kong",
+}
+
 
 def provider_symbol_for(symbol: str, provider_name: str) -> str:
     """返回同一证券的供应商代码格式，绝不使用代理证券。"""
@@ -162,7 +172,17 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
     is_macro = source_key == "fred" or item.get("series_id") in MACRO_SERIES
     symbol = str(item.get("symbol") or "")
     metadata = INSTRUMENT_METADATA.get(symbol, {})
-    market_timezone = str(item.get("timezone") or item.get("market_timezone") or metadata.get("timezone") or (
+    declared_timezone = (
+        item.get("source_timezone")
+        or item.get("timezone")
+        or item.get("market_timezone")
+        or metadata.get("timezone")
+        or SOURCE_TIMEZONES.get(source_key)
+        or ("America/New_York" if symbol in US_ETF_TICKERS or symbol in YFINANCE_ONLY_TICKERS else None)
+        or ("Asia/Hong_Kong" if symbol.endswith(".HK") else None)
+        or ("Asia/Shanghai" if symbol.endswith((".SS", ".SZ")) else None)
+    )
+    market_timezone = str(declared_timezone or (
         "America/New_York" if is_macro or symbol in US_ETF_TICKERS or symbol in YFINANCE_ONLY_TICKERS else "Asia/Shanghai"
     ))
     business_day_lag = _business_day_lag(str(market_date) if market_date else None, market_timezone)
@@ -182,19 +202,22 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
         data_session = "official_close"
     else:
         data_session = "previous_close"
+    observed_at_utc = None
+    received_at_utc = None
+    time_status = "ok"
+    try:
+        if observed_at:
+            observed_at_utc = normalize_to_utc(observed_at, source_timezone=str(declared_timezone) if declared_timezone else None)
+        received_at_utc = normalize_to_utc(fetched_at, source_timezone=str(item.get("received_timezone") or declared_timezone) if (item.get("received_timezone") or declared_timezone) else None)
+    except (TypeError, ValueError, KeyError) as exc:
+        if TIMEZONE_UNKNOWN in str(exc):
+            time_status = TIMEZONE_UNKNOWN
+            stale = True
+        observed_at_utc = observed_at_utc if observed_at_utc and observed_at_utc.tzinfo else None
+        received_at_utc = received_at_utc if received_at_utc and received_at_utc.tzinfo else None
     age_hours = item.get("age_hours")
-    if age_hours is None and observed_at:
-        try:
-            raw = str(observed_at).replace("Z", "+00:00")
-            observed_dt = datetime.fromisoformat(raw)
-            if observed_dt.tzinfo is None:
-                observed_dt = (
-                    datetime.combine(date.fromisoformat(raw), time.min, tzinfo=ZoneInfo(market_timezone))
-                    if len(raw) == 10 else observed_dt.replace(tzinfo=ZoneInfo(market_timezone))
-                )
-            age_hours = round(max(0.0, (datetime.now(timezone.utc) - observed_dt.astimezone(timezone.utc)).total_seconds() / 3600), 1)
-        except (TypeError, ValueError, KeyError):
-            age_hours = None
+    if age_hours is None and observed_at_utc and received_at_utc:
+        age_hours = calculate_age_hours(observed_at_utc, received_at_utc)
     freshness_status = "unavailable" if data_session == "unavailable" else "stale" if stale else str(item.get("freshness_status") or "fresh")
     return {
         **item,
@@ -204,7 +227,11 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
         "previous_value": item.get("previous_close", item.get("previous_value")),
         "timestamp": observed_at,
         "observed_at": observed_at,
+        "observed_at_utc": observed_at_utc.isoformat() if observed_at_utc else None,
         "fetched_at": fetched_at,
+        "received_at_utc": received_at_utc.isoformat() if received_at_utc else None,
+        "source_timezone": str(declared_timezone or "unknown"),
+        "time_status": time_status,
         "market_timezone": market_timezone,
         "timezone": market_timezone,
         "market_date": market_date,
@@ -297,7 +324,7 @@ def _official_vix_quote() -> dict[str, Any]:
     close = float(data.get("current_price") or data.get("close"))
     previous_close = close - float(data.get("price_change") or 0)
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
-    retrieved_at = datetime.now().isoformat(timespec="seconds")
+    retrieved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     published_at = payload.get("timestamp") or retrieved_at
     return {
         "close": round(close, 4),
@@ -308,6 +335,8 @@ def _official_vix_quote() -> dict[str, Any]:
         "published_at": published_at,
         "retrieved_at": retrieved_at,
         "fetched_at": retrieved_at,
+        "source_timezone": "UTC",
+        "received_at_utc": retrieved_at,
         "freshness_status": "fresh",
         "is_realtime": False,
         "cache_used": False,

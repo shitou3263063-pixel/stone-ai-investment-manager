@@ -1,6 +1,6 @@
 # Service Health
 
-- 检查时间：2026-07-15T02:25:17
+- 检查时间：2026-07-15T03:10:55
 - 可用服务：4/13
 - API Key 不会写入报告；这里只显示是否已配置。
 
@@ -15,7 +15,7 @@
 | FRED | not_configured | 0.18 |  | missing_config_or_dependency | yes | macro primary |
 | Alpha Vantage | not_configured | 0.18 |  | missing_config_or_dependency | yes | market backup |
 | Finnhub | not_configured | 0.18 |  | missing_config_or_dependency | yes | market backup/news |
-| CBOE | available | 0.18 | 2026-07-15T02:25:17 |  | yes | VIX official reference |
-| yfinance | available | 0.18 | 2026-07-15T02:25:17 |  | yes | market fallback |
-| AkShare | available | 0.18 | 2026-07-15T02:25:17 |  | yes | A/H optional fallback |
-| Gmail SMTP | configured | 0.18 | 2026-07-15T02:25:17 |  | yes | notification |
+| CBOE | available | 0.18 | 2026-07-15T03:10:55 |  | yes | VIX official reference |
+| yfinance | available | 0.18 | 2026-07-15T03:10:55 |  | yes | market fallback |
+| AkShare | available | 0.18 | 2026-07-15T03:10:55 |  | yes | A/H optional fallback |
+| Gmail SMTP | configured | 0.18 | 2026-07-15T03:10:55 |  | yes | notification |

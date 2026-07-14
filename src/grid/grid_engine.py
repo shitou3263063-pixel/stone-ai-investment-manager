@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .backtest import run_backtest_suite
 from .budget_manager import build_grid_budget, symbol_budget
-from .models import GRID_VERSION, GridSymbolState
+from .models import GRID_VERSION, GridSignal, GridSymbolState
 from .position_manager import load_portfolio_quantities, split_core_grid
 from .regime_detector import detect_market_regime
 from .signal_engine import build_signal, dynamic_grid_spacing, signal_key, update_next_prices
@@ -16,6 +16,7 @@ from .simulator import append_simulated_signal
 from .validator import review_grid_signal
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
+from src.data_sources.time_normalization import normalize_to_utc
 
 
 MANUAL_FIELDS = ["trade_id", "date", "symbol", "action", "quantity", "price", "fees", "status", "note"]
@@ -116,6 +117,85 @@ def _price(item: dict[str, Any]) -> float | None:
         return None
 
 
+def _session_phase(item: dict[str, Any]) -> str:
+    session = str(item.get("data_session") or "").lower()
+    if session in {"realtime", "intraday_delayed"}:
+        return "intraday"
+    if session in {"official_close", "previous_close"}:
+        return "close"
+    return "unknown"
+
+
+def build_grid_decision_snapshot(
+    live_market_result: dict[str, Any],
+    *,
+    symbols: tuple[str, ...] = ("VOO", "QQQ"),
+    max_gap_minutes: int = 30,
+) -> dict[str, Any]:
+    """Build one comparable decision snapshot while retaining display quotes."""
+    display_quotes = {symbol: _quote(live_market_result, symbol) for symbol in symbols}
+    normalized: dict[str, dict[str, Any]] = {}
+    reasons: list[str] = []
+    for symbol, item in display_quotes.items():
+        source_timezone = item.get("source_timezone") or item.get("market_timezone") or item.get("timezone")
+        raw_time = item.get("observed_at_utc") or item.get("observed_at") or item.get("published_at")
+        try:
+            observed_utc = normalize_to_utc(raw_time, source_timezone=str(source_timezone) if source_timezone else None)
+        except (TypeError, ValueError, KeyError):
+            observed_utc = None
+        phase = _session_phase(item)
+        market_date = item.get("comparable_date") or item.get("market_date")
+        valid = (
+            _price(item) is not None
+            and str(item.get("status") or "").lower() in {"ok", "success"}
+            and not bool(item.get("stale"))
+            and observed_utc is not None
+            and phase != "unknown"
+            and bool(market_date)
+        )
+        if not valid:
+            reasons.append(f"{symbol}缺少可用于决策的带时区新鲜行情。")
+        normalized[symbol] = {
+            "symbol": symbol,
+            "price": _price(item),
+            "observed_at_utc": observed_utc.isoformat() if observed_utc else None,
+            "source_timezone": source_timezone or "unknown",
+            "market_date": str(market_date) if market_date else None,
+            "market_phase": phase,
+            "source": item.get("source", "unavailable"),
+            "valid": valid,
+        }
+
+    valid_points = [normalized[symbol] for symbol in symbols if normalized[symbol]["valid"]]
+    comparable = len(valid_points) == len(symbols)
+    if comparable:
+        dates = {point["market_date"] for point in valid_points}
+        phases = {point["market_phase"] for point in valid_points}
+        observed = [datetime.fromisoformat(point["observed_at_utc"]).astimezone(timezone.utc) for point in valid_points]
+        gap_minutes = (max(observed) - min(observed)).total_seconds() / 60
+        if len(dates) != 1:
+            comparable = False
+            reasons.append("VOO与QQQ不属于同一市场日期。")
+        if len(phases) != 1:
+            comparable = False
+            reasons.append("VOO与QQQ不属于同一市场阶段。")
+        if gap_minutes > max_gap_minutes:
+            comparable = False
+            reasons.append(f"VOO与QQQ行情时间差{gap_minutes:.1f}分钟，超过{max_gap_minutes}分钟上限。")
+    else:
+        gap_minutes = None
+
+    return {
+        "snapshot_comparable": comparable,
+        "status": "COMPARABLE" if comparable else "DATA_NOT_COMPARABLE",
+        "reason": "；".join(dict.fromkeys(reasons)) or "VOO与QQQ决策行情同日、同阶段且时间差在允许范围内。",
+        "max_gap_minutes": max_gap_minutes,
+        "actual_gap_minutes": round(gap_minutes, 1) if gap_minutes is not None else None,
+        "display_quotes": display_quotes,
+        "decision_quotes": normalized if comparable else {},
+    }
+
+
 def _symbol_history_from_cache(symbol: str) -> list[float]:
     cache = project_root() / "data" / "cache" / f"grid_history_{symbol}.json"
     if not cache.exists():
@@ -138,10 +218,12 @@ def evaluate_symbol(
     config: dict[str, Any],
     grid_budget: dict[str, Any],
     quantities: dict[str, float],
+    decision_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     state = GridSymbolState.from_dict(state_payload or {"symbol": symbol})
     item = _quote(live_market_result, symbol)
     price = _price(item)
+    snapshot_comparable = True if decision_snapshot is None else bool(decision_snapshot.get("snapshot_comparable"))
     total_assets = float(decision.get("portfolio_value_yuan", 0) or 0)
     symbol_budget_yuan = symbol_budget(symbol, total_assets, grid_budget, symbol_cfg)
     total_quantity = float(quantities.get(symbol, 0) or 0)
@@ -154,12 +236,26 @@ def evaluate_symbol(
     vix = _price(_quote(live_market_result, "^VIX"))
     regime = detect_market_regime(symbol, item, history, vix)
     spacing = dynamic_grid_spacing(symbol_cfg, regime)
-    state.buy_spacing_pct = spacing["buy_spacing_pct"]
-    state.sell_spacing_pct = spacing["sell_spacing_pct"]
-    if price and not state.anchor_price:
-        state.anchor_price = price
-    update_next_prices(state)
-    signal = build_signal(symbol=symbol, price=price, state=state, symbol_cfg=symbol_cfg, symbol_budget_yuan=symbol_budget_yuan, config=config, regime=regime)
+    if snapshot_comparable:
+        state.buy_spacing_pct = spacing["buy_spacing_pct"]
+        state.sell_spacing_pct = spacing["sell_spacing_pct"]
+        if price and not state.anchor_price:
+            state.anchor_price = price
+        update_next_prices(state)
+        signal = build_signal(symbol=symbol, price=price, state=state, symbol_cfg=symbol_cfg, symbol_budget_yuan=symbol_budget_yuan, config=config, regime=regime)
+    else:
+        state.state = "SAFE_MODE"
+        signal = GridSignal(
+            symbol=symbol,
+            action="NONE",
+            raw_signal="DATA_NOT_COMPARABLE",
+            price=price,
+            trigger_price=None,
+            amount_yuan=0,
+            quantity=0,
+            layer=0,
+            reason=str((decision_snapshot or {}).get("reason") or "VOO与QQQ决策行情快照不可比，暂不计算精确触发价和距离。"),
+        )
     review = review_grid_signal(
         signal=signal,
         state=state,
@@ -177,12 +273,12 @@ def evaluate_symbol(
     state.market_regime = regime.get("regime", "unknown")
     state.updated_at = datetime.now().isoformat(timespec="seconds")
     sim_path = _grid_dir() / "simulation_trades.csv"
-    if config.get("smart_grid", {}).get("simulator", {}).get("enabled", True):
+    if snapshot_comparable and config.get("smart_grid", {}).get("simulator", {}).get("enabled", True):
         state.last_signal_key = append_simulated_signal(sim_path, signal, review, state.last_signal_key)
     return {
         "symbol": symbol,
         "price": price,
-        "data_time": item.get("published_at") or item.get("fetched_at") or item.get("retrieved_at") or "暂无数据",
+        "data_time": item.get("observed_at_utc") or item.get("observed_at") or item.get("published_at") or item.get("fetched_at") or item.get("retrieved_at") or "暂无数据",
         "source": item.get("source", "unavailable") if price is not None else "unavailable",
         "state": state.to_dict(),
         "regime": regime,
@@ -190,8 +286,13 @@ def evaluate_symbol(
         "signal": signal.to_dict(),
         "review": review.to_dict(),
         "symbol_budget_yuan": symbol_budget_yuan,
-        "distance_to_buy_pct": None if not price or not state.next_buy_price else round((price / state.next_buy_price - 1) * 100, 2),
-        "distance_to_sell_pct": None if not price or not state.next_sell_price else round((state.next_sell_price / price - 1) * 100, 2),
+        "snapshot_comparable": snapshot_comparable,
+        "snapshot_status": "COMPARABLE" if snapshot_comparable else "DATA_NOT_COMPARABLE",
+        "snapshot_reason": (decision_snapshot or {}).get("reason"),
+        "historical_next_buy_price": state.next_buy_price,
+        "historical_next_sell_price": state.next_sell_price,
+        "distance_to_buy_pct": None if not snapshot_comparable or not price or not state.next_buy_price else round((price / state.next_buy_price - 1) * 100, 2),
+        "distance_to_sell_pct": None if not snapshot_comparable or not price or not state.next_sell_price else round((state.next_sell_price / price - 1) * 100, 2),
     }
 
 
@@ -206,6 +307,8 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
     applied_manual_trades = _apply_confirmed_manual_trades(state, _grid_dir() / "manual_trades.csv")
     grid_budget = build_grid_budget(decision, config)
     quantities = load_portfolio_quantities()
+    max_gap_minutes = int(smart.get("risk", {}).get("max_decision_snapshot_gap_minutes", 30) or 30)
+    decision_snapshot = build_grid_decision_snapshot(live_market_result, max_gap_minutes=max_gap_minutes)
     symbols = {}
     for symbol, symbol_cfg in smart.get("symbols", {}).items():
         if not symbol_cfg.get("enabled", False):
@@ -221,6 +324,7 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
                 config=config,
                 grid_budget=grid_budget,
                 quantities=quantities,
+                decision_snapshot=decision_snapshot,
             )
             symbols[symbol] = result
             state.setdefault("symbols", {})[symbol] = result["state"]
@@ -240,6 +344,7 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
         "auto_trade": False,
         "summary": summary,
         "grid_budget": grid_budget,
+        "decision_snapshot": decision_snapshot,
         "symbols": symbols,
         "candidate_count": len(actionable),
         "approved_count": len(approved),

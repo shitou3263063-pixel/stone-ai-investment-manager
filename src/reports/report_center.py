@@ -481,7 +481,7 @@ def _market_table(decision: dict[str, Any]) -> list[str]:
     }
     pair_comparable = bool((decision.get("risk", {}).get("market_time_consistency", {}) or {}).get("comparable"))
     rows = [
-        "| 指标 | 当前值 | 前值 | 涨跌幅 | 观察时间 | 数据口径 | 数据年龄 | 是否可横向比较 | 来源 | 来源等级 | 状态 |",
+        "| 指标 | 当前值 | 前值 | 涨跌幅 | 源时间 / UTC时间 | 数据口径 | 数据年龄 | 是否可横向比较 | 来源 | 来源等级 | 状态 |",
         "| -- | --: | --: | --: | -- | -- | -- | -- | -- | --: | -- |",
     ]
     for item in decision.get("market_table", []) or []:
@@ -493,7 +493,8 @@ def _market_table(decision: dict[str, Any]) -> list[str]:
         rows.append(
             "| "
             f"{item['name']} | {item['display_value']} | {previous} | {change} | "
-            f"{item['timestamp']} | {session_labels.get(item.get('data_session'), item.get('data_session', '未知'))} | "
+            f"{item['timestamp']}（{item.get('source_timezone', 'unknown')}） / {item.get('observed_at_utc') or item.get('time_status', 'TIMEZONE_UNKNOWN')} | "
+            f"{session_labels.get(item.get('data_session'), item.get('data_session', '未知'))} | "
             f"{age} | {comparable} | {item['source']} | {item['source_tier']} | {status} |"
         )
     return rows
@@ -520,9 +521,11 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _events(decision: dict[str, Any]) -> list[str]:
-    events = decision.get("events", []) or []
+    events = decision.get("upcoming_events", []) or [
+        event for event in (decision.get("events", []) or []) if event.get("status") == "UPCOMING"
+    ]
     if not events:
-        return ["- 暂无已配置事件。"]
+        return ["- 未来7天暂无已核验待发布事件。"]
     lines = []
     for event in events:
         lines.append(
@@ -531,10 +534,24 @@ def _events(decision: dict[str, Any]) -> list[str]:
             f"源时区发布时间：{event.get('release_at') or '未验证'} {event.get('source_timezone', '未知')}，"
             f"风险等级：{event.get('risk_level', event.get('level', '暂无'))}，"
             f"核验状态：{event.get('verification_status', 'unverified')}，来源等级：{event.get('source_level', '未知')}，"
+            f"事件状态：{event.get('status', 'INVALID_TIME')}，"
             f"来源：{event.get('source', '暂无可靠来源')}；"
             "纪律：事件前不追涨，定投可复核但不一次性重仓。"
         )
     return lines
+
+
+def _released_events(decision: dict[str, Any]) -> list[str]:
+    events = decision.get("released_events", []) or [
+        event for event in (decision.get("events", []) or []) if event.get("status") == "RELEASED"
+    ]
+    if not events:
+        return ["- 本次日历中暂无已发布事件。"]
+    return [
+        f"- {event.get('event_name', event.get('name', '暂无名称'))}："
+        f"已于{event.get('release_at_report_timezone') or '时间无效'}发布，状态RELEASED；不再进入未来48小时、未来7天或交易限制窗口。"
+        for event in events
+    ]
 
 
 def _consistency_table(decision: dict[str, Any]) -> list[str]:
@@ -662,6 +679,7 @@ def generate_daily_report(
         f"- 当前最大风险：{decision.get('max_risk')}",
         f"- 当前最大机会：{decision.get('max_opportunity')}",
         f"- 下一次复核日期：{decision.get('next_review_date')}",
+        f"- 下一次复核依据：{decision.get('next_review_reason')}",
         "",
         "## 2. Stone CIO Commentary",
         "",
@@ -771,6 +789,10 @@ def generate_daily_report(
         f"- 未来48小时高等级事件结论：{'存在' if decision.get('macro_event_high_next_48_hours') else '无'}",
         f"- 未来7天高等级事件结论：{'存在' if decision.get('macro_event_high_next_7_days') else '无'}",
         *_events(decision),
+        "",
+        "### 已公布宏观事件",
+        "",
+        *_released_events(decision),
         "",
         "## 14. 三种市场情景",
         "",

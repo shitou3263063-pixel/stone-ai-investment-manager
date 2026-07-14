@@ -33,6 +33,11 @@ def _symbol_status_table(symbol: str, item: dict[str, Any]) -> list[str]:
     state = item.get("state", {}) or {}
     signal = item.get("signal", {}) or {}
     review = item.get("review", {}) or {}
+    comparable = bool(item.get("snapshot_comparable", True))
+    next_buy = _price(state.get("next_buy_price")) if comparable else "暂不计算（历史参数仅供参考）"
+    next_sell = _price(state.get("next_sell_price")) if comparable else "暂不计算（历史参数仅供参考）"
+    distance_buy = f"{_text(item.get('distance_to_buy_pct'), '暂无数据')}%" if comparable else "暂不计算"
+    distance_sell = f"{_text(item.get('distance_to_sell_pct'), '暂无数据')}%" if comparable else "暂不计算"
     rows = [
         f"## {symbol}状态",
         "",
@@ -40,14 +45,15 @@ def _symbol_status_table(symbol: str, item: dict[str, Any]) -> list[str]:
         "| -- | -- |",
         f"| 当前价格 | {_price(item.get('price'))} |",
         f"| 数据时间 | {_text(item.get('data_time'))} |",
+        f"| 决策快照 | {'可比' if comparable else '不可比：DATA_NOT_COMPARABLE'} |",
         f"| 市场状态 | {_text(item.get('regime', {}).get('regime'))} |",
         f"| 网格锚点 | {_price(state.get('anchor_price'))} |",
         f"| 动态买入间距 | {_pct_decimal(state.get('buy_spacing_pct'))} |",
         f"| 动态卖出间距 | {_pct_decimal(state.get('sell_spacing_pct'))} |",
-        f"| 下一买入价 | {_price(state.get('next_buy_price'))} |",
-        f"| 距离下一买入价 | {_text(item.get('distance_to_buy_pct'), '暂无数据')}% |",
-        f"| 下一卖出价 | {_price(state.get('next_sell_price'))} |",
-        f"| 距离下一卖出价 | {_text(item.get('distance_to_sell_pct'), '暂无数据')}% |",
+        f"| 下一买入价 | {next_buy} |",
+        f"| 距离下一买入价 | {distance_buy} |",
+        f"| 下一卖出价 | {next_sell} |",
+        f"| 距离下一卖出价 | {distance_sell} |",
         f"| 核心仓 | {_text(state.get('core_quantity'), '0')} 股 |",
         f"| 网格仓 | {_text(state.get('grid_quantity'), '0')} 股 |",
         f"| 网格现金 | {_yuan(state.get('available_grid_cash_yuan'))} |",
@@ -74,6 +80,7 @@ def generate_grid_daily_section(grid_result: dict[str, Any]) -> str:
         f"- 今日总建议金额：{_yuan(total_advice)}",
         f"- 总风控是否批准：{'是' if grid_result.get('approved_count', 0) > 0 else '否'}",
         f"- 一句话结论：{grid_result.get('summary')}",
+        f"- 决策快照状态：{(grid_result.get('decision_snapshot', {}) or {}).get('status', '暂无数据')}；{(grid_result.get('decision_snapshot', {}) or {}).get('reason', '暂无数据')}",
         "",
     ]
     if "VOO" in symbols:
@@ -132,7 +139,13 @@ def generate_grid_daily_section(grid_result: dict[str, Any]) -> str:
     )
     for symbol, item in symbols.items():
         state = item.get("state", {}) or {}
-        lines.append(f"- {symbol} 下跌至 { _price(state.get('next_buy_price')) } 附近触发买入候选；上涨至 { _price(state.get('next_sell_price')) } 附近触发卖出候选。")
+        if item.get("snapshot_comparable", True):
+            lines.append(f"- {symbol} 下跌至 {_price(state.get('next_buy_price'))}附近触发买入候选；上涨至 {_price(state.get('next_sell_price'))}附近触发卖出候选。")
+        else:
+            lines.append(
+                f"- {symbol}：当前决策快照不可比，暂不计算新的精确触发价或距离；"
+                f"历史买入参数{_price(item.get('historical_next_buy_price'))}、历史卖出参数{_price(item.get('historical_next_sell_price'))}仅供追溯。"
+            )
     lines.extend(
         [
             "- 即使价格触发，只要 DQS 不足、现金低于安全线、重大事件临近、预算冲突或总风控否决，也不会生成真实执行建议。",
@@ -173,8 +186,13 @@ def generate_grid_weekly_report(grid_result: dict[str, Any]) -> str:
     ]
     for symbol, item in symbols.items():
         state = item.get("state", {}) or {}
+        trigger_text = (
+            f"买{_price(state.get('next_buy_price'))}/卖{_price(state.get('next_sell_price'))}"
+            if item.get("snapshot_comparable", True)
+            else "DATA_NOT_COMPARABLE（历史参数仅供参考）"
+        )
         lines.append(
-            f"| {symbol} | {_text(item.get('regime', {}).get('regime'))} | {_text(item.get('signal', {}).get('raw_signal'))} | {_text(item.get('review', {}).get('final_advice'))} | 买{_price(state.get('next_buy_price'))}/卖{_price(state.get('next_sell_price'))} |"
+            f"| {symbol} | {_text(item.get('regime', {}).get('regime'))} | {_text(item.get('signal', {}).get('raw_signal'))} | {_text(item.get('review', {}).get('final_advice'))} | {trigger_text} |"
         )
     lines.extend(
         [
