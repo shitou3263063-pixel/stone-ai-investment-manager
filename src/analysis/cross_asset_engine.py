@@ -104,7 +104,7 @@ def analyze_cross_asset(
 ) -> dict[str, Any]:
     """分析跨资产联动，输出可直接写入日报的组合相关判断。"""
     us_stock = _metric(live_market_result, market_data, ["VOO", "QQQ", "^GSPC", "^IXIC"], "标普500涨跌幅")
-    hk_stock = _metric(live_market_result, market_data, ["3067.HK", "3033.HK", "2800.HK"], "恒生科技涨跌幅")
+    hk_stock = _metric(live_market_result, market_data, ["03033.HK", "2800.HK"], "恒生科技涨跌幅")
     cn_stock = _metric(live_market_result, market_data, ["510300.SS"], "沪深300涨跌幅")
     gold = _metric(live_market_result, market_data, ["GLD"], "黄金涨跌幅")
     bond = _metric(

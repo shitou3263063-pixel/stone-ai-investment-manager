@@ -309,7 +309,10 @@ MAX_LLM_RETRIES
 FRED_API_KEY
 ALPHA_VANTAGE_API_KEY
 FINNHUB_API_KEY
+TUSHARE_TOKEN
 ```
+
+`TUSHARE_TOKEN`用于A股P1A增强数据（交易日历、002558估值与财务、沪深300基准估值）。未配置时系统明确降级，不影响美股、FRED、报告或邮件主流程。HKMA官方开放接口无需密钥。
 
 OpenAI是规则裁决后的可选解释层。系统先完成资产、预算、DQS、风险、规则和一致性校验，再提交精简结构化摘要给OpenAI；返回内容还会经过现金、DQS、事件、预算和ST股票约束复核。未配置、额度不足、超时、非JSON或越权时，Stone CIO规则增强分析仍会完整生成，不影响核心决策和邮件日报。
 

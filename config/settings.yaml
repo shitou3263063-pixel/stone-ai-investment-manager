@@ -1,16 +1,11 @@
-config_version: V12.6_STABLE
+config_version: V12.6.1_STABLE
 config_role: compatibility_macro_and_legacy_planning_inputs
 
+# 仅作为官方日历不可用时的备用来源；CPI/PPI 使用 src/macro/macro_calendar.py
+# 内经 BLS 核验的含时区发布时间，不能由此处覆盖。
 macro_events:
   - name: FOMC利率决议
     date: 2026-07-29
-    time: 待确认
-    timezone: Asia/Shanghai
-    source: user_configured_calendar
-    confirmed: false
-    level: high
-  - name: CPI数据
-    date: 2026-07-15
     time: 待确认
     timezone: Asia/Shanghai
     source: user_configured_calendar
@@ -37,8 +32,8 @@ dca_plan:
     - symbol: 510300.SS
       name: 沪深300ETF
       base_amount: 2000
-    - symbol: 3067.HK
-      name: 恒生科技ETF
+    - symbol: 03033.HK
+      name: 南方东英恒生科技指数ETF
       base_amount: 2000
 
 data_sources:

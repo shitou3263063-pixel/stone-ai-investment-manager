@@ -59,7 +59,10 @@ def _live_market(dual: bool = True, missing: bool = False) -> dict:
         "TLT": _quote(90, "alpha_vantage", second),
         "GLD": _quote(220, "alpha_vantage", second),
         "^VIX": _quote(18, "cboe_official", "yfinance" if dual else None),
-        "3067.HK": _quote(8, "finnhub", "yfinance" if dual else None),
+        "03033.HK": _quote(8, "finnhub", "yfinance" if dual else None),
+        "002558.SZ": _quote(10, "yfinance"),
+        "513060.SS": _quote(1, "yfinance"),
+        "513090.SS": _quote(1, "yfinance"),
         "510300.SS": _quote(4, "finnhub", "yfinance" if dual else None),
         "DX-Y.NYB": _quote(104, "yfinance", None),
         "^GSPC": _quote(5600, "yfinance", None),
@@ -175,7 +178,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         encoded = json.dumps(decision, ensure_ascii=False, default=str)
-        self.assertIn("Stone AI Investment Manager Pro V12.6 Stable", encoded)
+        self.assertIn("Stone AI Investment Manager Pro V12.6.1 Stable", encoded)
 
     def test_report_fields_complete(self) -> None:
         decision = build_v12_1_decision(

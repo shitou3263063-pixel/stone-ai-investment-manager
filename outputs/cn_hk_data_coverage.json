@@ -1,0 +1,225 @@
+{
+  "generated_at": "2026-07-15T02:22:48+08:00",
+  "scope": "CN_HK_P0_PLUS_P1A",
+  "p0_market_completeness": {
+    "cn_data_completeness": {
+      "market": "A股",
+      "score_pct": 85.7,
+      "confidence": "usable",
+      "decision_restricted": false,
+      "high_confidence_buy_allowed": true,
+      "missing_fields": [
+        "510300.SS:market_date",
+        "002558.SZ:market_date"
+      ],
+      "items": [
+        {
+          "symbol": "510300.SS",
+          "official_name": "沪深300ETF",
+          "exchange": "SSE",
+          "market": "CN",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "data_status": "VALID",
+          "source": "yfinance",
+          "market_date": "2026-07-13",
+          "fetched_at": "2026-07-15T02:22:44",
+          "freshness": "stale",
+          "fallback_used": true,
+          "missing_fields": [
+            "market_date"
+          ],
+          "checks": {
+            "symbol_mapping": true,
+            "valid_price": true,
+            "currency": true,
+            "market_date": false,
+            "registered_source": true,
+            "no_proxy_substitution": true,
+            "no_critical_anomaly": true
+          }
+        },
+        {
+          "symbol": "002558.SZ",
+          "official_name": "巨人网络",
+          "exchange": "SZSE",
+          "market": "CN",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "data_status": "VALID",
+          "source": "yfinance",
+          "market_date": "2026-07-13",
+          "fetched_at": "2026-07-15T02:22:45",
+          "freshness": "stale",
+          "fallback_used": true,
+          "missing_fields": [
+            "market_date"
+          ],
+          "checks": {
+            "symbol_mapping": true,
+            "valid_price": true,
+            "currency": true,
+            "market_date": false,
+            "registered_source": true,
+            "no_proxy_substitution": true,
+            "no_critical_anomaly": true
+          }
+        }
+      ]
+    },
+    "hk_data_completeness": {
+      "market": "港股及港股主题基金",
+      "score_pct": 85.7,
+      "confidence": "usable",
+      "decision_restricted": false,
+      "high_confidence_buy_allowed": true,
+      "missing_fields": [
+        "03033.HK:market_date",
+        "513060.SS:market_date",
+        "513090.SS:market_date"
+      ],
+      "items": [
+        {
+          "symbol": "03033.HK",
+          "official_name": "南方东英恒生科技指数ETF",
+          "exchange": "HKEX",
+          "market": "HK",
+          "currency": "HKD",
+          "timezone": "Asia/Hong_Kong",
+          "data_status": "VALID",
+          "source": "yfinance",
+          "market_date": "2026-07-13",
+          "fetched_at": "2026-07-15T02:22:44",
+          "freshness": "stale",
+          "fallback_used": true,
+          "missing_fields": [
+            "market_date"
+          ],
+          "checks": {
+            "symbol_mapping": true,
+            "valid_price": true,
+            "currency": true,
+            "market_date": false,
+            "registered_source": true,
+            "no_proxy_substitution": true,
+            "no_critical_anomaly": true
+          }
+        },
+        {
+          "symbol": "513060.SS",
+          "official_name": "恒生医疗ETF",
+          "exchange": "SSE",
+          "market": "CN",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "data_status": "VALID",
+          "source": "yfinance",
+          "market_date": "2026-07-13",
+          "fetched_at": "2026-07-15T02:22:45",
+          "freshness": "stale",
+          "fallback_used": true,
+          "missing_fields": [
+            "market_date"
+          ],
+          "checks": {
+            "symbol_mapping": true,
+            "valid_price": true,
+            "currency": true,
+            "market_date": false,
+            "registered_source": true,
+            "no_proxy_substitution": true,
+            "no_critical_anomaly": true
+          }
+        },
+        {
+          "symbol": "513090.SS",
+          "official_name": "香港证券ETF",
+          "exchange": "SSE",
+          "market": "CN",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "data_status": "VALID",
+          "source": "yfinance",
+          "market_date": "2026-07-13",
+          "fetched_at": "2026-07-15T02:22:45",
+          "freshness": "stale",
+          "fallback_used": true,
+          "missing_fields": [
+            "market_date"
+          ],
+          "checks": {
+            "symbol_mapping": true,
+            "valid_price": true,
+            "currency": true,
+            "market_date": false,
+            "registered_source": true,
+            "no_proxy_substitution": true,
+            "no_critical_anomaly": true
+          }
+        }
+      ]
+    },
+    "policy": {
+      "below_60": "不得输出高置信度买入建议",
+      "below_40": "Opportunity Score只能标记为低可信度",
+      "mapping_or_validation_error": "不得被AI自然语言解释覆盖"
+    }
+  },
+  "cn_analysis_completeness": {
+    "market": "A股",
+    "score_pct": 90,
+    "confidence": "usable",
+    "decision_restricted": false,
+    "high_confidence_buy_allowed": true,
+    "checks": {
+      "P0真实持仓基础行情": true,
+      "A股交易日历": true,
+      "002558个股估值": false,
+      "沪深300基准估值": true,
+      "002558财务报表": true,
+      "A股官方公告": true
+    },
+    "weights": {
+      "P0真实持仓基础行情": 45,
+      "A股交易日历": 10,
+      "002558个股估值": 10,
+      "沪深300基准估值": 10,
+      "002558财务报表": 20,
+      "A股官方公告": 5
+    },
+    "missing_fields": [
+      "002558个股估值"
+    ]
+  },
+  "hk_analysis_completeness": {
+    "market": "港股及港股主题基金",
+    "score_pct": 65,
+    "confidence": "usable",
+    "decision_restricted": false,
+    "high_confidence_buy_allowed": true,
+    "checks": {
+      "P0真实持仓基础行情": true,
+      "HKMA HIBOR": false,
+      "HKMA 港元汇率": false,
+      "HKMA 银行体系流动性": true,
+      "港交所官方公告": false
+    },
+    "weights": {
+      "P0真实持仓基础行情": 50,
+      "HKMA HIBOR": 15,
+      "HKMA 港元汇率": 15,
+      "HKMA 银行体系流动性": 15,
+      "港交所官方公告": 5
+    },
+    "missing_fields": [
+      "HKMA HIBOR",
+      "HKMA 港元汇率",
+      "港交所官方公告"
+    ]
+  },
+  "policy": {
+    "below_60": "不得输出高置信度买入建议",
+    "below_40": "Opportunity Score只能标记为低可信度",
+    "no_ai_override": true
+  }
+}

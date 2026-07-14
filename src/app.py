@@ -165,7 +165,7 @@ def run(*, send_email: bool = True) -> str:
     reports_dir.mkdir(exist_ok=True)
     today = date.today()
 
-    write_log("V12.6 Stable 正式运行开始", filename="stone_ai.log")
+    write_log("V12.6.1 Stable 正式运行开始", filename="stone_ai.log")
     write_log("阶段：数据获取与每日统一快照开始", filename="stone_ai.log")
     snapshot = write_snapshot()
     context = _build_context(snapshot)
@@ -255,7 +255,7 @@ def run(*, send_email: bool = True) -> str:
             f"条件性债券转权益：{budget.get('conditional_bond_to_equity_month_yuan', 0):.0f} 元",
             f"DQS：{decision['dqs']['score']}；模式：{decision['dqs']['mode_label']}",
             f"风险评分：{decision['risk']['score']}；等级：{decision['risk']['level']}",
-            f"一致性校验：{'通过' if validation.get('ok') else '未通过'}",
+            f"一致性校验：{validation.get('status', 'PASS' if validation.get('ok') else 'FAIL')}",
             f"邮件通知：{email_result['message']}",
             "固定联动文件：reports/today_action.md、reports/daily_report.md、reports/weekly_report.md、reports/run_status.json",
             "声明：系统不自动交易，不接券商下单权限；仅供投资辅助，不构成投资建议，不承诺收益。",

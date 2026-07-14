@@ -1,6 +1,6 @@
-config_version: V12.6_STABLE
+config_version: V12.6.1_STABLE
 config_role: production_strategy_authority
-version: V12.6 Stable
+version: V12.6.1 Stable
 
 target_allocation:
   美股: 0.30
@@ -114,8 +114,8 @@ dca:
     - symbol: 510300
       name: 沪深300ETF
       base_weight: 0.25
-    - symbol: 03033
-      name: 恒生科技ETF
+    - symbol: 03033.HK
+      name: 南方东英恒生科技指数ETF
       base_weight: 0.15
 
 rebalance:

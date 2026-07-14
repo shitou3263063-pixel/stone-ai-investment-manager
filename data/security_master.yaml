@@ -93,15 +93,26 @@ securities:
     currency: USD
 
   - canonical_id: HK_03033
-    display_name: 南方恒生科技ETF
-    ticker: "03033"
+    display_name: 南方东英恒生科技指数ETF
+    ticker: "03033.HK"
     exchange: HKEX
-    aliases: ["03033", "03033.HK", "3067.HK", 南方恒生科技ETF, 恒生科技ETF]
-    pricing_proxy: 3067.HK
+    aliases: ["03033", "03033.HK", "3033.HK", 南方东英恒生科技指数ETF, 南方恒生科技ETF, 恒生科技ETF]
+    pricing_proxy: "03033.HK"
     asset_class: 港股
     strategy_type: core_etf
     currency: HKD
-    note: "03033为用户实际持仓代码；3067.HK可作为行情参考代理，不代表真实持仓。"
+    note: "03033.HK为用户真实持仓；3033.HK仅是部分供应商去除前导零后的同证券代码格式，不是代理标的。"
+
+  - canonical_id: HK_03067
+    display_name: iShares恒生科技ETF
+    ticker: "3067.HK"
+    exchange: HKEX
+    aliases: ["03067", "03067.HK", "3067.HK", iShares恒生科技ETF]
+    pricing_proxy: "3067.HK"
+    asset_class: 港股
+    strategy_type: independent_reference_etf
+    currency: HKD
+    note: "独立证券，与03033.HK不存在替代、代理或回退关系。"
 
   - canonical_id: HK_513060
     display_name: 恒生医疗ETF

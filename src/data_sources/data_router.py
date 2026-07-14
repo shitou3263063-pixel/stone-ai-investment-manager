@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 import json
 from typing import Any, Callable
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from src.data_sources import alpha_vantage_client, finnhub_client, fred_client, yfinance_client
+from src.data_sources.cn_hk_p1a import build_cn_hk_p1a_snapshot
 from src.data_sources.data_cache import read_cache, write_cache
 from utils.data_loader import project_root
 from utils.logger import write_log
@@ -21,10 +23,12 @@ MARKET_TICKERS = [
     "XLF",
     "^GSPC",
     "^IXIC",
-    "3067.HK",
-    "3033.HK",
+    "03033.HK",
     "2800.HK",
     "510300.SS",
+    "002558.SZ",
+    "513060.SS",
+    "513090.SS",
     "GLD",
     "TLT",
     "IEF",
@@ -34,8 +38,72 @@ MARKET_TICKERS = [
 ]
 
 US_ETF_TICKERS = {"VOO", "QQQ", "NVDA", "GOOG", "BABA", "IBKR", "XLF", "GLD", "TLT", "IEF", "UUP"}
-HK_CN_TICKERS = {"3067.HK", "3033.HK", "2800.HK", "510300.SS"}
+HK_CN_TICKERS = {"03033.HK", "2800.HK", "510300.SS", "002558.SZ", "513060.SS", "513090.SS"}
 YFINANCE_ONLY_TICKERS = {"^GSPC", "^IXIC", "DX-Y.NYB"}
+
+INSTRUMENT_METADATA: dict[str, dict[str, str]] = {
+    "03033.HK": {
+        "official_name": "南方东英恒生科技指数ETF",
+        "exchange": "HKEX",
+        "market": "HK",
+        "currency": "HKD",
+        "timezone": "Asia/Hong_Kong",
+    },
+    "3067.HK": {
+        "official_name": "iShares恒生科技ETF",
+        "exchange": "HKEX",
+        "market": "HK",
+        "currency": "HKD",
+        "timezone": "Asia/Hong_Kong",
+    },
+    "2800.HK": {
+        "official_name": "盈富基金",
+        "exchange": "HKEX",
+        "market": "HK",
+        "currency": "HKD",
+        "timezone": "Asia/Hong_Kong",
+    },
+    "510300.SS": {
+        "official_name": "沪深300ETF",
+        "exchange": "SSE",
+        "market": "CN",
+        "currency": "CNY",
+        "timezone": "Asia/Shanghai",
+    },
+    "002558.SZ": {
+        "official_name": "巨人网络",
+        "exchange": "SZSE",
+        "market": "CN",
+        "currency": "CNY",
+        "timezone": "Asia/Shanghai",
+    },
+    "513060.SS": {
+        "official_name": "恒生医疗ETF",
+        "exchange": "SSE",
+        "market": "CN",
+        "currency": "CNY",
+        "timezone": "Asia/Shanghai",
+    },
+    "513090.SS": {
+        "official_name": "香港证券ETF",
+        "exchange": "SSE",
+        "market": "CN",
+        "currency": "CNY",
+        "timezone": "Asia/Shanghai",
+    },
+}
+
+# 3033.HK 是同一只03033.HK证券在部分供应商中的去前导零代码，不是代理ETF。
+PROVIDER_SYMBOLS: dict[str, dict[str, str]] = {
+    "03033.HK": {"yfinance": "3033.HK"},
+}
+
+CN_HELD_MARKET_SYMBOLS = ["510300.SS", "002558.SZ"]
+HK_ALLOCATION_SYMBOLS = ["03033.HK", "513060.SS", "513090.SS"]
+QUALITY_MARKET_SYMBOLS = [
+    "VOO", "QQQ", "TLT", "GLD", "^VIX",
+    "03033.HK", "510300.SS", "002558.SZ", "513060.SS", "513090.SS",
+]
 
 MACRO_SERIES = {
     "DGS10": "美国10年国债收益率",
@@ -55,24 +123,101 @@ SOURCE_LEVELS = {
     "alpha_vantage": 2,
     "finnhub": 2,
     "yfinance": 3,
+    "tushare_pro": 2,
+    "hkma_official": 1,
+    "cninfo_official": 1,
+    "hkex_official": 1,
     "unavailable": 99,
 }
 
 
+def provider_symbol_for(symbol: str, provider_name: str) -> str:
+    """返回同一证券的供应商代码格式，绝不使用代理证券。"""
+    return PROVIDER_SYMBOLS.get(symbol, {}).get(provider_name, symbol)
+
+
+def _business_day_lag(market_date: str | None, timezone_name: str) -> int | None:
+    if not market_date:
+        return None
+    try:
+        start = date.fromisoformat(str(market_date)[:10])
+        end = datetime.now(tz=ZoneInfo(timezone_name)).date()
+    except (TypeError, ValueError, KeyError):
+        return None
+    if start > end:
+        return -1
+    return sum(1 for offset in range(1, (end - start).days + 1) if (start + timedelta(days=offset)).weekday() < 5)
+
+
 def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
-    """为行情和宏观点补齐统一审计字段，不用0替代缺失值。"""
+    """为行情和宏观点补齐统一审计时间口径，不用0替代缺失值。"""
     source = str(item.get("source") or "unavailable")
     source_key = source.split(":", 1)[1] if source.startswith("cache:") else source
     status = str(item.get("status") or ("ok" if item.get("close", item.get("value")) is not None else "missing"))
     stale = bool(item.get("cache_stale")) or item.get("freshness_status") == "stale"
-    timestamp = item.get("published_at") or item.get("date") or item.get("fetched_at")
+    observed_at = item.get("observed_at") or item.get("published_at") or item.get("date")
+    fetched_at = item.get("fetched_at") or item.get("retrieved_at") or datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat()
+    comparable_date = item.get("comparable_date") or (str(observed_at)[:10] if observed_at else None)
+    market_date = item.get("market_date") or comparable_date
+    is_macro = source_key == "fred" or item.get("series_id") in MACRO_SERIES
+    symbol = str(item.get("symbol") or "")
+    metadata = INSTRUMENT_METADATA.get(symbol, {})
+    market_timezone = str(item.get("timezone") or item.get("market_timezone") or metadata.get("timezone") or (
+        "America/New_York" if is_macro or symbol in US_ETF_TICKERS or symbol in YFINANCE_ONLY_TICKERS else "Asia/Shanghai"
+    ))
+    business_day_lag = _business_day_lag(str(market_date) if market_date else None, market_timezone)
+    if business_day_lag is not None and business_day_lag > 1 and not is_macro:
+        stale = True
+    if status not in {"ok", "success"}:
+        data_session = "unavailable"
+    elif stale:
+        data_session = "stale"
+    elif is_macro:
+        data_session = "official_lagged_macro"
+    elif bool(item.get("is_realtime")):
+        data_session = "realtime"
+    elif source_key in {"cboe_official", "finnhub"}:
+        data_session = "intraday_delayed"
+    elif comparable_date == datetime.now(tz=ZoneInfo(market_timezone)).date().isoformat():
+        data_session = "official_close"
+    else:
+        data_session = "previous_close"
+    age_hours = item.get("age_hours")
+    if age_hours is None and observed_at:
+        try:
+            raw = str(observed_at).replace("Z", "+00:00")
+            observed_dt = datetime.fromisoformat(raw)
+            if observed_dt.tzinfo is None:
+                observed_dt = (
+                    datetime.combine(date.fromisoformat(raw), time.min, tzinfo=ZoneInfo(market_timezone))
+                    if len(raw) == 10 else observed_dt.replace(tzinfo=ZoneInfo(market_timezone))
+                )
+            age_hours = round(max(0.0, (datetime.now(timezone.utc) - observed_dt.astimezone(timezone.utc)).total_seconds() / 3600), 1)
+        except (TypeError, ValueError, KeyError):
+            age_hours = None
+    freshness_status = "unavailable" if data_session == "unavailable" else "stale" if stale else str(item.get("freshness_status") or "fresh")
     return {
         **item,
+        **metadata,
+        "symbol": symbol,
         "value": item.get("close", item.get("value")),
         "previous_value": item.get("previous_close", item.get("previous_value")),
-        "timestamp": timestamp,
+        "timestamp": observed_at,
+        "observed_at": observed_at,
+        "fetched_at": fetched_at,
+        "market_timezone": market_timezone,
+        "timezone": market_timezone,
+        "market_date": market_date,
+        "latest_market_date": market_date,
+        "business_day_lag": business_day_lag,
+        "freshness": freshness_status,
+        "data_frequency": str(item.get("data_frequency") or ("daily" if is_macro else "quote")),
+        "data_session": data_session,
+        "freshness_status": freshness_status,
+        "age_hours": age_hours,
+        "comparable_date": comparable_date,
         "source": source,
-        "source_level": SOURCE_LEVELS.get(source_key, 99),
+        "source_level": int(item.get("source_level") or SOURCE_LEVELS.get(source_key, 99)),
         "status": status,
         "stale": stale,
         "fallback_used": bool(item.get("cache_used")) or source.startswith("cache:"),
@@ -115,7 +260,7 @@ def _failed_item(symbol: str, errors: list[str]) -> dict[str, Any]:
 
 
 def _with_symbol(symbol: str, data: dict[str, Any]) -> dict[str, Any]:
-    return {**data, "symbol": symbol, "status": data.get("status", "ok")}
+    return {**data, **INSTRUMENT_METADATA.get(symbol, {}), "symbol": symbol, "status": data.get("status", "ok")}
 
 
 def _try_provider(
@@ -125,9 +270,16 @@ def _try_provider(
     errors: list[str],
 ) -> dict[str, Any] | None:
     try:
-        data = fn(symbol)
+        provider_symbol = provider_symbol_for(symbol, provider_name)
+        data = fn(provider_symbol)
+        data = {
+            **data,
+            "provider_symbol": provider_symbol,
+            "symbol_alias_normalization": provider_symbol != symbol,
+            "proxy_used": False,
+        }
         write_cache("quote", symbol, data, provider_name)
-        write_log(f"{symbol} 行情获取成功：{provider_name}", filename="data_router.log")
+        write_log(f"{symbol} 行情获取成功：{provider_name}（供应商代码 {provider_symbol}）", filename="data_router.log")
         return _with_symbol(symbol, data)
     except Exception as exc:  # noqa: BLE001 - any source failure should degrade
         message = f"{symbol} {provider_name} 获取失败：{exc}"
@@ -161,6 +313,172 @@ def _official_vix_quote() -> dict[str, Any]:
         "cache_used": False,
         "cache_stale": False,
     }
+
+
+def validate_market_item(symbol: str, item: dict[str, Any]) -> dict[str, Any]:
+    """校验真实标的、市场、币种和时间口径；旧流程仍使用原始status。"""
+    metadata = INSTRUMENT_METADATA.get(symbol, {})
+    missing_fields: list[str] = []
+    validation_errors: list[str] = []
+    value = item.get("close", item.get("value"))
+    try:
+        price_valid = value is not None and float(value) > 0
+    except (TypeError, ValueError):
+        price_valid = False
+    if not price_valid:
+        missing_fields.append("price")
+    if not item.get("market_date"):
+        missing_fields.append("market_date")
+    if item.get("source") in {None, "", "unavailable"}:
+        missing_fields.append("source")
+
+    provider_symbol = str(item.get("provider_symbol") or symbol)
+    if str(item.get("symbol") or symbol) != symbol:
+        validation_errors.append("canonical_symbol_mismatch")
+    if symbol == "03033.HK" and provider_symbol == "3067.HK":
+        validation_errors.append("forbidden_proxy_3067")
+    if item.get("proxy_used"):
+        validation_errors.append("proxy_symbol_used")
+    if metadata.get("currency") and item.get("currency") != metadata["currency"]:
+        validation_errors.append("currency_mismatch")
+    if metadata.get("timezone") and item.get("timezone") != metadata["timezone"]:
+        validation_errors.append("timezone_mismatch")
+
+    mapping_errors = {"canonical_symbol_mismatch", "forbidden_proxy_3067", "proxy_symbol_used"}
+    validation_failures = {"currency_mismatch", "timezone_mismatch"}
+    if mapping_errors.intersection(validation_errors):
+        data_status = "SYMBOL_MAPPING_ERROR"
+    elif validation_failures.intersection(validation_errors):
+        data_status = "DATA_VALIDATION_FAILED"
+    elif item.get("status") not in {"ok", "success"} or missing_fields:
+        data_status = "DATA_INSUFFICIENT"
+    else:
+        data_status = "VALID"
+    return {
+        **item,
+        "data_status": data_status,
+        "validation_status": data_status,
+        "missing_fields": list(dict.fromkeys(missing_fields)),
+        "validation_errors": list(dict.fromkeys(validation_errors)),
+        "decision_eligible": data_status == "VALID" and item.get("freshness_status") != "stale",
+    }
+
+
+def build_market_completeness(items: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """计算A股和港股持仓专项完整度，防止低质量行情进入高置信度建议。"""
+
+    def group_result(name: str, symbols: list[str]) -> dict[str, Any]:
+        rows: list[dict[str, Any]] = []
+        passed = 0
+        total = len(symbols) * 7
+        group_missing: list[str] = []
+        for symbol in symbols:
+            item = items.get(symbol, {}) or {}
+            metadata = INSTRUMENT_METADATA[symbol]
+            value = item.get("close", item.get("value"))
+            try:
+                valid_price = value is not None and float(value) > 0
+            except (TypeError, ValueError):
+                valid_price = False
+            checks = {
+                "symbol_mapping": item.get("data_status") != "SYMBOL_MAPPING_ERROR" and item.get("symbol") == symbol,
+                "valid_price": valid_price and item.get("status") in {"ok", "success"},
+                "currency": item.get("currency") == metadata["currency"],
+                "market_date": bool(item.get("market_date")) and item.get("freshness_status") != "stale",
+                "registered_source": item.get("source") not in {None, "", "unavailable"},
+                "no_proxy_substitution": not item.get("proxy_used") and not (
+                    symbol == "03033.HK" and item.get("provider_symbol") == "3067.HK"
+                ),
+                "no_critical_anomaly": item.get("data_status") not in {"SYMBOL_MAPPING_ERROR", "DATA_VALIDATION_FAILED"},
+            }
+            passed += sum(bool(ok) for ok in checks.values())
+            failed = [key for key, ok in checks.items() if not ok]
+            group_missing.extend(f"{symbol}:{key}" for key in failed)
+            rows.append({
+                "symbol": symbol,
+                "official_name": metadata["official_name"],
+                "exchange": metadata["exchange"],
+                "market": metadata["market"],
+                "currency": metadata["currency"],
+                "timezone": metadata["timezone"],
+                "data_status": item.get("data_status", "DATA_INSUFFICIENT"),
+                "source": item.get("source", "unavailable"),
+                "market_date": item.get("market_date"),
+                "fetched_at": item.get("fetched_at"),
+                "freshness": item.get("freshness_status", "unavailable"),
+                "fallback_used": bool(item.get("fallback_used")),
+                "missing_fields": list(dict.fromkeys((item.get("missing_fields") or []) + failed)),
+                "checks": checks,
+            })
+        score = round(passed / total * 100, 1) if total else 0.0
+        return {
+            "market": name,
+            "score_pct": score,
+            "confidence": "low" if score < 40 else "restricted" if score < 60 else "usable",
+            "decision_restricted": score < 60,
+            "high_confidence_buy_allowed": score >= 60,
+            "missing_fields": list(dict.fromkeys(group_missing)),
+            "items": rows,
+        }
+
+    return {
+        "cn_data_completeness": group_result("A股", CN_HELD_MARKET_SYMBOLS),
+        "hk_data_completeness": group_result("港股及港股主题基金", HK_ALLOCATION_SYMBOLS),
+        "policy": {
+            "below_60": "不得输出高置信度买入建议",
+            "below_40": "Opportunity Score只能标记为低可信度",
+            "mapping_or_validation_error": "不得被AI自然语言解释覆盖",
+        },
+    }
+
+
+def write_cn_hk_p0_validation(items: dict[str, dict[str, Any]], completeness: dict[str, Any]) -> None:
+    """保存P0机器可读验收结果，便于报告复查，不参与交易决策。"""
+    output_dir = project_root() / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generated_at = datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds")
+    mapping_validation = {
+        "generated_at": generated_at,
+        "canonical_symbol": "03033.HK",
+        "yfinance_provider_symbol": provider_symbol_for("03033.HK", "yfinance"),
+        "forbidden_substitute": "3067.HK",
+        "mapping_passed": provider_symbol_for("03033.HK", "yfinance") == "3033.HK"
+        and provider_symbol_for("03033.HK", "finnhub") == "03033.HK",
+        "independent_symbol_3067": True,
+        "quote_provider_symbol": (items.get("03033.HK", {}) or {}).get("provider_symbol"),
+        "quote_data_status": (items.get("03033.HK", {}) or {}).get("data_status", "DATA_INSUFFICIENT"),
+    }
+    coverage = {
+        "generated_at": generated_at,
+        "scope": "CN_HK_P0_REAL_HOLDINGS",
+        **completeness,
+    }
+    p0_validation = {
+        "generated_at": generated_at,
+        "mapping_validation_passed": mapping_validation["mapping_passed"],
+        "cn_data_completeness": completeness["cn_data_completeness"]["score_pct"],
+        "hk_data_completeness": completeness["hk_data_completeness"]["score_pct"],
+        "all_target_symbols": {
+            symbol: {
+                "official_name": (items.get(symbol, {}) or {}).get("official_name", INSTRUMENT_METADATA[symbol]["official_name"]),
+                "status": (items.get(symbol, {}) or {}).get("data_status", "DATA_INSUFFICIENT"),
+                "source": (items.get(symbol, {}) or {}).get("source", "unavailable"),
+                "market_date": (items.get(symbol, {}) or {}).get("market_date"),
+                "currency": (items.get(symbol, {}) or {}).get("currency", INSTRUMENT_METADATA[symbol]["currency"]),
+                "timezone": (items.get(symbol, {}) or {}).get("timezone", INSTRUMENT_METADATA[symbol]["timezone"]),
+            }
+            for symbol in CN_HELD_MARKET_SYMBOLS + HK_ALLOCATION_SYMBOLS
+        },
+    }
+    (output_dir / "symbol_mapping_validation.json").write_text(
+        json.dumps(mapping_validation, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (output_dir / "cn_hk_data_coverage.json").write_text(
+        json.dumps(coverage, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (output_dir / "cn_hk_p0_validation.json").write_text(
+        json.dumps(p0_validation, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def get_market_quote(symbol: str) -> dict[str, Any]:
@@ -201,20 +519,25 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
         normalized_candidates = [_normalize_point(item) for item in candidates]
         selected = normalized_candidates[0]
         verified = _dual_source_verified(normalized_candidates)
-        return {
+        return validate_market_item(symbol, {
             **selected,
             "candidates": normalized_candidates,
             "source_count": len({item.get("source") for item in normalized_candidates}),
             "verified_by_second_source": verified,
-        }
+            "fallback_used": bool(selected.get("fallback_used")) or bool(errors),
+            "provider_errors": errors,
+        })
 
     cached = read_cache("quote", symbol)
     if cached:
         write_log(f"{symbol} 使用缓存行情：{cached.get('source')}", filename="data_router.log")
-        return _normalize_point(_with_symbol(symbol, {**cached, "status": "ok", "source": f"cache:{cached.get('source', 'unknown')}"}))
+        return validate_market_item(
+            symbol,
+            _normalize_point(_with_symbol(symbol, {**cached, "status": "ok", "source": f"cache:{cached.get('source', 'unknown')}"})),
+        )
 
     write_log(f"{symbol} 行情全部失败，数据缺失，不做激进判断", filename="data_router.log")
-    return _normalize_point(_failed_item(symbol, errors))
+    return validate_market_item(symbol, _normalize_point(_with_symbol(symbol, _failed_item(symbol, errors))))
 
 
 def get_macro_snapshot() -> dict[str, Any]:
@@ -289,6 +612,15 @@ def _status_point(
     stale: bool = False,
     verified: bool = False,
     note: str = "",
+    data_category: str = "enhancement_data",
+    observed_at: Any = None,
+    fetched_at: Any = None,
+    market_timezone: str = "America/New_York",
+    data_frequency: str = "unknown",
+    data_session: str = "unavailable",
+    freshness_status: str = "unavailable",
+    age_hours: Any = None,
+    comparable_date: Any = None,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -301,6 +633,15 @@ def _status_point(
         "stale": stale,
         "verified_by_second_source": verified,
         "note": note,
+        "data_category": data_category,
+        "observed_at": observed_at or timestamp,
+        "fetched_at": fetched_at,
+        "market_timezone": market_timezone,
+        "data_frequency": data_frequency,
+        "data_session": data_session,
+        "freshness_status": freshness_status,
+        "age_hours": age_hours,
+        "comparable_date": comparable_date or (str(observed_at or timestamp)[:10] if observed_at or timestamp else None),
     }
 
 
@@ -312,9 +653,15 @@ def _build_market_context_status(items: dict[str, Any], macro: dict[str, Any]) -
                       timestamp=vix.get("timestamp"), source=str(vix.get("source", "unavailable")),
                       source_level=int(vix.get("source_level", 99) or 99), status=str(vix.get("status", "missing")),
                       stale=bool(vix.get("stale")), verified=bool(vix.get("verified_by_second_source")),
-                      note="Cboe优先，其他行情源仅用于交叉验证。"),
+                      note="Cboe优先，其他行情源仅用于交叉验证。",
+                      observed_at=vix.get("observed_at"), fetched_at=vix.get("fetched_at"),
+                      market_timezone=str(vix.get("market_timezone") or "America/New_York"),
+                      data_frequency=str(vix.get("data_frequency") or "quote"),
+                      data_session=str(vix.get("data_session") or "unavailable"),
+                      freshness_status=str(vix.get("freshness_status") or "unavailable"),
+                      age_hours=vix.get("age_hours"), comparable_date=vix.get("comparable_date")),
         _status_point("Put/Call Ratio", note="未找到当前流程可稳定复用的官方接口，本版不接入。"),
-        _status_point("上涨/下跌家数与新高/新低", note="市场宽度未接入；不得以指数涨跌替代。"),
+        _status_point("市场宽度", note="上涨/下跌家数与新高/新低未接入；不得以指数涨跌替代。"),
         _status_point("ETF资金流", note="未接入可靠许可数据；不得以价格或成交量替代净申赎。"),
         _status_point("AAII情绪", note="未接入稳定自动数据源，仅保留状态说明。"),
     ]
@@ -326,12 +673,18 @@ def _build_market_context_status(items: dict[str, Any], macro: dict[str, Any]) -
                 previous_value=point.get("previous_value"), timestamp=point.get("timestamp"),
                 source=str(point.get("source", "unavailable")), source_level=int(point.get("source_level", 99) or 99),
                 status=str(point.get("status", "missing")), stale=bool(point.get("stale")),
-                verified=bool(point.get("verified_by_second_source")), note="FRED官方宏观序列。",
+                verified=bool(point.get("verified_by_second_source")), note="FRED一级来源；属于官方滞后数据。",
+                observed_at=point.get("observed_at"), fetched_at=point.get("fetched_at"),
+                market_timezone=str(point.get("market_timezone") or "America/New_York"),
+                data_frequency=str(point.get("data_frequency") or "daily"),
+                data_session=str(point.get("data_session") or "official_lagged_macro"),
+                freshness_status=str(point.get("freshness_status") or "official_lagged"),
+                age_hours=point.get("age_hours"), comparable_date=point.get("comparable_date"),
             )
         )
     return {
         "indicators": indicators,
-        "breadth_status": "available" if any(row["name"] == "上涨/下跌家数与新高/新低" and row["status"] == "ok" for row in indicators) else "not_connected",
+        "breadth_status": "available" if any(row["name"] == "市场宽度" and row["status"] == "ok" for row in indicators) else "not_connected",
         "fund_flow_status": "not_connected",
         "sentiment_status": "partial" if vix.get("status") == "ok" else "missing",
         "note": "仅列出本次真实接通的数据；未接入项不参与高确定性买入判断。",
@@ -342,7 +695,7 @@ def _quality_score(items: dict[str, dict[str, Any]], macro: dict[str, Any]) -> i
     total = 0
     count = 0
 
-    for symbol in ["VOO", "QQQ", "TLT", "GLD", "^VIX", "3067.HK", "510300.SS"]:
+    for symbol in QUALITY_MARKET_SYMBOLS:
         item = items.get(symbol, {})
         count += 1
         if item.get("status") != "ok":
@@ -376,7 +729,7 @@ def _quality_score(items: dict[str, dict[str, Any]], macro: dict[str, Any]) -> i
 
 def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any], news: dict[str, Any]) -> dict[str, Any]:
     key_rows: list[dict[str, Any]] = []
-    for symbol in ["VOO", "QQQ", "TLT", "GLD", "^VIX", "3067.HK", "510300.SS"]:
+    for symbol in QUALITY_MARKET_SYMBOLS:
         item = items.get(symbol, {})
         key_rows.append(
             {
@@ -439,6 +792,23 @@ def _build_quality_report(items: dict[str, dict[str, Any]], macro: dict[str, Any
 
 def fetch_layered_market_data() -> dict[str, Any]:
     items = {ticker: get_market_quote(ticker) for ticker in MARKET_TICKERS}
+    market_completeness = build_market_completeness(items)
+    try:
+        write_cn_hk_p0_validation(items, market_completeness)
+    except Exception as exc:  # noqa: BLE001 - validation artifact failure must not break daily report
+        write_log(f"A股与港股P0验证文件写入失败：{exc}", filename="stone_ai.log")
+    try:
+        cn_hk_p1a = build_cn_hk_p1a_snapshot(market_completeness, market_items=items)
+    except Exception as exc:  # noqa: BLE001 - P1A enhancement must never break the core snapshot
+        write_log(f"A股与港股P1A增强层失败，主流程降级继续：{exc}", filename="stone_ai.log")
+        cn_hk_p1a = {
+            "status": "failed",
+            "error_message": str(exc),
+            "analysis_completeness": {
+                "cn_analysis_completeness": {"score_pct": 0, "decision_restricted": True, "missing_fields": ["P1A增强层失败"]},
+                "hk_analysis_completeness": {"score_pct": 0, "decision_restricted": True, "missing_fields": ["P1A增强层失败"]},
+            },
+        }
     macro = get_macro_snapshot()
     news = get_news_and_earnings()
     quality = _build_quality_report(items, macro, news)
@@ -456,6 +826,11 @@ def fetch_layered_market_data() -> dict[str, Any]:
         "macro": macro,
         "news": news,
         "market_context_status": _build_market_context_status(items, macro),
+        "market_completeness": market_completeness,
+        "cn_hk_p1a": cn_hk_p1a,
+        "cn_hk_analysis_completeness": cn_hk_p1a.get("analysis_completeness", {}),
+        "cn_data_completeness": market_completeness["cn_data_completeness"]["score_pct"],
+        "hk_data_completeness": market_completeness["hk_data_completeness"]["score_pct"],
         "data_quality": quality,
         "errors": errors,
     }

@@ -65,7 +65,8 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
     asset_class = labels.get(asset_key) or CANONICAL_CATEGORY.get(asset_key, asset_key)
     value_cny = round(_to_float(holding.get("market_value_cny")))
     original_value = _to_float(holding.get("market_value_original"), value_cny)
-    exchange_rate = _to_float(holding.get("exchange_rate"), 1.0)
+    raw_exchange_rate = holding.get("exchange_rate")
+    exchange_rate = None if raw_exchange_rate in {None, ""} else _to_float(raw_exchange_rate)
     confirmed_at = str(holding.get("last_confirmed_at") or holding.get("valuation_time") or date.today().isoformat())
     valuation_method = str(
         holding.get("valuation_method")
@@ -85,7 +86,9 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "quantity": holding.get("quantity"),
         "unit": holding.get("unit") or "",
         "market_value_original": original_value,
+        "market_value_original_currency": holding.get("market_value_original_currency") or holding.get("currency") or "CNY",
         "exchange_rate": exchange_rate,
+        "fx_status": "not_applied_user_confirmed_cny" if exchange_rate is None else "applied",
         "market_value_cny": value_cny,
         "data_source": holding.get("data_source") or "user_confirmed",
         "source": holding.get("data_source") or "user_confirmed",

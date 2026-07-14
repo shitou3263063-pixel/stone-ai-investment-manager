@@ -46,6 +46,8 @@ def _items(values: list[Any] | None) -> str:
 
 
 def _amount_mode_text(decision: dict[str, Any], amount: int | float) -> str:
+    if not decision.get("today_trade") or float(amount or 0) <= 0:
+        return "0元"
     mode = decision.get("dqs", {}).get("mode")
     if mode == "exact" and amount > 0:
         return _yuan(amount)
@@ -161,6 +163,26 @@ def build_run_status(
     consistency = decision.get("consistency", {}) or {}
     warnings = list(action["data_anomalies_or_baseline_conflicts"])
     errors = _unique_text(consistency.get("errors", []) or [])
+    p1a = decision.get("cn_hk_p1a", {}) or {}
+    tushare = p1a.get("tushare", {}) or {}
+    akshare = p1a.get("akshare", {}) or {}
+    akshare_valuation_interfaces = ((akshare.get("valuation") or {}).get("interfaces") or {})
+    akshare_fundamental = ((akshare.get("fundamentals") or {}).get("002558.SZ") or {})
+    akshare_conflicts = list(akshare.get("source_conflicts", []) or [])
+    akshare_market_references = akshare.get("market_references", {}) or {}
+    hkma = p1a.get("hkma", {}) or {}
+    hkma_datasets = hkma.get("datasets", {}) or {}
+    trade_calendar = tushare.get("trade_calendar", {}) or {}
+    valuation = tushare.get("valuation", {}) or {}
+    valuation_interfaces = valuation.get("interfaces", {}) or {}
+    fundamental = ((tushare.get("fundamentals") or {}).get("002558.SZ") or {})
+    if tushare.get("configured") and tushare.get("status") in {"failed", "partial"}:
+        warnings.append(
+            f"Tushare {tushare.get('error_code') or 'UNKNOWN_ERROR'}："
+            f"{tushare.get('error_summary') or '部分或全部P1A接口不可用'}"
+        )
+    if akshare_conflicts:
+        warnings.append(f"AKShare与主源存在{len(akshare_conflicts)}项SOURCE_CONFLICT，相关数据禁止进入评分。")
     if email_status == "failed" and email_error:
         warnings.append(f"邮件发送失败：{email_error}")
     warnings = _unique_text(warnings)
@@ -197,6 +219,46 @@ def build_run_status(
         "report_files": report_files,
         "email_status": email_status,
         "email_error": email_error,
+        "cn_hk_p1a": {
+            "cn_analysis_completeness": ((decision.get("cn_hk_analysis_completeness", {}) or {}).get("cn_analysis_completeness", {}) or {}).get("score_pct"),
+            "hk_analysis_completeness": ((decision.get("cn_hk_analysis_completeness", {}) or {}).get("hk_analysis_completeness", {}) or {}).get("score_pct"),
+            "tushare_configured": bool(((decision.get("cn_hk_p1a", {}) or {}).get("tushare", {}) or {}).get("configured")),
+            "tushare_status": tushare.get("status", "missing"),
+            "tushare_error_code": tushare.get("error_code"),
+            "tushare_error_summary": tushare.get("error_summary"),
+            "tushare_trade_calendar_status": trade_calendar.get("status", "missing"),
+            "tushare_002558_valuation_status": (valuation_interfaces.get("002558_valuation") or {}).get("status", "missing"),
+            "tushare_002558_fundamental_status": fundamental.get("status", "missing"),
+            "tushare_csi300_valuation_status": (valuation_interfaces.get("csi300_valuation") or {}).get("status", "missing"),
+            "tushare_last_success_at": tushare.get("last_success_at"),
+            "akshare_status": akshare.get("status", "missing"),
+            "akshare_version": akshare.get("version"),
+            "akshare_trade_calendar_status": (akshare.get("trade_calendar") or {}).get("status", "missing"),
+            "akshare_002558_valuation_status": (akshare_valuation_interfaces.get("002558_valuation") or {}).get("status", "missing"),
+            "akshare_002558_fundamental_status": akshare_fundamental.get("status", "missing"),
+            "akshare_csi300_valuation_status": (akshare_valuation_interfaces.get("csi300_valuation") or {}).get("status", "missing"),
+            "akshare_source_conflicts": akshare_conflicts,
+            "akshare_last_success_at": akshare.get("last_success_at"),
+            "akshare_03033_history_status": (akshare_market_references.get("03033.HK") or {}).get("status", "missing"),
+            "akshare_03033_history_date": (akshare_market_references.get("03033.HK") or {}).get("market_date"),
+            "akshare_03033_underlying_provider": (akshare_market_references.get("03033.HK") or {}).get("underlying_provider"),
+            "akshare_hstech_history_status": (akshare_market_references.get("HSTECH") or {}).get("status", "missing"),
+            "akshare_hstech_history_date": (akshare_market_references.get("HSTECH") or {}).get("market_date"),
+            "akshare_hstech_underlying_provider": (akshare_market_references.get("HSTECH") or {}).get("underlying_provider"),
+            "effective_sources": ((p1a.get("effective_data") or {}).get("selected_sources") or {}),
+            "hkma_status": hkma.get("status", "missing"),
+            "hkma_hibor_status": (hkma_datasets.get("hibor") or {}).get("status", "missing"),
+            "hkma_hibor_date": (hkma_datasets.get("hibor") or {}).get("market_date"),
+            "hkma_hibor_freshness": (hkma_datasets.get("hibor") or {}).get("freshness", "unavailable"),
+            "hkma_exchange_rate_status": (hkma_datasets.get("exchange_rate") or {}).get("status", "missing"),
+            "hkma_exchange_rate_date": (hkma_datasets.get("exchange_rate") or {}).get("market_date"),
+            "hkma_exchange_rate_freshness": (hkma_datasets.get("exchange_rate") or {}).get("freshness", "unavailable"),
+            "official_announcement_status": (((decision.get("cn_hk_p1a", {}) or {}).get("announcements", {}) or {}).get("status", "missing")),
+            "high_confidence_buy_restricted": any(
+                float(((decision.get("cn_hk_analysis_completeness", {}) or {}).get(key, {}) or {}).get("score_pct", 0) or 0) < 60
+                for key in ["cn_analysis_completeness", "hk_analysis_completeness"]
+            ) or bool(akshare_conflicts) or float(decision.get("dqs", {}).get("score", 0) or 0) < 85,
+        },
         "warnings": warnings,
         "errors": errors,
     }
@@ -266,20 +328,129 @@ def _cash_table(decision: dict[str, Any]) -> list[str]:
 
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 标的 | 最终分 | 原始分 | 横截面 | 数据调整 | 组合约束 | 建议区间 | 建议 | 当前持仓 | 分项得分 | 主要加分项 | 主要扣分项 |",
-        "| -- | ---: | ---: | ---: | ---: | ---: | -- | -- | ---: | -- | -- | -- |",
+        "| 标的 | 最终分 | 原始分 | 横截面 | 数据调整 | 组合约束 | 行情完整度 | 分析完整度 | 评分可信度 | 财务模型 | P1A输入 | 建议 | 当前持仓 | 主要原因 |",
+        "| -- | ---: | ---: | ---: | ---: | ---: | --: | --: | -- | -- | -- | -- | ---: | -- |",
     ]
     for item in decision.get("opportunity", []) or []:
+        completeness_value = item.get("market_data_completeness")
+        completeness_display = "不适用" if completeness_value is None else f"{float(completeness_value):.1f}%"
+        analysis_value = item.get("analysis_data_completeness")
+        analysis_display = "不适用" if analysis_value is None else f"{float(analysis_value):.1f}%"
         rows.append(
             "| "
             f"{item['name']} | {item['score']} | {item.get('raw_score', item['score'])} | "
             f"{item.get('cross_section_adjustment', 0):+d} | {item.get('data_quality_adjustment', 0):+d} | "
-            f"{item.get('portfolio_constraint_adjustment', 0):+d} | {item.get('advice_band', '暂无')} | "
-            f"{item['advice']} | {_yuan(item['current_holding_yuan'])} | "
-            f"{'；'.join(f'{key}{value}' for key, value in (item.get('components', {}) or {}).items()) or '暂无'} | "
-            f"{'；'.join(item.get('positive_factors', []) or ['暂无'])} | "
-            f"{'；'.join(item.get('negative_factors', []) or ['暂无'])} |"
+            f"{item.get('portfolio_constraint_adjustment', 0):+d} | {completeness_display} | {analysis_display} | "
+            f"{item.get('scoring_confidence', '可用')} | {item.get('financial_model', '不适用')} | "
+            f"{'、'.join(item.get('p1a_inputs_used', []) or ['无'])} | {item['advice']} | "
+            f"{_yuan(item['current_holding_yuan'])} | {item.get('reason', '暂无')} |"
         )
+    return rows
+
+
+def _cn_hk_completeness_table(decision: dict[str, Any]) -> list[str]:
+    completeness = decision.get("market_completeness", {}) or {}
+    rows = [
+        "| 市场 | 数据完整度 | 评分可信度 | 是否限制决策 | 缺失字段 |",
+        "| -- | --: | -- | -- | -- |",
+    ]
+    for key, label in [("cn_data_completeness", "A股"), ("hk_data_completeness", "港股及港股主题基金")]:
+        item = completeness.get(key, {}) or {}
+        rows.append(
+            f"| {label} | {float(item.get('score_pct', 0) or 0):.1f}% | {item.get('confidence', 'low')} | "
+            f"{'是' if item.get('decision_restricted', True) else '否'} | "
+            f"{'、'.join(item.get('missing_fields', []) or ['无'])} |"
+        )
+    rows.extend(["", "| 标的 | 正式名称 | 代码 | 交易所 | 市场 | 币种 | 时区 | 市场日期 | 来源 | 数据状态 |", "| -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |"])
+    for key in ["cn_data_completeness", "hk_data_completeness"]:
+        for item in (completeness.get(key, {}) or {}).get("items", []) or []:
+            rows.append(
+                f"| {item.get('symbol')} | {item.get('official_name')} | {item.get('symbol')} | "
+                f"{item.get('exchange')} | {item.get('market')} | {item.get('currency')} | {item.get('timezone')} | "
+                f"{item.get('market_date') or '暂无可靠数据'} | {item.get('source')} | {item.get('data_status')} |"
+            )
+    return rows
+
+
+def _cn_hk_p1a_table(decision: dict[str, Any]) -> list[str]:
+    snapshot = decision.get("cn_hk_p1a", {}) or {}
+    analysis = snapshot.get("analysis_completeness", {}) or {}
+    tushare = snapshot.get("tushare", {}) or {}
+    akshare = snapshot.get("akshare", {}) or {}
+    effective = snapshot.get("effective_data", {}) or {}
+    hkma = snapshot.get("hkma", {}) or {}
+    announcements = snapshot.get("announcements", {}) or {}
+    rows = [
+        "| P1A项目 | 状态/完整度 | 来源 | 是否进入评分 | 缺失或限制 |",
+        "| -- | -- | -- | -- | -- |",
+    ]
+    for key, label in [("cn_analysis_completeness", "A股整体分析"), ("hk_analysis_completeness", "港股整体分析")]:
+        item = analysis.get(key, {}) or {}
+        rows.append(
+            f"| {label} | {float(item.get('score_pct', 0) or 0):.1f}%（{item.get('confidence', 'low')}） | 多源汇总 | "
+            f"{'受门槛约束' if item.get('decision_restricted', True) else '是'} | {'、'.join(item.get('missing_fields', []) or ['无'])} |"
+        )
+    fundamentals = ((tushare.get("fundamentals") or {}).get("002558.SZ") or {})
+    valuation = ((tushare.get("valuation") or {}).get("items") or {})
+    trade_calendar = tushare.get("trade_calendar") or {}
+    rows.extend([
+        f"| A股交易日历 | {trade_calendar.get('status', 'missing')} | Tushare Pro | 否，仅用于日期校验 | "
+        f"{trade_calendar.get('error_code') or '无'}：{trade_calendar.get('error_summary') or '无'} |",
+        f"| 002558估值 | {(valuation.get('002558.SZ') or {}).get('status', 'missing')} | Tushare Pro | 是（成功时） | {(valuation.get('002558.SZ') or {}).get('error_message') or '无'} |",
+        f"| 002558财务 | {fundamentals.get('status', 'missing')} | Tushare Pro | 是（成功时） | {fundamentals.get('note') or '无'} |",
+        f"| 港元流动性/HIBOR/汇率 | {hkma.get('status', 'missing')} | HKMA官方 | 是（成功时） | {'、'.join(hkma.get('missing_fields', []) or ['无'])} |",
+        f"| A股官方公告 | {(announcements.get('cn') or {}).get('status', 'missing')} | 巨潮资讯 | 否，仅作风险解释 | {(announcements.get('cn') or {}).get('error_message') or '无'} |",
+        f"| 港股官方公告 | {(announcements.get('hk') or {}).get('status', 'missing')} | HKEX | 否，仅作风险解释 | {(announcements.get('hk') or {}).get('error_message') or '无'} |",
+    ])
+    ak_valuation = ((akshare.get("valuation") or {}).get("items") or {})
+    ak_fundamental = ((akshare.get("fundamentals") or {}).get("002558.SZ") or {})
+    selected = effective.get("selected_sources", {}) or {}
+    for key, label, record, scoring_note in [
+        ("trade_calendar", "AKShare A股交易日历", akshare.get("trade_calendar", {}) or {}, "否，仅用于日期校验"),
+        ("002558_valuation", "AKShare 002558估值", ak_valuation.get("002558.SZ", {}) or {}, "通过校验且被选中时"),
+        ("002558_fundamental", "AKShare 002558财务", ak_fundamental, "通过校验且被选中时"),
+        ("csi300_valuation", "AKShare 沪深300估值", ak_valuation.get("510300.SS", {}) or {}, "通过校验且被选中时"),
+    ]:
+        underlying = record.get("underlying_provider") or "未识别"
+        used = selected.get(key) == "akshare" and bool(record.get("scoring_eligible"))
+        rows.append(
+            f"| {label} | {record.get('status', 'missing')} | AKShare（底层：{underlying}） | "
+            f"{'是' if used else scoring_note} | "
+            f"{record.get('error_code') or record.get('error_message') or ('市场日期未明确或未通过评分校验，仅展示' if not record.get('scoring_eligible') else '无')} |"
+        )
+    market_references = akshare.get("market_references", {}) or {}
+    successful_display = [
+        f"{symbol}({record.get('underlying_provider')})"
+        for symbol, record in market_references.items()
+        if record.get("status") in {"ok", "cached"}
+    ]
+    rows.append(
+        f"| AKShare基础行情核验 | {akshare.get('status', 'missing')} | AKShare受监控备用 | 否，仅展示/冲突核验 | "
+        f"{'成功：' + '、'.join(successful_display) if successful_display else '无成功行情；不以代理或0值替代'} |"
+    )
+    for symbol, label in [("03033.HK", "03033.HK历史行情"), ("HSTECH", "恒生科技指数历史行情")]:
+        record = market_references.get(symbol, {}) or {}
+        rows.append(
+            f"| {label} | {record.get('status', 'missing')}（{record.get('market_date') or '无日期'}） | "
+            f"AKShare（底层：{record.get('underlying_provider') or '未识别'}） | 否，仅展示/同日核验 | "
+            f"{record.get('error_code') or record.get('comparison_reason') or record.get('error_message') or '无'} |"
+        )
+    hkma_datasets = hkma.get("datasets", {}) or {}
+    for key, label in [("hibor", "HKMA HIBOR"), ("exchange_rate", "HKMA港元汇率")]:
+        record = hkma_datasets.get(key, {}) or {}
+        usable = record.get("status") in {"ok", "cached"} and record.get("freshness") == "fresh"
+        rows.append(
+            f"| {label} | {record.get('status', 'missing')}（{record.get('market_date') or '无日期'}；{record.get('freshness', 'unavailable')}） | "
+            f"HKMA官方（底层：{record.get('underlying_provider') or 'hkma_open_api'}） | {'是' if usable else '否，过期或失败仅展示'} | "
+            f"{record.get('error_code') or record.get('error_message') or '无'} |"
+        )
+    if akshare.get("source_conflicts"):
+        rows.append(
+            f"| AKShare来源冲突 | SOURCE_CONFLICT | 主源 vs AKShare | 否 | "
+            f"{len(akshare.get('source_conflicts') or [])}项；已降低DQS并限制高置信度加仓 |"
+        )
+    rows.append("")
+    rows.append("- ETF财务规则：510300、513060、513090及03033均不套用002558个股财务评分。")
     return rows
 
 
@@ -299,18 +470,31 @@ def _holding_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _market_table(decision: dict[str, Any]) -> list[str]:
+    session_labels = {
+        "realtime": "实时",
+        "intraday_delayed": "盘中或延迟盘中",
+        "official_close": "当日官方收盘",
+        "previous_close": "上一交易日收盘",
+        "official_lagged_macro": "最新官方滞后数据",
+        "stale": "过期数据",
+        "unavailable": "不可用",
+    }
+    pair_comparable = bool((decision.get("risk", {}).get("market_time_consistency", {}) or {}).get("comparable"))
     rows = [
-        "| 指标 | 当前值 | 前值 | 涨跌幅 | 时间戳 | 来源 | 来源等级 | 状态 |",
-        "| -- | --: | --: | --: | -- | -- | --: | -- |",
+        "| 指标 | 当前值 | 前值 | 涨跌幅 | 观察时间 | 数据口径 | 数据年龄 | 是否可横向比较 | 来源 | 来源等级 | 状态 |",
+        "| -- | --: | --: | --: | -- | -- | -- | -- | -- | --: | -- |",
     ]
     for item in decision.get("market_table", []) or []:
         change = "暂无数据" if item.get("change_pct") is None else f"{float(item['change_pct']):.2f}%"
         previous = "暂无数据" if item.get("previous") is None else f"{float(item['previous']):.2f}"
         status = "成功" if item.get("success") else _text(item.get("error"), "请求失败")
+        age = "暂无" if item.get("age_hours") is None else f"{float(item['age_hours']):.1f}小时"
+        comparable = "是" if item.get("name") in {"VOO", "QQQ"} and pair_comparable else "否"
         rows.append(
             "| "
             f"{item['name']} | {item['display_value']} | {previous} | {change} | "
-            f"{item['timestamp']} | {item['source']} | {item['source_tier']} | {status} |"
+            f"{item['timestamp']} | {session_labels.get(item.get('data_session'), item.get('data_session', '未知'))} | "
+            f"{age} | {comparable} | {item['source']} | {item['source_tier']} | {status} |"
         )
     return rows
 
@@ -342,12 +526,22 @@ def _events(decision: dict[str, Any]) -> list[str]:
     lines = []
     for event in events:
         lines.append(
-            f"- {event.get('date', '暂无日期')} {event.get('time', '待确认')}（{event.get('timezone', '时区待确认')}）："
-            f"{event.get('name', '暂无名称')}，风险等级：{event.get('level', '暂无')}，"
-            f"状态：{event.get('status', '日期待确认')}，来源：{event.get('source', '暂无可靠来源')}；"
+            f"- {event.get('event_name', event.get('name', '暂无名称'))}（参考期{event.get('reference_period', '未知')}）："
+            f"{event.get('release_at_report_timezone') or '发布时间未验证'}（报告时区），"
+            f"源时区发布时间：{event.get('release_at') or '未验证'} {event.get('source_timezone', '未知')}，"
+            f"风险等级：{event.get('risk_level', event.get('level', '暂无'))}，"
+            f"核验状态：{event.get('verification_status', 'unverified')}，来源等级：{event.get('source_level', '未知')}，"
+            f"来源：{event.get('source', '暂无可靠来源')}；"
             "纪律：事件前不追涨，定投可复核但不一次性重仓。"
         )
     return lines
+
+
+def _consistency_table(decision: dict[str, Any]) -> list[str]:
+    rows = ["| 检查项 | 状态 | 说明 |", "| -- | -- | -- |"]
+    for item in decision.get("consistency", {}).get("checks", []) or []:
+        rows.append(f"| {item.get('check_item')} | {item.get('status')} | {item.get('description')} |")
+    return rows
 
 
 def _scenarios(decision: dict[str, Any]) -> list[str]:
@@ -435,13 +629,17 @@ def generate_daily_report(
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 15. Stone Smart Grid", 1)
     lines = [
-        "# Stone AI Investment Manager Pro V12.6 Stable 日报",
+        "# Stone AI Investment Manager Pro V12.6.1 Stable 日报",
         "",
         "## 0. 报告状态",
         "",
         f"- 报告日期：{decision.get('date')}",
-        f"- 运行时间：{decision.get('generated_at')}",
-        f"- 数据截止时间：{decision.get('data_cutoff')}",
+        f"- 报告时区：{decision.get('report_timezone', 'Asia/Shanghai')}",
+        f"- 报告生成时间（含时区）：{decision.get('generated_at')}",
+        f"- 决策数据统一截止时间：{(decision.get('data_time_summary', {}) or {}).get('decision_data_cutoff', decision.get('data_cutoff'))}",
+        f"- 是否存在不同步数据：{_yes_no((decision.get('data_time_summary', {}) or {}).get('has_unsynchronized_data'))}",
+        f"- 最旧关键数据时间：{_text((decision.get('data_time_summary', {}) or {}).get('oldest_critical_data_at'))}",
+        f"- 最新关键数据时间：{_text((decision.get('data_time_summary', {}) or {}).get('newest_critical_data_at'))}",
         f"- 当前交易日状态：{decision.get('trading_day_status')}",
         f"- 分析模式：{ai.get('mode')}（{ai.get('provider')}）",
         f"- DQS：{dqs.get('score')} / {dqs.get('mode_label')}",
@@ -495,12 +693,17 @@ def generate_daily_report(
         "",
         *_allocation_table(decision),
         "",
-        "## 7. 未来12个月资产迁移路线图",
+        "## 7. 未来12个月债券迁移第一阶段路线图",
         "",
         f"- 当前债券金额：{_yuan(migration.get('current_bond_yuan'))}",
         f"- 目标债券金额：{_yuan(migration.get('target_bond_yuan'))}",
         f"- 理论需转出金额：{_yuan(migration.get('theoretical_transfer_yuan'))}",
         f"- 每月建议转出上限：{_yuan(migration.get('monthly_cap_yuan'))}",
+        f"- 理论完整迁移周期：{migration.get('theoretical_full_months')}个月",
+        f"- 12个月预计转出：{_yuan(migration.get('twelve_month_transfer_yuan'))}",
+        f"- 12个月后预计剩余超配：{_yuan(migration.get('remaining_after_12_months_yuan'))}",
+        f"- 完成周期说明：{migration.get('estimated_completion')}",
+        f"- 路线图纪律：{migration.get('conditional_cap_note')}",
         f"- 本月批准额度：{_yuan(migration.get('approved_this_month_yuan'))}",
         f"- 实际到账资金：{_yuan(migration.get('actual_arrived_yuan'))}",
         f"- 本月已执行：{_yuan(migration.get('executed_this_month_yuan'))}",
@@ -526,6 +729,14 @@ def generate_daily_report(
         "",
         *_market_table(decision),
         "",
+        "### A股与港股专项数据完整度",
+        "",
+        *_cn_hk_completeness_table(decision),
+        "",
+        "### A股与港股P1A权威基础数据",
+        "",
+        *_cn_hk_p1a_table(decision),
+        "",
         "### 市场宽度、资金流与情绪数据状态",
         "",
         *_market_context_status(decision),
@@ -543,14 +754,22 @@ def generate_daily_report(
         f"- 最终分：{dqs.get('score')}",
         f"- 降级原因：{'；'.join(dqs.get('blocking_errors', [])) or '无硬性降级'}",
         f"- 建议精度影响：{dqs.get('mode_label')}",
-        f"- 缺失数据：{', '.join(dqs.get('missing_metrics', [])) or '无'}",
-        f"- 冲突数据：{len(dqs.get('conflicts', []))}项",
+        f"- 核心必需数据缺失：{dqs.get('required_core_missing_count', 0)}项",
+        f"- 核心必需缺失项目：{', '.join((dqs.get('required_core_data', {}) or {}).get('missing_items', [])) or '无'}",
+        f"- 增强型数据缺失：{dqs.get('enhancement_missing_count', 0)}项",
+        f"- 增强型缺失项目：{'、'.join(dqs.get('enhancement_missing_items', [])) or '无'}",
+        f"- 可选解释数据缺失：{dqs.get('optional_explanation_missing_count', 0)}项",
+        f"- 数据冲突：{len(dqs.get('conflicts', []))}项",
+        f"- 过期数据：{len(dqs.get('stale_metrics', []))}项",
+        f"- 不可横向比较数据：{len(dqs.get('non_comparable_metrics', []))}项（{'、'.join(dqs.get('non_comparable_metrics', [])) or '无'}）",
         f"- 异常0值：{', '.join(dqs.get('suspicious_zero', [])) or '无'}",
         "",
         *_dqs_table(decision),
         "",
         "## 13. 未来7天事件",
         "",
+        f"- 未来48小时高等级事件结论：{'存在' if decision.get('macro_event_high_next_48_hours') else '无'}",
+        f"- 未来7天高等级事件结论：{'存在' if decision.get('macro_event_high_next_7_days') else '无'}",
         *_events(decision),
         "",
         "## 14. 三种市场情景",
@@ -563,14 +782,15 @@ def generate_daily_report(
         "",
         "## 16. OpenAI状态与回退说明",
         "",
+        f"- OpenAI状态：{ai.get('openai_status', 'rules_only')}",
         f"- 分析模式：{ai.get('mode')}",
         f"- 分析来源：{ai.get('provider')}",
         f"- OpenAI可选复核：{'已参与' if ai.get('openai_participated') else '本次未参与，规则引擎已完成完整分析'}",
         f"- 是否启用：{'是' if ai.get('enabled') else '否'}",
         f"- 是否实际调用：{'是' if ai.get('called') else '否'}",
-        f"- 是否调用成功：{'是' if ai.get('success') else '否'}",
+        f"- 是否发生调用失败：{'是' if ai.get('call_failed') else '否'}",
         f"- 模型：{ai.get('model') or '不适用'}",
-        f"- 是否回退：{'否' if ai.get('openai_participated') else '是'}",
+        f"- 是否发生回退：{'是' if ai.get('fallback_occurred') else '否'}",
         f"- 回退原因：{ai.get('fallback_reason') or '无'}",
         f"- 失败类别：{ai.get('error_category') or '无'}",
         f"- 重试次数：{ai.get('retry_count', 0)}",
@@ -578,6 +798,7 @@ def generate_daily_report(
         f"- AI复核摘要：{ai.get('review_summary') or ai.get('summary') or '规则引擎独立完成复核'}",
         f"- 验证拒绝原因：{'；'.join(ai.get('validation_errors', [])) or '无'}",
         f"- 可靠性说明：{ai.get('impact')}",
+        f"- 说明：{ai.get('description', '规则引擎独立完成分析。')}",
         f"- 规则触发：DQS={dqs.get('score')}，风险={risk.get('score')}，现金可用={_yuan(budget.get('confirmed_cash_available_yuan'))}",
         "",
         "## 17. 数据来源",
@@ -589,6 +810,8 @@ def generate_daily_report(
         f"- 验证结果：{consistency.get('status', 'PASS' if consistency.get('ok') else 'FAIL')}",
         f"- 错误：{'; '.join(consistency.get('errors', [])) or '无'}",
         f"- 警告：{'; '.join(consistency.get('warnings', [])) or '无'}",
+        "",
+        *_consistency_table(decision),
         "",
         "## 19. 免责声明",
         "",
@@ -608,7 +831,7 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
     week_end = week_start + timedelta(days=6)
     return "\n".join(
         [
-            "# Stone AI V12.6 Stable 周报",
+            "# Stone AI V12.6.1 Stable 周报",
             "",
             f"- 报告所属周：{iso_year}-W{iso_week:02d}",
             f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
@@ -628,7 +851,7 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.6 Stable 月报",
+            "# Stone AI V12.6.1 Stable 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
             f"- 本月条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",

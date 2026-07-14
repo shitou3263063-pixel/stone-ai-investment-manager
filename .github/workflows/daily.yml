@@ -31,6 +31,7 @@ jobs:
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -64,4 +65,5 @@ jobs:
           path: |
             reports/
             logs/
+            outputs/
           if-no-files-found: warn

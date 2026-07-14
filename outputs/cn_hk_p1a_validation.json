@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-07-15T02:22:48+08:00",
+  "scope": "CN_HK_P1A_AUTHORITY_BASE_DATA",
+  "tushare_configured": false,
+  "tushare_transport": "official_rest_api",
+  "tushare_status": "disabled",
+  "tushare_error_code": "TOKEN_INVALID",
+  "tushare_error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+  "tushare_trade_calendar_status": "disabled",
+  "tushare_002558_valuation_status": "disabled",
+  "tushare_002558_fundamental_status": "disabled",
+  "tushare_csi300_valuation_status": "disabled",
+  "tushare_last_success_at": null,
+  "akshare_status": "partial",
+  "akshare_version": "1.18.64",
+  "akshare_source_conflicts": [],
+  "effective_sources": {
+    "trade_calendar": "akshare",
+    "002558_valuation": "unavailable",
+    "002558_fundamental": "akshare",
+    "csi300_valuation": "akshare"
+  },
+  "fundamental_002558_status": "disabled",
+  "etf_financial_model_prohibited": true,
+  "hkma_status": "partial",
+  "cn_announcement_status": "ok",
+  "hk_announcement_status": "framework_ready",
+  "cn_analysis_completeness": {
+    "market": "A股",
+    "score_pct": 90,
+    "confidence": "usable",
+    "decision_restricted": false,
+    "high_confidence_buy_allowed": true,
+    "checks": {
+      "P0真实持仓基础行情": true,
+      "A股交易日历": true,
+      "002558个股估值": false,
+      "沪深300基准估值": true,
+      "002558财务报表": true,
+      "A股官方公告": true
+    },
+    "weights": {
+      "P0真实持仓基础行情": 45,
+      "A股交易日历": 10,
+      "002558个股估值": 10,
+      "沪深300基准估值": 10,
+      "002558财务报表": 20,
+      "A股官方公告": 5
+    },
+    "missing_fields": [
+      "002558个股估值"
+    ]
+  },
+  "hk_analysis_completeness": {
+    "market": "港股及港股主题基金",
+    "score_pct": 65,
+    "confidence": "usable",
+    "decision_restricted": false,
+    "high_confidence_buy_allowed": true,
+    "checks": {
+      "P0真实持仓基础行情": true,
+      "HKMA HIBOR": false,
+      "HKMA 港元汇率": false,
+      "HKMA 银行体系流动性": true,
+      "港交所官方公告": false
+    },
+    "weights": {
+      "P0真实持仓基础行情": 50,
+      "HKMA HIBOR": 15,
+      "HKMA 港元汇率": 15,
+      "HKMA 银行体系流动性": 15,
+      "港交所官方公告": 5
+    },
+    "missing_fields": [
+      "HKMA HIBOR",
+      "HKMA 港元汇率",
+      "港交所官方公告"
+    ]
+  },
+  "policy": {
+    "below_60": "不得输出高置信度买入建议",
+    "below_40": "Opportunity Score只能标记为低可信度",
+    "no_ai_override": true
+  },
+  "safe_degradation_passed": true
+}

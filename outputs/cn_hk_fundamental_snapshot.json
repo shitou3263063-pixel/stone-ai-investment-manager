@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-07-15T02:22:48+08:00",
+  "items": {
+    "002558.SZ": {
+      "interface": "002558_fundamental",
+      "symbol": "002558.SZ",
+      "official_name": "巨人网络",
+      "source": "akshare",
+      "source_level": 3,
+      "source_type": "monitored_aggregator_fallback",
+      "underlying_provider": "eastmoney",
+      "fetched_at": "2026-07-15T02:22:57+08:00",
+      "market_date": null,
+      "reporting_period": "2026-03-31",
+      "currency": "CNY",
+      "unit": "mixed_financial_units",
+      "status": "ok",
+      "freshness": "fresh",
+      "confidence": "medium",
+      "fallback_used": false,
+      "error_code": null,
+      "error_message": "",
+      "scoring_eligible": true,
+      "model": "single_stock_fundamental",
+      "validated_metric_count": 8,
+      "successful_statement_count": 1,
+      "statements": {
+        "financial_indicators": {
+          "interface": "002558_fundamental",
+          "symbol": "002558.SZ",
+          "official_name": "巨人网络",
+          "source": "akshare",
+          "source_level": 3,
+          "source_type": "monitored_aggregator_fallback",
+          "underlying_provider": "eastmoney",
+          "fetched_at": "2026-07-15T02:22:57+08:00",
+          "market_date": null,
+          "reporting_period": "2026-03-31",
+          "currency": "CNY",
+          "unit": "mixed_financial_units",
+          "status": "ok",
+          "freshness": "fresh",
+          "confidence": "medium",
+          "fallback_used": false,
+          "error_code": null,
+          "error_message": "",
+          "scoring_eligible": true,
+          "announcement_date": "2026-04-28",
+          "metrics": {
+            "revenue": 2328514124.66,
+            "net_profit_parent": 1080400017.37,
+            "or_yoy": 221.7004406829,
+            "netprofit_yoy": 210.5778080961,
+            "roe": 6.81,
+            "operating_cash_flow_per_share": 0.6953623958,
+            "debt_to_assets": 19.8603486944,
+            "netprofit_margin": 50.0717643862
+          },
+          "metric_units": {
+            "revenue": "CNY",
+            "net_profit_parent": "CNY",
+            "or_yoy": "percent",
+            "netprofit_yoy": "percent",
+            "roe": "percent",
+            "operating_cash_flow_per_share": "CNY_per_share",
+            "debt_to_assets": "percent",
+            "netprofit_margin": "percent"
+          }
+        }
+      },
+      "metrics": {
+        "revenue": 2328514124.66,
+        "net_profit_parent": 1080400017.37,
+        "or_yoy": 221.7004406829,
+        "netprofit_yoy": 210.5778080961,
+        "roe": 6.81,
+        "operating_cash_flow_per_share": 0.6953623958,
+        "debt_to_assets": 19.8603486944,
+        "netprofit_margin": 50.0717643862
+      },
+      "missing_fields": [
+        "operating_cash_flow"
+      ],
+      "period_consistent": true,
+      "attempts": 1,
+      "cashflow_status": "failed",
+      "cashflow_error_code": "TIMEOUT"
+    }
+  },
+  "selected_sources": {
+    "trade_calendar": "akshare",
+    "002558_valuation": "unavailable",
+    "002558_fundamental": "akshare",
+    "csi300_valuation": "akshare"
+  },
+  "etf_policy": "ETF不得套用个股财务评分。"
+}

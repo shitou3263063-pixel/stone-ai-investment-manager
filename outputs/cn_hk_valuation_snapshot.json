@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-07-15T02:22:48+08:00",
+  "items": {
+    "002558.SZ": {
+      "api_name": "daily_basic",
+      "source": "tushare_pro",
+      "source_type": "authorized_api",
+      "source_level": 2,
+      "fetched_at": "2026-07-15T02:22:48+08:00",
+      "market_date": null,
+      "timezone": "Asia/Shanghai",
+      "currency": "CNY",
+      "status": "disabled",
+      "freshness": "unavailable",
+      "fallback_used": false,
+      "records_count": 0,
+      "fields_status": "missing",
+      "error_code": "TOKEN_INVALID",
+      "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+      "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+      "last_success_at": null,
+      "symbol": "002558.SZ",
+      "official_name": "巨人网络",
+      "instrument_type": "single_stock",
+      "valuation_basis": "security_itself",
+      "metrics": {
+        "close": null,
+        "turnover_rate": null,
+        "volume_ratio": null,
+        "pe": null,
+        "pe_ttm": null,
+        "pb": null,
+        "ps": null,
+        "ps_ttm": null,
+        "dv_ratio": null,
+        "dv_ttm": null,
+        "total_mv": null,
+        "circ_mv": null
+      }
+    },
+    "510300.SS": {
+      "interface": "csi300_valuation",
+      "symbol": "000300.SH",
+      "official_name": "沪深300指数",
+      "source": "akshare",
+      "source_level": 3,
+      "source_type": "monitored_aggregator_fallback",
+      "underlying_provider": "csindex_official",
+      "fetched_at": "2026-07-15T02:23:31+08:00",
+      "market_date": "2026-07-14",
+      "reporting_period": null,
+      "currency": "CNY",
+      "unit": "mixed_valuation_units",
+      "status": "ok",
+      "freshness": "fresh",
+      "confidence": "high",
+      "fallback_used": false,
+      "error_code": null,
+      "error_message": "",
+      "scoring_eligible": true,
+      "valuation_basis": "CSI300_total_share_capital_PE1_DP1",
+      "metrics": {
+        "pe_ttm": 14.89,
+        "pb": null,
+        "dividend_yield": 2.63
+      },
+      "metric_units": {
+        "pe_ttm": "multiple",
+        "pb": "not_available",
+        "dividend_yield": "percent"
+      },
+      "missing_fields": [
+        "pb"
+      ],
+      "price_percentile_used_as_valuation": false,
+      "attempts": 1
+    }
+  },
+  "selected_sources": {
+    "trade_calendar": "akshare",
+    "002558_valuation": "unavailable",
+    "002558_fundamental": "akshare",
+    "csi300_valuation": "akshare"
+  }
+}

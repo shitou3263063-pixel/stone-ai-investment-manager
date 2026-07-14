@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import math
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from src.analysis.scenario_analysis import calculate_portfolio_stress_scenarios
+from src.data_sources.cn_hk_p1a import write_scoring_trace
+from src.macro.macro_calendar import get_upcoming_high_risk_events
 from src.portfolio_snapshot import build_portfolio_snapshot
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
 
 
-VERSION_NAME = "Stone AI Investment Manager Pro V12.6 Stable"
+VERSION_NAME = "Stone AI Investment Manager Pro V12.6.1 Stable"
 
 DEFAULT_STRATEGY: dict[str, Any] = {
     "cash": {"safety_ratio": 0.08, "hard_floor_ratio": 0.05},
@@ -62,7 +66,10 @@ DEFAULT_STRATEGY: dict[str, Any] = {
 }
 
 CATEGORY_KEYS = ["美股", "港股", "A股", "债券", "黄金", "现金"]
-CRITICAL_MARKET = ["VOO", "QQQ", "TLT", "GLD", "^VIX", "3067.HK", "510300.SS", "DX-Y.NYB"]
+CRITICAL_MARKET = [
+    "VOO", "QQQ", "TLT", "GLD", "^VIX", "DX-Y.NYB",
+    "03033.HK", "510300.SS", "002558.SZ", "513060.SS", "513090.SS",
+]
 CRITICAL_MACRO = ["DGS10", "CPIAUCSL", "UNRATE", "GDP"]
 SOURCE_TIERS = {
     "fred": 1,
@@ -184,7 +191,16 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "display_value": display,
         "previous": item.get("previous_close", item.get("previous_value")),
         "change_pct": item.get("change_pct"),
-        "timestamp": item.get("published_at") or item.get("fetched_at") or item.get("date") or "暂无数据",
+        "timestamp": item.get("observed_at") or item.get("published_at") or item.get("date") or "暂无数据",
+        "observed_at": item.get("observed_at") or item.get("published_at") or item.get("date"),
+        "fetched_at": item.get("fetched_at") or item.get("retrieved_at"),
+        "market_timezone": item.get("market_timezone") or "unknown",
+        "data_frequency": item.get("data_frequency") or "unknown",
+        "data_session": item.get("data_session") or ("unavailable" if not _is_ok_item(item) else "unknown"),
+        "freshness_status": item.get("freshness_status") or ("unavailable" if not _is_ok_item(item) else "unknown"),
+        "age_hours": item.get("age_hours"),
+        "source_level": item.get("source_level", _source_tier(item.get("source"))),
+        "comparable_date": item.get("comparable_date") or str(item.get("observed_at") or item.get("published_at") or item.get("date") or "")[:10] or None,
         "retrieved_at": item.get("retrieved_at") or item.get("fetched_at") or "暂无数据",
         "source": item.get("source", "unavailable") if _is_ok_item(item) else "unavailable",
         "source_tier": _source_tier(item.get("source")),
@@ -193,6 +209,43 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "error": item.get("error") or item.get("warning") or ("数据拉取失败" if not _is_ok_item(item) else ""),
         "fallback_used": bool(item.get("cache_used")),
         "dual_verified": _verified_dual_source(item),
+    }
+
+
+COMPARABLE_INTRADAY_SESSIONS = {"realtime", "intraday_delayed"}
+COMPARABLE_CLOSE_SESSIONS = {"official_close", "previous_close"}
+
+
+def market_points_comparable(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """Only equal dates with like-for-like trading sessions are comparable."""
+    if not left.get("comparable_date") or left.get("comparable_date") != right.get("comparable_date"):
+        return False
+    sessions = {str(left.get("data_session")), str(right.get("data_session"))}
+    return sessions <= COMPARABLE_INTRADAY_SESSIONS or sessions <= COMPARABLE_CLOSE_SESSIONS
+
+
+def aggregate_comparable_market_changes(
+    live_market: dict[str, Any], symbols: tuple[str, str] = ("VOO", "QQQ")
+) -> dict[str, Any]:
+    items = _market_items(live_market)
+    left, right = items.get(symbols[0], {}) or {}, items.get(symbols[1], {}) or {}
+    comparable = market_points_comparable(left, right)
+    changes_present = left.get("change_pct") is not None and right.get("change_pct") is not None
+    if not comparable or not changes_present:
+        return {
+            "comparable": False,
+            "combined_change_pct": None,
+            "confidence": "low",
+            "explanation": "行情时点不一致，暂不计算指数当日合计变化",
+            "symbols": list(symbols),
+        }
+    return {
+        "comparable": True,
+        "combined_change_pct": _to_float(left.get("change_pct")) + _to_float(right.get("change_pct")),
+        "confidence": "normal",
+        "explanation": "行情日期和交易口径一致，可进行横向比较",
+        "symbols": list(symbols),
+        "comparable_date": left.get("comparable_date"),
     }
 
 
@@ -224,7 +277,31 @@ def compute_dqs(
         for name, item in {**{k: items.get(k, {}) for k in CRITICAL_MARKET}, **{k: macro.get(k, {}) for k in CRITICAL_MACRO}}.items()
         if _is_ok_item(item) and _to_float(item.get("close", item.get("value"))) == 0.0
     ]
-    conflicts = (live_market.get("source_audit", {}) or {}).get("data_conflicts", []) or []
+    conflicts = list((live_market.get("source_audit", {}) or {}).get("data_conflicts", []) or [])
+    akshare_conflicts = (
+        (((live_market.get("cn_hk_p1a", {}) or {}).get("akshare", {}) or {}).get("source_conflicts", []))
+        or []
+    )
+    conflicts.extend(akshare_conflicts)
+    required_missing = [row["name"] for row in build_market_table(live_market) if not row["success"]]
+    enhancement_rows = [
+        row for row in (live_market.get("market_context_status", {}) or {}).get("indicators", []) or []
+        if row.get("data_category") == "enhancement_data"
+        and row.get("name") in {"Put/Call Ratio", "市场宽度", "ETF资金流", "AAII情绪"}
+    ]
+    enhancement_missing = [
+        str(row.get("name")) for row in enhancement_rows if row.get("status") not in {"ok", "success"}
+    ]
+    # The four enhancement rows are part of the stable report contract even
+    # when an older cached snapshot predates market_context_status.
+    for name in ["Put/Call Ratio", "市场宽度", "ETF资金流", "AAII情绪"]:
+        if not any(row.get("name") == name and row.get("status") in {"ok", "success"} for row in enhancement_rows):
+            if name not in enhancement_missing:
+                enhancement_missing.append(name)
+    optional_missing: list[str] = []
+    stale_metrics = [row["name"] for row in build_market_table(live_market) if row.get("stale")]
+    market_time = aggregate_comparable_market_changes(live_market)
+    non_comparable = [] if market_time["comparable"] else market_time["symbols"]
 
     market_score = round(sum(market_ok) / len(CRITICAL_MARKET) * weights["market_completeness"])
     macro_score = round(sum(macro_ok) / len(CRITICAL_MACRO) * weights["macro_completeness"])
@@ -298,10 +375,24 @@ def compute_dqs(
         "fx_available": _is_ok_item(items.get("DX-Y.NYB", {})),
         "event_calendar_confidence": calendar_confidence,
         "blocking_errors": blocking_errors,
-        "missing_metrics": [row["name"] for row in build_market_table(live_market) if not row["success"]],
+        "missing_metrics": required_missing,
+        "required_core_data": {"missing_count": len(required_missing), "missing_items": required_missing},
+        "enhancement_data": {"missing_count": len(enhancement_missing), "missing_items": enhancement_missing},
+        "optional_explanation_data": {"missing_count": len(optional_missing), "missing_items": optional_missing},
+        "required_core_missing_count": len(required_missing),
+        "enhancement_missing_count": len(enhancement_missing),
+        "optional_explanation_missing_count": len(optional_missing),
+        "enhancement_missing_items": enhancement_missing,
+        "stale_metrics": stale_metrics,
+        "non_comparable_metrics": non_comparable,
         "conflicts": conflicts,
         "suspicious_zero": suspicious_zero,
-        "conclusion": "数据质量足够支持金额建议" if mode in {"exact", "range"} else "数据覆盖不足或验证不足，禁止激进建议",
+        "conclusion": (
+            "核心决策数据基本可用，但增强型市场宽度、资金流和情绪数据不足，禁止生成精确新增仓位建议。"
+            if not required_missing and enhancement_missing
+            else "数据质量足够支持金额建议" if mode in {"exact", "range"}
+            else "核心数据覆盖不足或验证不足，禁止新增仓位建议。"
+        ),
     }
 
 
@@ -371,8 +462,7 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
     macro = _macro_items(live_market)
     vix = _to_float(items.get("^VIX", {}).get("close"), default=-1)
     dgs10 = _to_float(macro.get("DGS10", {}).get("value"), default=0)
-    spx_change = _to_float(items.get("^GSPC", {}).get("change_pct"), default=0)
-    nasdaq_change = _to_float(items.get("^IXIC", {}).get("change_pct"), default=0)
+    market_time = aggregate_comparable_market_changes(live_market)
     snapshot = _portfolio_snapshot()
     total_assets = float(snapshot.get("total_assets", 0) or 0)
     class_totals = snapshot.get("asset_class_totals", {}) or {}
@@ -395,17 +485,30 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
         interest = min(weights["interest_rate"], interest + 3)
     liquidity = 10 if investable_cash <= 0 else (5 if dqs["market_coverage"] >= 0.7 else 8)
     macro_event = weights["macro_event"] if macro_result.get("has_high_event_next_7_days") else 5
-    trend = 8 if (spx_change + nasdaq_change) < -2 else 5
+    combined_change = market_time.get("combined_change_pct")
+    trend = 8 if combined_change is not None and combined_change < -2 else 5
     policy_geo = 7 if gold_ratio > float(strategy["target_allocation"]["黄金"]) else 6
     data_quality = round((100 - dqs["score"]) / 100 * weights["data_quality"])
 
+    dgs10_point = macro.get("DGS10", {}) or {}
+    dgs10_observed = dgs10_point.get("comparable_date") or dgs10_point.get("date") or "暂无可靠观察日期"
+    interest_basis = (
+        f"美国10年期收益率最新官方值为{dgs10:.2f}%，观察日期{dgs10_observed}；"
+        "属于官方滞后日度数据，不代表报告生成时的实时收益率；风险评分已降低时效性置信度。"
+        if dgs10 else "美国10年期收益率暂无可靠数据。"
+    )
+    trend_basis = (
+        f"VOO与QQQ在{market_time.get('comparable_date')}口径一致，当日变化合计约{combined_change:.2f}%。"
+        if market_time["comparable"] else
+        "行情时点不一致，暂不计算指数当日合计变化；趋势按中性分处理，置信度低。"
+    )
     components = [
         {"item": "估值", "score": min(valuation, weights["valuation"]), "weight": weights["valuation"], "basis": "估值数据不完整时按中性偏高风险处理。"},
         {"item": "波动率", "score": min(volatility, weights["volatility"]), "weight": weights["volatility"], "basis": f"VIX={vix if vix >= 0 else '暂无可靠数据'}；最大高风险/单股占比约{max_single_stock_ratio:.1%}。"},
-        {"item": "利率", "score": min(interest, weights["interest_rate"]), "weight": weights["interest_rate"], "basis": f"美国10年期收益率={dgs10 if dgs10 else '暂无可靠数据'}；债券占比{bond_ratio:.1%}，包含久期风险。"},
+        {"item": "利率", "score": min(interest, weights["interest_rate"]), "weight": weights["interest_rate"], "basis": interest_basis},
         {"item": "流动性", "score": min(liquidity, weights["liquidity"]), "weight": weights["liquidity"], "basis": f"真实可投资现金={investable_cash:,.0f}元；安全储备不可用于投资。"},
         {"item": "宏观事件", "score": min(macro_event, weights["macro_event"]), "weight": weights["macro_event"], "basis": "未来7天存在高等级事件。" if macro_result.get("has_high_event_next_7_days") else "未来7天暂无高等级事件。"},
-        {"item": "趋势", "score": min(trend, weights["trend"]), "weight": weights["trend"], "basis": f"标普和纳指当日变化合计约{spx_change + nasdaq_change:.2f}%。"},
+        {"item": "趋势", "score": min(trend, weights["trend"]), "weight": weights["trend"], "basis": trend_basis},
         {"item": "政策与地缘", "score": min(policy_geo, weights["policy_geo"]), "weight": weights["policy_geo"], "basis": f"按中性偏谨慎处理；黄金占比{gold_ratio:.1%}，超配提高组合对避险行情反转的敏感度。"},
         {"item": "数据质量", "score": min(data_quality, weights["data_quality"]), "weight": weights["data_quality"], "basis": f"DQS={dqs['score']}。"},
     ]
@@ -420,7 +523,7 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
         level = "高风险"
     else:
         level = "极高风险"
-    return {"score": score, "level": level, "components": components}
+    return {"score": score, "level": level, "components": components, "market_time_consistency": market_time}
 
 
 def _portfolio_snapshot() -> dict[str, Any]:
@@ -453,9 +556,81 @@ def _holding_amounts() -> dict[str, float]:
     return amounts
 
 
+def _p1a_record_usable(record: dict[str, Any]) -> bool:
+    if str(record.get("status")) not in {"ok", "cached", "partial"}:
+        return False
+    if str(record.get("freshness", "fresh")) == "stale":
+        return False
+    if record.get("error_code") == "SOURCE_CONFLICT":
+        return False
+    if record.get("source") == "akshare" and not bool(record.get("scoring_eligible")):
+        return False
+    return True
+
+
+def _p1a_source_label(record: dict[str, Any]) -> str:
+    source = str(record.get("source") or record.get("provider") or "Tushare")
+    underlying = str(record.get("underlying_provider") or "").strip()
+    return f"{source}（底层：{underlying}）" if underlying else source
+
+
+def _score_stock_valuation(metrics: dict[str, Any], fallback: float) -> tuple[float, list[str]]:
+    pe = _to_float(metrics.get("pe_ttm"), -1)
+    pb = _to_float(metrics.get("pb"), -1)
+    evidence: list[str] = []
+    scores: list[float] = []
+    if pe > 0:
+        scores.append(78 if pe <= 15 else 68 if pe <= 25 else 54 if pe <= 40 else 38 if pe <= 60 else 24)
+        evidence.append(f"PE(TTM)={pe:.2f}")
+    if pb > 0:
+        scores.append(76 if pb <= 2 else 64 if pb <= 4 else 48 if pb <= 7 else 30)
+        evidence.append(f"PB={pb:.2f}")
+    return (sum(scores) / len(scores) if scores else fallback), evidence
+
+
+def _score_002558_fundamentals(fundamental: dict[str, Any], fallback: float) -> tuple[float, list[str]]:
+    indicators = ((fundamental.get("statements") or {}).get("financial_indicators") or {})
+    metrics = indicators.get("metrics", {}) or {}
+    if not _p1a_record_usable(indicators) or not metrics:
+        return fallback, []
+    evidence: list[str] = []
+    scores: list[float] = []
+    roe = _to_float(metrics.get("roe"), -1)
+    margin = _to_float(metrics.get("netprofit_margin"), -1)
+    debt = _to_float(metrics.get("debt_to_assets"), -1)
+    revenue_yoy = _to_float(metrics.get("or_yoy"), -999)
+    profit_yoy = _to_float(metrics.get("netprofit_yoy"), -999)
+    if roe >= 0:
+        scores.append(80 if roe >= 18 else 68 if roe >= 12 else 55 if roe >= 7 else 35)
+        evidence.append(f"ROE={roe:.2f}%")
+    if margin >= 0:
+        scores.append(78 if margin >= 20 else 65 if margin >= 12 else 50 if margin >= 5 else 30)
+        evidence.append(f"净利率={margin:.2f}%")
+    if debt >= 0:
+        scores.append(72 if debt <= 35 else 60 if debt <= 55 else 42 if debt <= 70 else 25)
+        evidence.append(f"资产负债率={debt:.2f}%")
+    if revenue_yoy > -900:
+        scores.append(72 if revenue_yoy >= 15 else 62 if revenue_yoy >= 5 else 48 if revenue_yoy >= 0 else 30)
+        evidence.append(f"营收同比={revenue_yoy:.2f}%")
+    if profit_yoy > -900:
+        scores.append(76 if profit_yoy >= 15 else 64 if profit_yoy >= 5 else 46 if profit_yoy >= 0 else 28)
+        evidence.append(f"净利润同比={profit_yoy:.2f}%")
+    return (sum(scores) / len(scores) if scores else fallback), evidence
+
+
 def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict[str, Any], strategy: dict[str, Any]) -> list[dict[str, Any]]:
     items = _market_items(live_market)
     macro_items = _macro_items(live_market)
+    market_completeness = live_market.get("market_completeness", {}) or {}
+    p1a = live_market.get("cn_hk_p1a", {}) or {}
+    p1a_completeness = p1a.get("analysis_completeness", {}) or {}
+    # Older saved/test snapshots predate effective_data; keep read compatibility
+    # while production snapshots always use the explicit provider selection.
+    effective_p1a = p1a.get("effective_data", {}) or p1a.get("tushare", {}) or {}
+    p1a_valuations = ((effective_p1a.get("valuation") or {}).get("items") or {})
+    p1a_fundamentals = effective_p1a.get("fundamentals", {}) or {}
+    hk_liquidity = p1a.get("hkma", {}) or {}
+    hk_liquidity_metrics = hk_liquidity.get("metrics", {}) or {}
     amounts = _holding_amounts()
     asset_defs = [
         {"name": "VOO", "category": "美股", "symbol": "VOO", "holding_key": "VOO", "type": "core_etf", "reason": "核心宽基ETF，优先用于长期修复美股低配"},
@@ -467,7 +642,7 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
         {"name": "XLF", "category": "美股", "symbol": "XLF", "holding_key": "XLF", "type": "sector_etf", "reason": "行业ETF，不因美股低配获得宽基同等优先级"},
         {"name": "TLT", "category": "债券", "symbol": "TLT", "holding_key": "TLT", "type": "duration_bond_etf", "reason": "美国长期国债ETF，承受高久期利率风险"},
         {"name": "沪深300ETF", "category": "A股", "symbol": "510300.SS", "holding_key": "510300", "type": "core_etf", "reason": "A股核心宽基ETF"},
-        {"name": "恒生科技ETF", "category": "港股", "symbol": "3067.HK", "holding_key": "03033", "type": "core_etf", "reason": "03033为真实持仓，3067.HK仅为行情代理"},
+        {"name": "南方东英恒生科技指数ETF", "category": "港股", "symbol": "03033.HK", "holding_key": "03033.HK", "type": "core_etf", "reason": "真实持仓03033.HK；3033.HK仅为供应商代码格式，不使用代理ETF"},
         {"name": "恒生医疗ETF", "category": "港股", "symbol": "513060.SS", "holding_key": "513060", "type": "thematic_etf", "reason": "主题ETF，受行业周期和集中度约束"},
         {"name": "香港证券ETF", "category": "港股", "symbol": "513090.SS", "holding_key": "513090", "type": "thematic_etf", "reason": "高弹性主题ETF，不作为优先补仓资产"},
         {"name": "巨人网络", "category": "A股", "symbol": "002558.SZ", "holding_key": "002558", "type": "single_stock", "reason": "A股个股，需公司数据和集中度复核"},
@@ -516,11 +691,42 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             portfolio_fit = 28
         item = items.get(symbol, {}) if symbol else {}
         data_ok = _is_ok_item(item) if symbol else True
+        completeness_key = "cn_data_completeness" if category == "A股" else "hk_data_completeness" if category == "港股" else ""
+        market_gate = market_completeness.get(completeness_key, {}) if completeness_key else {}
+        market_completeness_score = _to_float(market_gate.get("score_pct"), 100.0)
+        analysis_key = "cn_analysis_completeness" if category == "A股" else "hk_analysis_completeness" if category == "港股" else ""
+        analysis_gate = p1a_completeness.get(analysis_key, {}) if analysis_key else {}
+        analysis_completeness_score = _to_float(analysis_gate.get("score_pct"), 100.0)
+        effective_completeness_score = min(market_completeness_score, analysis_completeness_score)
+        data_status = str(item.get("data_status") or ("VALID" if data_ok else "DATA_INSUFFICIENT")) if symbol else "NOT_APPLICABLE"
+        decision_restricted = bool(
+            symbol
+            and category in {"A股", "港股"}
+            and (effective_completeness_score < 60 or data_status != "VALID")
+        )
         change = _to_float(item.get("change_pct")) if data_ok else 0.0
         holding_amount = round(amounts.get(asset["holding_key"], amounts.get(name, amounts.get(symbol, 0))))
         holding_ratio = holding_amount / total_yuan if total_yuan else 0.0
         valuation_base, fundamentals = base_by_type[asset_type]
         valuation = valuation_base + (10 if change <= -3 else 5 if change <= -1 else -8 if change >= 3 else -3 if change >= 1 else 0)
+        p1a_inputs_used: list[str] = []
+        p1a_positive: list[str] = []
+        valuation_record = p1a_valuations.get(symbol, {}) if symbol else {}
+        if _p1a_record_usable(valuation_record) and valuation_record.get("metrics"):
+            valuation, evidence = _score_stock_valuation(valuation_record.get("metrics", {}), valuation)
+            if evidence:
+                p1a_inputs_used.append(
+                    f"{_p1a_source_label(valuation_record)}估值:{valuation_record.get('valuation_basis')}"
+                )
+                p1a_positive.extend(evidence)
+        financial_model = "not_applicable_etf" if asset_type in {"core_etf", "growth_etf", "sector_etf", "thematic_etf"} else "not_connected"
+        if symbol == "002558.SZ":
+            financial_model = "single_stock_fundamental"
+            fundamental_record = p1a_fundamentals.get(symbol, {}) or {}
+            fundamentals, evidence = _score_002558_fundamentals(fundamental_record, fundamentals - 8)
+            if evidence:
+                p1a_inputs_used.append(f"{_p1a_source_label(fundamental_record)}:002558财务指标")
+                p1a_positive.extend(evidence)
         trend = 62 + max(-22, min(18, change * 5)) if data_ok else 22
         macro = 58
         if asset_type == "growth_etf" or (asset_type == "single_stock" and name in {"NVDA", "GOOG"}):
@@ -529,6 +735,19 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             macro += 10 if 0 <= dgs10 < 4 else -12 if dgs10 >= 4.8 else -3
         elif asset_type == "defensive_gold":
             macro += 6 if vix >= 25 else -3 if 0 <= vix < 15 else 0
+        if category == "港股" and hk_liquidity.get("status") in {"ok", "partial"}:
+            hibor_1m = _to_float(hk_liquidity_metrics.get("hibor_1m_pct"), -1)
+            aggregate_balance = _to_float(hk_liquidity_metrics.get("aggregate_balance_hkd_mn"), -1)
+            hkma_datasets = hk_liquidity.get("datasets", {}) or {}
+            hibor_fresh = ((hkma_datasets.get("hibor") or {}).get("freshness") == "fresh")
+            liquidity_fresh = ((hkma_datasets.get("liquidity") or {}).get("freshness") == "fresh")
+            if hibor_1m >= 0 and hibor_fresh:
+                macro += 5 if hibor_1m <= 2 else -7 if hibor_1m >= 4.5 else 0
+                p1a_inputs_used.append("HKMA:1个月HIBOR")
+                p1a_positive.append(f"1个月HIBOR={hibor_1m:.3f}%")
+            if aggregate_balance >= 0 and liquidity_fresh:
+                macro += 3 if aggregate_balance >= 100000 else -3 if aggregate_balance < 50000 else 0
+                p1a_inputs_used.append("HKMA:银行体系总结余")
         volume_ratio = item.get("volume_ratio")
         flow = max(20, min(80, 50 + (_to_float(volume_ratio, 1.0) - 1.0) * 35)) if volume_ratio is not None else 24
         source_count = int(item.get("source_count", len(_candidate_values(item))) or 0) if symbol else 0
@@ -544,12 +763,20 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             data_confidence = 68
         else:
             data_confidence = 52
+        if symbol and category in {"A股", "港股"}:
+            if effective_completeness_score < 40:
+                data_confidence = min(data_confidence, 20)
+            elif effective_completeness_score < 60:
+                data_confidence = min(data_confidence, 35)
+            if data_status != "VALID":
+                data_confidence = min(data_confidence, 15)
 
         if asset_type == "single_stock":
             portfolio_fit = min(portfolio_fit, 45)
             if holding_ratio > 0.05:
                 portfolio_fit -= 12
-            fundamentals -= 8 if not item.get("fundamental_data_available") else 0
+            if symbol != "002558.SZ":
+                fundamentals -= 8 if not item.get("fundamental_data_available") else 0
         if asset_type == "st_stock":
             portfolio_fit = 0
             valuation = min(valuation, 20)
@@ -589,6 +816,8 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             data_adjustment -= int(scoring.get("stale_data_penalty", 6))
         elif symbol and source_count < 2:
             data_adjustment -= int(scoring.get("single_source_penalty", 3))
+        if decision_restricted:
+            data_adjustment -= 15 if market_completeness_score < 40 or data_status != "VALID" else 8
         portfolio_adjustment = 0
         if deviation > 0.08:
             portfolio_adjustment -= int(scoring.get("overweight_8pct_penalty", 15))
@@ -614,6 +843,13 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             limitations.append("ST高风险股票永久禁止自动新增，必须人工风险复核")
         if not data_ok and symbol:
             limitations.append("行情数据不足，仅供观察")
+        if decision_restricted:
+            limitations.append(
+                f"{category}基础行情完整度{market_completeness_score:.1f}%、P1A分析完整度{analysis_completeness_score:.1f}%，"
+                f"状态{data_status}；限制高置信度买入建议"
+            )
+        if financial_model == "not_applicable_etf":
+            limitations.append("ETF不适用个股财务评分")
         if volume_ratio is None and symbol:
             limitations.append("可靠ETF资金流未接入，成交结构项按低置信度处理")
         rows.append(
@@ -630,11 +866,19 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
                 "current_holding_yuan": holding_amount,
                 "portfolio_fit": portfolio_fit,
                 "limitations": limitations or ["无硬性限制"],
-                "positive_factors": [asset["reason"], f"{category}偏离目标{deviation * 100:+.1f}个百分点"],
+                "positive_factors": [asset["reason"], f"{category}偏离目标{deviation * 100:+.1f}个百分点", *p1a_positive],
                 "negative_factors": limitations or ["暂无额外硬性扣分"],
                 "data_ok": data_ok,
+                "data_status": data_status,
+                "market_data_completeness": market_completeness_score if completeness_key else None,
+                "analysis_data_completeness": analysis_completeness_score if analysis_key else None,
+                "scoring_confidence": "低" if effective_completeness_score < 40 or data_status != "VALID" else "受限" if effective_completeness_score < 60 else "可用",
+                "decision_restricted": decision_restricted,
+                "missing_fields": item.get("missing_fields", []) if symbol else [],
                 "asset_type": asset_type,
                 "deviation": deviation,
+                "financial_model": financial_model,
+                "p1a_inputs_used": list(dict.fromkeys(p1a_inputs_used)),
             }
         )
 
@@ -660,7 +904,9 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
         else:
             band = "0—39：风险复核或回避"
         row["advice_band"] = band
-        if row["asset_type"] == "st_stock":
+        if row.get("decision_restricted"):
+            advice = "等待数据补齐" if row.get("data_status") != "VALID" else "观察"
+        elif row["asset_type"] == "st_stock":
             advice = "风险复核或回避"
         elif row["category"] in {"黄金", "债券"} and row["deviation"] > 0:
             advice = "暂停新增"
@@ -837,6 +1083,9 @@ def build_migration_plan(allocation: list[dict[str, Any]], budget: dict[str, Any
     actual_arrived = max(0, budget.get("actual_bond_cash_arrived_yuan", 0))
     executed_this_month = max(0, budget.get("bond_to_equity_executed_this_month_yuan", 0))
     remaining_this_month = max(0, approved_this_month - executed_this_month)
+    theoretical_full_months = math.ceil(transfer_needed / monthly_cap) if monthly_cap > 0 else 0
+    twelve_month_transfer = min(transfer_needed, monthly_cap * 12)
+    remaining_after_12 = max(0, transfer_needed - twelve_month_transfer)
     months = []
     remaining = transfer_needed
     for index in range(1, 13):
@@ -859,6 +1108,12 @@ def build_migration_plan(allocation: list[dict[str, Any]], budget: dict[str, Any
         "actual_arrived_yuan": round(actual_arrived),
         "executed_this_month_yuan": round(executed_this_month),
         "remaining_this_month_yuan": round(remaining_this_month),
+        "theoretical_full_months": theoretical_full_months,
+        "twelve_month_transfer_yuan": round(twelve_month_transfer),
+        "remaining_after_12_months_yuan": round(remaining_after_12),
+        "estimated_completion": f"预计第{theoretical_full_months}个月完成，但仍以DQS、到账资金和风险条件为准。" if theoretical_full_months else "当前无债券超配迁移需求。",
+        "route_title": "未来12个月债券迁移第一阶段路线图",
+        "conditional_cap_note": "路线图仅表示条件性月度上限，不保证每月执行；暂停月份的未用额度不得累积到下一月一次性执行。",
         "quarterly_reviews": ["第3个月", "第6个月", "第9个月", "第12个月"],
         "pause_conditions": ["DQS低于60", "现金低于安全线", "VIX高于30", "重大宏观事件前后", "债券赎回资金未到账"],
         "accelerate_conditions": ["DQS不低于85", "权益资产明显回撤且长期逻辑未变", "债券资金已到账", "现金仍高于安全线"],
@@ -964,6 +1219,20 @@ def build_holding_diagnostics(live_market: dict[str, Any], allocation: list[dict
     return rows
 
 
+def build_data_time_summary(market_table: list[dict[str, Any]], generated_at: str) -> dict[str, Any]:
+    observed = sorted(str(row["observed_at"]) for row in market_table if row.get("success") and row.get("observed_at"))
+    comparable_dates = {str(row.get("comparable_date")) for row in market_table if row.get("success") and row.get("comparable_date")}
+    sessions = {str(row.get("data_session")) for row in market_table if row.get("success") and row.get("data_session")}
+    return {
+        "report_timezone": "Asia/Shanghai",
+        "report_generated_at": generated_at,
+        "decision_data_cutoff": generated_at,
+        "has_unsynchronized_data": len(comparable_dates) > 1 or len(sessions) > 1,
+        "oldest_critical_data_at": observed[0] if observed else None,
+        "newest_critical_data_at": observed[-1] if observed else None,
+    }
+
+
 def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], strategy: dict[str, Any]) -> list[dict[str, Any]]:
     actionable = [row for row in opportunity if row.get("advice") in {"优先加仓", "正常定投", "小额分批"}]
     targets = "、".join(row["name"] for row in actionable[:3]) if actionable else "VOO/QQQ、沪深300ETF"
@@ -1032,13 +1301,17 @@ def build_ai_mode(ai_advice: dict[str, Any], dqs: dict[str, Any]) -> dict[str, A
     elif ai_advice.get("ai_status") == "available":
         mode = "AI_PARTIAL"
     else:
-        mode = "RULE_ENHANCED"
+        mode = "RULES_ONLY"
     return {
         "mode": mode,
         "provider": ai_advice.get("actual_provider", "stone_rule_engine"),
         "enabled": bool(ai_advice.get("enabled", False)),
         "called": bool(ai_advice.get("called", False)),
         "success": bool(ai_advice.get("success", False)),
+        "openai_status": ai_advice.get("openai_status", "rules_only"),
+        "call_failed": bool(ai_advice.get("call_failed", False)),
+        "fallback_occurred": bool(ai_advice.get("fallback_occurred", False)),
+        "description": ai_advice.get("description", "规则引擎独立完成分析。"),
         "openai_participated": ai_advice.get("ai_status") == "available",
         "fallback_reason": ai_advice.get("fallback_reason", ""),
         "error_category": ai_advice.get("error_category", ""),
@@ -1120,7 +1393,7 @@ def apply_dqs_to_opportunity(opportunity: list[dict[str, Any]], dqs: dict[str, A
     return adjusted
 
 
-def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
+def _build_consistency_checks_legacy(decision: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     snapshot = decision.get("portfolio_snapshot") or _portfolio_snapshot()
@@ -1230,6 +1503,204 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
+    """Validate cross-section facts and return PASS/WARN/FAIL only."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    checks: list[dict[str, str]] = []
+
+    def record(name: str, local_errors: list[str], local_warnings: list[str]) -> None:
+        errors.extend(local_errors)
+        warnings.extend(local_warnings)
+        status = "FAIL" if local_errors else "WARN" if local_warnings else "PASS"
+        explanation = "；".join(local_errors + local_warnings) or "口径一致。"
+        checks.append({"check_item": name, "status": status, "description": explanation})
+
+    budget = decision.get("budget", {}) or {}
+    dqs = decision.get("dqs", {}) or {}
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+
+    # Event consistency: all horizons and grid checks derive from the same event set.
+    event_errors: list[str] = []
+    event_warnings: list[str] = []
+    try:
+        as_of_raw = decision.get("date") or decision.get("generated_at") or date.today().isoformat()
+        as_of = datetime.fromisoformat(str(as_of_raw))
+        events = decision.get("events", []) or []
+        actual_48h = bool(get_upcoming_high_risk_events(as_of, hours=48, events=events))
+        actual_7d = bool(get_upcoming_high_risk_events(as_of, days=7, events=events))
+        if actual_48h != bool(decision.get("macro_event_high_next_48_hours", actual_48h)):
+            event_errors.append("未来48小时事件结论与统一事件列表不一致。")
+        if actual_7d != bool(decision.get("macro_event_high_next_7_days", actual_7d)):
+            event_errors.append("未来7天事件结论与统一事件列表不一致。")
+        grid = decision.get("grid", {}) or {}
+        if grid.get("enabled") and actual_48h:
+            reasons = [
+                str(reason)
+                for item in (grid.get("symbols", {}) or {}).values()
+                for reason in ((item.get("review", {}) or {}).get("reasons", []) or [])
+            ]
+            if not any("未来48小时" in reason for reason in reasons):
+                event_errors.append("未来48小时存在高等级事件，但Smart Grid未进入谨慎模式。")
+        if actual_48h and float(budget.get("today_total_yuan", 0) or 0) > 0:
+            event_errors.append("高等级事件窗口内仍生成真实交易预算。")
+    except (TypeError, ValueError, KeyError) as exc:
+        event_warnings.append(f"事件时间无法完整核验：{exc}")
+    record("事件一致性", event_errors, event_warnings)
+
+    dqs_errors: list[str] = []
+    dqs_warnings: list[str] = []
+    required = dqs.get("required_core_data", {}) or {}
+    enhancement = dqs.get("enhancement_data", {}) or {}
+    if int(required.get("missing_count", 0) or 0) != len(required.get("missing_items", []) or []):
+        dqs_errors.append("核心必需数据缺失统计与状态表不一致。")
+    if int(enhancement.get("missing_count", 0) or 0) != len(enhancement.get("missing_items", []) or []):
+        dqs_errors.append("增强型数据缺失统计与状态表不一致。")
+    if dqs.get("mode") in {"direction", "safe"} and float(budget.get("today_total_yuan", 0) or 0) > 0:
+        dqs_errors.append("DQS限制与最终交易建议冲突。")
+    if dqs.get("stale_metrics"):
+        dqs_warnings.append(f"存在过期数据：{', '.join(dqs['stale_metrics'])}。")
+    record("DQS一致性", dqs_errors, dqs_warnings)
+
+    cn_hk_errors: list[str] = []
+    cn_hk_warnings: list[str] = []
+    completeness = decision.get("market_completeness", {}) or {}
+    for key, label in [("cn_data_completeness", "A股"), ("hk_data_completeness", "港股")]:
+        if key not in completeness:
+            continue
+        gate = completeness.get(key, {}) or {}
+        score = float(gate.get("score_pct", 0) or 0)
+        if score < 60:
+            cn_hk_warnings.append(f"{label}数据完整度{score:.1f}%，已限制高置信度买入建议。")
+    for item in decision.get("opportunity", []) or []:
+        if item.get("category") in {"A股", "港股"} and item.get("decision_restricted"):
+            if item.get("advice") in {"优先加仓", "正常定投", "小额分批"}:
+                cn_hk_errors.append(f"{item.get('name')}数据受限却仍出现加仓类建议。")
+    record("A股与港股数据门槛", cn_hk_errors, cn_hk_warnings)
+
+    cash_errors: list[str] = []
+    cash_warnings: list[str] = []
+    cash = snapshot.get("cash", {}) or {}
+    expected_cash = max(
+        0,
+        float(cash.get("account_total_cash_cny", budget.get("account_total_cash_yuan", 0)) or 0)
+        - float(cash.get("cash_safety_reserve_cny", budget.get("cash_safety_reserve_yuan", 0)) or 0)
+        - float(cash.get("live_grid_cash_cny", budget.get("live_grid_cash_yuan", 0)) or 0)
+        - float(cash.get("other_reserved_cash_cny", budget.get("other_reserved_cash_yuan", 0)) or 0),
+    )
+    investable = float(budget.get("investable_cash_yuan", 0) or 0)
+    if abs(expected_cash - investable) > 10:
+        cash_errors.append("可投资现金与账户现金减安全储备及占用资金的公式不一致。")
+    if investable <= 0 and float(budget.get("today_total_yuan", 0) or 0) > 0:
+        cash_errors.append("可投资现金为0时真实执行金额大于0。")
+    if float(budget.get("actual_bond_cash_arrived_yuan", 0) or 0) <= 0 and float(budget.get("approved_bond_to_equity_month_yuan", 0) or 0) > 0:
+        cash_errors.append("未到账债券资金被计入真实可投资现金。")
+    conditional = float(budget.get("conditional_bond_to_equity_month_yuan", 0) or 0)
+    if conditional > 0 and conditional == float(budget.get("today_total_yuan", 0) or 0):
+        cash_errors.append("条件性预算被显示为今日执行预算。")
+    record("现金预算一致性", cash_errors, cash_warnings)
+
+    time_errors: list[str] = []
+    time_warnings: list[str] = []
+    market_time = (decision.get("risk", {}) or {}).get("market_time_consistency", {}) or {}
+    if market_time and not market_time.get("comparable"):
+        time_warnings.append("行情时点不一致，未计算指数当日合计变化。")
+    if any(row.get("stale") for row in decision.get("market_table", []) or []):
+        time_warnings.append("关键行情或宏观数据存在过期项。")
+    trend_basis = next((row.get("basis", "") for row in (decision.get("risk", {}) or {}).get("components", []) if row.get("item") == "趋势"), "")
+    if market_time and not market_time.get("comparable") and "合计约" in str(trend_basis):
+        time_errors.append("不同comparable_date的数据被直接形成当日合计结论。")
+    try:
+        run_time = _parse_review_datetime(decision.get("generated_at"))
+        next_review = _parse_review_datetime(decision.get("next_review_date"))
+        if run_time is None or next_review is None:
+            time_errors.append("运行时间或下一复核时间无法解析。")
+        elif next_review <= run_time:
+            time_errors.append("下一复核时间不晚于本次运行时间。")
+    except (TypeError, ValueError) as exc:
+        time_errors.append(f"下一复核时间校验失败：{exc}")
+    record("行情时点一致性", time_errors, time_warnings)
+
+    trade_errors: list[str] = []
+    grid = decision.get("grid", {}) or {}
+    grid_budget = grid.get("grid_budget", {}) or {}
+    if not decision.get("today_trade") and any(float(budget.get(key, 0) or 0) > 0 for key in ["today_total_yuan", "week_confirmed_yuan", "month_confirmed_yuan"]):
+        trade_errors.append("今日是否操作为否，但真实执行预算不为0。")
+    if grid.get("paper_mode", True) and (float(grid_budget.get("live_available_yuan", 0) or 0) > 0 or grid.get("live_advice_enabled")):
+        trade_errors.append("模拟网格影响了真实执行预算或建议。")
+    record("模拟与实盘隔离", trade_errors, [])
+
+    ai_errors: list[str] = []
+    ai = decision.get("ai", {}) or {}
+    if ai.get("openai_status") == "disabled" and (ai.get("call_failed") or ai.get("fallback_occurred") or ai.get("called")):
+        ai_errors.append("OpenAI主动关闭却被标记为调用失败或回退。")
+    if not ai.get("called") and ai.get("call_failed"):
+        ai_errors.append("OpenAI未调用却显示调用失败。")
+    record("OpenAI状态一致性", ai_errors, [])
+
+    migration_errors: list[str] = []
+    migration = decision.get("migration_plan", {}) or {}
+    transfer = float(migration.get("theoretical_transfer_yuan", 0) or 0)
+    cap = float(migration.get("monthly_cap_yuan", 0) or 0)
+    expected_months = math.ceil(transfer / cap) if cap else 0
+    if int(migration.get("theoretical_full_months", expected_months) or 0) != expected_months:
+        migration_errors.append("债券理论转出总额、月度上限与预计完成月份不一致。")
+    record("迁移路线一致性", migration_errors, [])
+
+    status = "FAIL" if errors else "WARN" if warnings else "PASS"
+    return {
+        "ok": not errors,
+        "status": status,
+        "errors": list(dict.fromkeys(errors)),
+        "warnings": list(dict.fromkeys(warnings)),
+        "checks": checks,
+        "checked_at": datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds"),
+    }
+
+
+def _parse_review_datetime(value: Any, *, timezone_name: str = "Asia/Shanghai") -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    timezone_value = ZoneInfo(timezone_name)
+    if len(text) == 10:
+        parsed = datetime.combine(date.fromisoformat(text), datetime.min.time()).replace(hour=8, minute=30)
+    else:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone_value)
+    return parsed.astimezone(timezone_value)
+
+
+def resolve_next_review_datetime(
+    generated_at: str,
+    *,
+    macro_candidate: Any = None,
+    dca_candidate: Any = None,
+    cn_next_open_date: Any = None,
+    timezone_name: str = "Asia/Shanghai",
+) -> str:
+    """确保复核时间严格晚于运行时间，并正确比较带不同时区的候选时间。"""
+    timezone_value = ZoneInfo(timezone_name)
+    generated = _parse_review_datetime(generated_at, timezone_name=timezone_name)
+    if generated is None:
+        generated = datetime.now(tz=timezone_value)
+    candidates: list[datetime] = []
+    for value in [macro_candidate, cn_next_open_date, dca_candidate]:
+        try:
+            parsed = _parse_review_datetime(value, timezone_name=timezone_name)
+        except (TypeError, ValueError):
+            parsed = None
+        if parsed is not None and parsed > generated:
+            candidates.append(parsed)
+    if not candidates:
+        candidate_date = generated.date() + timedelta(days=1)
+        while candidate_date.weekday() >= 5:
+            candidate_date += timedelta(days=1)
+        candidates.append(datetime.combine(candidate_date, datetime.min.time(), tzinfo=timezone_value).replace(hour=8, minute=30))
+    return min(candidates).isoformat(timespec="seconds")
+
+
 def build_v12_1_decision(
     *,
     portfolio_result: dict[str, Any],
@@ -1243,6 +1714,10 @@ def build_v12_1_decision(
     dqs = compute_dqs(live_market_result, strategy, macro_result)
     risk = compute_risk_score(live_market_result, macro_result, dqs, strategy)
     opportunity = apply_dqs_to_opportunity(build_opportunity_scores(allocation, live_market_result, strategy), dqs)
+    try:
+        write_scoring_trace(opportunity, live_market_result.get("cn_hk_p1a", {}) or {})
+    except Exception as exc:  # noqa: BLE001 - trace output must not break decisions
+        write_log(f"P1A评分追踪文件写入失败：{exc}", filename="stone_ai.log")
     budget = build_budget_plan(allocation, dqs, risk, macro_result, opportunity, strategy)
     migration = build_migration_plan(allocation, budget)
     holding_diagnostics = build_holding_diagnostics(live_market_result, allocation)
@@ -1250,6 +1725,17 @@ def build_v12_1_decision(
     stress_scenarios = calculate_portfolio_stress_scenarios(allocation, strategy.get("scenario_stress", {}))
     ai_mode = build_ai_mode(ai_advice_result, dqs)
     market_table = build_market_table(live_market_result)
+    generated_at = datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds")
+    time_summary = build_data_time_summary(market_table, generated_at)
+    tushare_calendar = (
+        (((live_market_result.get("cn_hk_p1a", {}) or {}).get("tushare", {}) or {}).get("trade_calendar", {}) or {})
+    )
+    next_review_date = resolve_next_review_datetime(
+        generated_at,
+        macro_candidate=macro_result.get("next_review_date"),
+        dca_candidate=budget.get("next_dca_date"),
+        cn_next_open_date=tushare_calendar.get("next_open_date"),
+    )
     total_yuan = sum(row["current_amount_yuan"] for row in allocation)
     today_trade = budget["today_total_yuan"] > 0
 
@@ -1268,7 +1754,9 @@ def build_v12_1_decision(
     decision = {
         "version": VERSION_NAME,
         "date": date.today().isoformat(),
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": generated_at,
+        "report_timezone": "Asia/Shanghai",
+        "data_time_summary": time_summary,
         "data_cutoff": live_market_result.get("fetched_at") or datetime.now().isoformat(timespec="seconds"),
         "trading_day_status": "周末/非交易时段需以下一交易日为准" if date.today().weekday() >= 5 else "交易日",
         "portfolio_value_yuan": round(total_yuan),
@@ -1284,9 +1772,15 @@ def build_v12_1_decision(
         "scenarios": scenarios,
         "stress_scenarios": stress_scenarios,
         "market_context_status": live_market_result.get("market_context_status", {}),
+        "market_completeness": live_market_result.get("market_completeness", {}),
+        "cn_hk_p1a": live_market_result.get("cn_hk_p1a", {}),
+        "cn_hk_analysis_completeness": live_market_result.get("cn_hk_analysis_completeness", {}),
         "market_table": market_table,
         "ai": ai_mode,
         "macro_event_high_next_7_days": bool(macro_result.get("has_high_event_next_7_days")),
+        "macro_event_high_next_48_hours": bool(macro_result.get("has_high_event_next_48_hours")),
+        "high_risk_events_48h": macro_result.get("high_risk_events_48h", []) or [],
+        "high_risk_events_7d": macro_result.get("high_risk_events_7d", []) or [],
         "events": macro_result.get("upcoming_events", []) or [],
         "today_trade": today_trade,
         "trade_type": "无操作" if not today_trade else "基础定投/机会加仓/再平衡",
@@ -1295,7 +1789,7 @@ def build_v12_1_decision(
         "funding_source": "现金安全线以上资金" if today_trade else "今日不使用资金",
         "no_trade_reasons": no_trade_reasons,
         "next_triggers": build_next_triggers(budget, dqs),
-        "next_review_date": budget["next_dca_date"],
+        "next_review_date": next_review_date,
         "max_risk": max(risk["components"], key=lambda row: row.get("score", 0))["basis"] if risk["components"] else "暂无",
         "max_opportunity": describe_max_opportunity(opportunity, dqs, today_trade),
         "one_sentence": "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。",
@@ -1312,7 +1806,7 @@ def build_v12_1_decision(
         decision["no_trade_reasons"] = ["数据对账失败，今日不操作"] + decision.get("no_trade_reasons", [])
         decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
     decision["ai"] = build_rule_enhanced_analysis(decision)
-    write_log(f"V12.6 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
+    write_log(f"V12.6.1 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
     return decision
 
 
@@ -1339,10 +1833,10 @@ def build_system_audit_text(context: dict[str, Any], decision: dict[str, Any]) -
     market_result = context.get("market_result", {}) or {}
     execution = context.get("execution_plan_result", {}) or {}
     lines = [
-        "# Stone AI V12.6 Stable System Audit",
+        "# Stone AI V12.6.1 Stable System Audit",
         "",
         f"- 审计时间：{datetime.now().isoformat(timespec='seconds')}",
-        "- 当前实际运行入口：根目录 `main.py`（V12.6 Stable唯一入口）。",
+        "- 当前实际运行入口：根目录 `main.py`（V12.6.1 Stable唯一正式入口）。",
         "- GitHub Actions 应调用：`python main.py`。",
         "- 报告生成模块：`src/reports/report_center.py`。",
         "- 决策核心模块：`src/decision/v12_1_decision.py`。",

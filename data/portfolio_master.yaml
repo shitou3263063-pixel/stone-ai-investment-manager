@@ -151,20 +151,24 @@ holdings:
 
   - asset_id: hk_03033
     asset_class: hk_stock
-    security_name: 南方恒生科技ETF
-    security_code: "03033"
+    security_name: 南方东英恒生科技指数ETF
+    security_code: "03033.HK"
     market: HK
-    currency: CNY
+    currency: HKD
     quantity: 35200
     unit: unit
     market_value_cny: 140400
+    market_value_original: 140400
+    market_value_original_currency: CNY
+    exchange_rate: null
     data_source: user_confirmed_category_reconciled
     valuation_time: 2026-07-11
     confidence: medium
     account: securities_account
     liquidity_status: liquid
     strategy_bucket: core_etf
-    pricing_proxy: 3067.HK
+    pricing_proxy: "03033.HK"
+    valuation_method: user_confirmed_cny_no_live_fx
 
   - asset_id: hk_513060
     asset_class: hk_stock

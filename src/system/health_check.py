@@ -60,7 +60,7 @@ dca_plan:
     - symbol: 510300.SS
       name: 沪深300ETF
       base_amount: 2000
-    - symbol: 3067.HK
+    - symbol: 03033.HK
       name: 恒生科技ETF
       base_amount: 2000
 
@@ -309,7 +309,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
             )
         )
 
-    openai_enabled = str(env_values.get("OPENAI_ENABLED") or os.getenv("OPENAI_ENABLED") or "true").strip().lower() in {"1", "true", "yes", "on"}
+    openai_enabled = str(env_values.get("OPENAI_ENABLED") or os.getenv("OPENAI_ENABLED") or "false").strip().lower() in {"1", "true", "yes", "on"}
     if not openai_enabled:
         items.append(HealthItem("OpenAI可选复核", "OK", "OPENAI_ENABLED=false；已按配置跳过调用，规则引擎完整运行。"))
     elif env_values.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"):
@@ -336,7 +336,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
 def format_health_report(result: dict[str, object]) -> str:
     items = result.get("items", [])
     lines = [
-        "Stone AI Investment Manager Pro V12.6 Stable 系统自检",
+        "Stone AI Investment Manager Pro V12.6.1 Stable 系统自检",
         f"总体状态：{result.get('status', 'UNKNOWN')}",
         "",
     ]

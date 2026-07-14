@@ -8,6 +8,7 @@ import yaml
 
 from src.data_sources.data_router import get_market_quote
 from src.decision.v12_1_decision import build_v12_1_decision
+from src.macro.macro_calendar import analyze_macro_calendar
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import generate_daily_report
 from tests.test_v12_5_stable import _live_market, _portfolio_result
@@ -21,10 +22,7 @@ def _decision(*, weekend: bool = False) -> dict:
     kwargs = {
         "portfolio_result": _portfolio_result(snapshot),
         "live_market_result": _live_market(),
-        "macro_result": {
-            "has_high_event_next_7_days": True,
-            "upcoming_events": [{"date": "2026-07-15", "name": "CPI", "level": "high"}],
-        },
+        "macro_result": analyze_macro_calendar(today=date(2026, 7, 13)),
         "ai_advice_result": {
             "ai_status": "rule_only",
             "actual_provider": "stone_rule_engine",
@@ -52,7 +50,7 @@ def test_asset_total_consistency() -> None:
 
 def test_target_weight_sum() -> None:
     strategy = yaml.safe_load((PROJECT_ROOT / "config" / "strategy.yaml").read_text(encoding="utf-8"))
-    assert strategy["config_version"] == "V12.6_STABLE"
+    assert strategy["config_version"] == "V12.6.1_STABLE"
     assert abs(sum(strategy["target_allocation"].values()) - 1.0) < 1e-9
 
 
@@ -130,7 +128,7 @@ def test_report_required_sections() -> None:
         "## 4. 现金与预算口径",
         "## 5. 下一触发条件",
         "## 6. 资产配置与偏离",
-        "## 7. 未来12个月资产迁移路线图",
+        "## 7. 未来12个月债券迁移第一阶段路线图",
         "## 8. Opportunity Score",
         "## 9. 持仓健康检查",
         "## 10. 市场与宏观",

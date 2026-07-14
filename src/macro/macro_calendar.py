@@ -1,150 +1,240 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from utils.logger import write_log
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_REPORT_TIMEZONE = "Asia/Shanghai"
 DEFAULT_EVENT_TYPES = ["FOMC", "CPI", "PPI", "非农", "美联储主席讲话", "财报季"]
 
+# BLS 2026 release calendar. These official timestamps take precedence over
+# user_configured_calendar entries with the same event/reference period.
+OFFICIAL_BLS_EVENTS: tuple[dict[str, str], ...] = (
+    {
+        "event_name": "CPI",
+        "reference_period": "2026-06",
+        "release_at": "2026-07-14 08:30:00",
+        "source_timezone": "America/New_York",
+        "source": "https://www.bls.gov/schedule/2026/07_sched.htm",
+        "source_level": "official_primary",
+        "verification_status": "verified",
+        "risk_level": "high",
+    },
+    {
+        "event_name": "PPI",
+        "reference_period": "2026-06",
+        "release_at": "2026-07-15 08:30:00",
+        "source_timezone": "America/New_York",
+        "source": "https://www.bls.gov/schedule/2026/07_sched.htm",
+        "source_level": "official_primary",
+        "verification_status": "verified",
+        "risk_level": "high",
+    },
+)
 
-def _parse_event_date(value: Any) -> date | None:
-    if isinstance(value, date):
-        return value
-    if value is None:
-        return None
-    try:
-        return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
-    except ValueError:
-        return None
 
-
-def _load_settings_with_yaml(path: Path) -> dict[str, Any]:
+def _load_settings(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
     try:
         import yaml  # type: ignore
 
-        with path.open("r", encoding="utf-8") as file:
-            return yaml.safe_load(file) or {}
-    except Exception as exc:  # noqa: BLE001 - 配置失败时使用空配置继续运行
-        write_log(f"settings.yaml 读取失败，已跳过宏观事件配置：{exc}", filename="macro_calendar.log")
+        with path.open("r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle) or {}
+    except Exception as exc:  # noqa: BLE001
+        write_log(f"宏观事件备用配置读取失败：{exc}", filename="macro_calendar.log")
         return {}
 
 
-def _load_settings_without_yaml(path: Path) -> dict[str, Any]:
-    """简易读取 macro_events 列表，避免缺 PyYAML 时主程序崩溃。"""
-    if not path.exists():
-        return {}
-
-    events: list[dict[str, str]] = []
-    current: dict[str, str] | None = None
-    in_macro_events = False
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        if line == "macro_events:":
-            in_macro_events = True
-            continue
-        if not in_macro_events:
-            continue
-
-        if line.startswith("- "):
-            if current:
-                events.append(current)
-            current = {}
-            line = line[2:].strip()
-
-        if current is not None and ":" in line:
-            key, value = line.split(":", 1)
-            current[key.strip()] = value.strip().strip('"').strip("'")
-
-    if current:
-        events.append(current)
-
-    return {"macro_events": events}
+def _as_aware_datetime(value: date | datetime, timezone_name: str) -> datetime:
+    zone = ZoneInfo(timezone_name)
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=zone) if value.tzinfo is None else value.astimezone(zone)
+    return datetime.combine(value, time.min, tzinfo=zone)
 
 
-def load_macro_events(settings_path: Path | None = None) -> list[dict[str, Any]]:
-    """从 config/settings.yaml 读取宏观事件。"""
-    path = settings_path or PROJECT_ROOT / "config" / "settings.yaml"
-    if not path.exists():
-        write_log("settings.yaml 不存在，宏观事件列表为空", filename="macro_calendar.log")
-        return []
+def _normalise_official_event(raw: dict[str, Any], report_timezone: str) -> dict[str, Any]:
+    source_zone = ZoneInfo(str(raw["source_timezone"]))
+    report_zone = ZoneInfo(report_timezone)
+    local_release = datetime.fromisoformat(str(raw["release_at"]))
+    if local_release.tzinfo is None:
+        local_release = local_release.replace(tzinfo=source_zone)
+    else:
+        local_release = local_release.astimezone(source_zone)
+    release_utc = local_release.astimezone(timezone.utc)
+    release_report = local_release.astimezone(report_zone)
+    verified = str(raw.get("verification_status")) == "verified"
+    event = {
+        "event_name": str(raw["event_name"]),
+        "reference_period": str(raw.get("reference_period") or "unknown"),
+        "release_at": local_release.isoformat(),
+        "source_timezone": str(raw["source_timezone"]),
+        "release_at_utc": release_utc.isoformat(),
+        "release_at_report_timezone": release_report.isoformat(),
+        "source": str(raw.get("source") or "unavailable"),
+        "source_level": str(raw.get("source_level") or "unverified"),
+        "verification_status": str(raw.get("verification_status") or "unverified"),
+        "risk_level": str(raw.get("risk_level") or "medium").lower(),
+        "report_timezone": report_timezone,
+        # Backward-compatible display keys used by the existing report code.
+        "name": str(raw["event_name"]),
+        "date": release_report.date().isoformat(),
+        "time": release_report.strftime("%H:%M"),
+        "timezone": report_timezone,
+        "level": str(raw.get("risk_level") or "medium").lower(),
+        "confirmed": verified,
+        "status": "即将发生" if verified else "未验证",
+    }
+    return event
 
+
+def _normalise_config_event(raw: dict[str, Any], report_timezone: str) -> dict[str, Any] | None:
+    """Convert a user-configured fallback without inventing a missing timezone."""
+    event_name = str(raw.get("event_name") or raw.get("name") or "未命名事件").strip()
+    reference_period = str(raw.get("reference_period") or "unknown")
+    release_at = raw.get("release_at")
+    source_timezone = raw.get("source_timezone") or raw.get("timezone")
+    if not release_at and raw.get("date") and raw.get("time") and source_timezone:
+        release_at = f"{raw['date']} {raw['time']}"
+
+    base = {
+        "event_name": event_name,
+        "reference_period": reference_period,
+        "source": str(raw.get("source") or "user_configured_calendar"),
+        "source_level": "user_configured_calendar",
+        "verification_status": "unverified",
+        "risk_level": str(raw.get("risk_level") or raw.get("level") or "medium").lower(),
+    }
+    if not release_at or not source_timezone:
+        # A date-only entry is retained for audit, but never promoted to a
+        # confirmed high-risk event and never receives a guessed timestamp.
+        return {
+            **base,
+            "release_at": None,
+            "source_timezone": str(source_timezone or "unknown"),
+            "release_at_utc": None,
+            "release_at_report_timezone": None,
+            "report_timezone": report_timezone,
+            "name": event_name,
+            "date": None,
+            "time": "未验证",
+            "timezone": str(source_timezone or "unknown"),
+            "level": base["risk_level"],
+            "confirmed": False,
+            "status": "未验证（缺少含时区发布时间）",
+        }
     try:
-        import yaml  # noqa: F401
+        return _normalise_official_event(
+            {**base, "release_at": str(release_at), "source_timezone": str(source_timezone)},
+            report_timezone,
+        ) | {"confirmed": False, "status": "未验证", "verification_status": "unverified"}
+    except (ValueError, TypeError):
+        return None
 
-        settings = _load_settings_with_yaml(path)
-    except ImportError:
-        settings = _load_settings_without_yaml(path)
 
-    events: list[dict[str, Any]] = []
-    for item in settings.get("macro_events", []) or []:
-        event_date = _parse_event_date(item.get("date"))
-        if not event_date:
-            write_log(f"宏观事件日期无效，已跳过：{item}", filename="macro_calendar.log")
+def load_macro_events(
+    settings_path: Path | None = None,
+    report_timezone: str = DEFAULT_REPORT_TIMEZONE,
+) -> list[dict[str, Any]]:
+    """Load official events first; user configuration is fallback-only."""
+    official = [_normalise_official_event(item, report_timezone) for item in OFFICIAL_BLS_EVENTS]
+    official_keys = {(item["event_name"].upper(), item["reference_period"]) for item in official}
+    settings = _load_settings(settings_path or PROJECT_ROOT / "config" / "settings.yaml")
+    fallback: list[dict[str, Any]] = []
+    for raw in settings.get("macro_events", []) or []:
+        event = _normalise_config_event(raw, report_timezone)
+        if not event:
             continue
-        events.append(
-            {
-                "name": str(item.get("name", "未命名事件")).strip(),
-                "date": event_date,
-                "time": str(item.get("time") or "待确认"),
-                "timezone": str(item.get("timezone") or "Asia/Shanghai"),
-                "level": str(item.get("level", "medium")).strip().lower(),
-                "source": str(item.get("source") or "config/settings.yaml（人工维护）"),
-                "confirmed": bool(item.get("confirmed", False)),
-            }
-        )
-    return events
+        key = (event["event_name"].upper(), event["reference_period"])
+        # Official BLS dates can never be overwritten by user configuration.
+        if key in official_keys or event["event_name"].upper() in {"CPI", "PPI", "CPI数据", "PPI数据"}:
+            continue
+        fallback.append(event)
+    return sorted(
+        official + fallback,
+        key=lambda item: item.get("release_at_utc") or "9999-12-31T23:59:59+00:00",
+    )
+
+
+def get_upcoming_high_risk_events(
+    as_of: date | datetime,
+    *,
+    hours: int | None = None,
+    days: int | None = None,
+    events: list[dict[str, Any]] | None = None,
+    report_timezone: str = DEFAULT_REPORT_TIMEZONE,
+) -> list[dict[str, Any]]:
+    """Return the single authoritative verified high-risk event selection."""
+    if (hours is None) == (days is None):
+        raise ValueError("hours 和 days 必须且只能指定一个")
+    start = _as_aware_datetime(as_of, report_timezone).astimezone(timezone.utc)
+    end = start + (timedelta(hours=hours) if hours is not None else timedelta(days=days or 0))
+    selected: list[dict[str, Any]] = []
+    for event in events if events is not None else load_macro_events(report_timezone=report_timezone):
+        if event.get("risk_level") != "high" or event.get("verification_status") != "verified":
+            continue
+        raw_release = event.get("release_at_utc")
+        if not raw_release:
+            continue
+        release = datetime.fromisoformat(str(raw_release).replace("Z", "+00:00")).astimezone(timezone.utc)
+        if start <= release <= end:
+            selected.append(event)
+    return sorted(selected, key=lambda item: item["release_at_utc"])
 
 
 def analyze_macro_calendar(
     today: date | None = None,
     settings_path: Path | None = None,
+    *,
+    as_of: datetime | None = None,
+    report_timezone: str = DEFAULT_REPORT_TIMEZONE,
 ) -> dict[str, Any]:
-    """判断未来7天是否有重大宏观事件。"""
-    current_date = today or date.today()
-    window_end = current_date + timedelta(days=7)
-    events = load_macro_events(settings_path)
-
+    current = as_of or _as_aware_datetime(today or date.today(), report_timezone)
+    events = load_macro_events(settings_path, report_timezone)
+    high_48h = get_upcoming_high_risk_events(current, hours=48, events=events, report_timezone=report_timezone)
+    high_7d = get_upcoming_high_risk_events(current, days=7, events=events, report_timezone=report_timezone)
+    end_7d = current.astimezone(timezone.utc) + timedelta(days=7)
     upcoming = [
-        event
-        for event in events
-        if current_date <= event["date"] <= window_end
+        event for event in events
+        if event.get("release_at_utc")
+        and current.astimezone(timezone.utc)
+        <= datetime.fromisoformat(str(event["release_at_utc"])).astimezone(timezone.utc)
+        <= end_7d
     ]
-    upcoming.sort(key=lambda item: item["date"])
-    high_events = [event for event in upcoming if event["level"] == "high" and event.get("confirmed")]
-    unconfirmed_high_events = [event for event in upcoming if event["level"] == "high" and not event.get("confirmed")]
-    for event in upcoming:
-        event["status"] = "即将发生" if event.get("confirmed") else "日期待确认"
-
-    if high_events:
-        reminder = "未来7天有 high 级别宏观事件：重大事件前不追涨，定投可以继续，不建议一次性重仓买入。"
-    elif unconfirmed_high_events:
-        reminder = "未来7天有待官方确认的高等级事件日期；降低事件日历置信度，执行前必须复核官方时间。"
-    elif upcoming:
-        reminder = "未来7天有宏观事件，建议保持仓位纪律，避免临时冲动交易。"
+    next_review = high_48h[0] if high_48h else high_7d[0] if high_7d else None
+    if high_7d:
+        reminder = "未来7天存在已核验高等级宏观事件；事件前暂停机会加仓，基础定投只复核，不自动转为大额交易。"
+    elif any(item.get("verification_status") == "unverified" for item in upcoming):
+        reminder = "未来7天存在未验证事件；不得把未验证日期当作已确认高等级事件。"
     else:
-        reminder = "未来7天暂未配置重大宏观事件，继续按组合纪律执行。"
-
+        reminder = "未来7天暂无已核验高等级宏观事件。"
     return {
-        "as_of": current_date.isoformat(),
+        "as_of": current.isoformat(),
+        "report_timezone": report_timezone,
         "window_days": 7,
         "important_event_types": DEFAULT_EVENT_TYPES,
+        "events": events,
         "upcoming_events": upcoming,
-        "has_high_event_next_7_days": bool(high_events),
-        "has_unconfirmed_high_event_next_7_days": bool(unconfirmed_high_events),
-        "calendar_confidence": "high" if upcoming and not unconfirmed_high_events else "low" if unconfirmed_high_events else "medium",
+        "high_risk_events_48h": high_48h,
+        "high_risk_events_7d": high_7d,
+        "has_high_event_next_48_hours": bool(high_48h),
+        "has_high_event_next_7_days": bool(high_7d),
+        "has_unconfirmed_high_event_next_7_days": any(
+            item.get("risk_level") == "high" and item.get("verification_status") == "unverified"
+            for item in upcoming
+        ),
+        "next_review_date": next_review.get("release_at_report_timezone") if next_review else None,
+        "calendar_confidence": "high" if high_7d else "low" if upcoming else "medium",
         "reminder": reminder,
         "discipline": [
             "重大事件前不追涨",
-            "定投可以继续",
-            "不建议一次性重仓买入",
+            "基础定投只允许复核",
+            "机会加仓暂停",
             "所有操作必须人工确认，系统不自动交易",
         ],
     }

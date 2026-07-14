@@ -74,11 +74,24 @@ def _fallback_result(
     error_category: str = "",
 ) -> dict[str, Any]:
     neutral = "Stone CIO规则引擎已完成完整分析；OpenAI可选复核本次未参与，不影响核心风控与决策。"
+    if reason == "disabled":
+        openai_status = "disabled"
+        description = "OpenAI功能由配置主动关闭，规则引擎独立完成分析。"
+    elif called:
+        openai_status = "called_failed_fallback"
+        description = "OpenAI实际调用失败，已转用规则引擎。"
+    else:
+        openai_status = "rules_only"
+        description = "OpenAI未调用，规则引擎独立完成分析。"
     return {
         "enabled": enabled,
         "called": called,
         "success": False,
         "ai_status": "rule_only",
+        "openai_status": openai_status,
+        "call_failed": bool(called),
+        "fallback_occurred": bool(called),
+        "description": description,
         "actual_provider": "stone_rule_engine",
         "fallback_reason": reason,
         "error_category": error_category or (reason if reason in {
@@ -188,7 +201,7 @@ def build_cio_review_context(
 
 def _build_prompt(context: dict[str, Any]) -> str:
     return (
-        "你是Stone AI Investment Manager Pro V12.6 Stable的CIO解释与复核层。"
+        "你是Stone AI Investment Manager Pro V12.6.1 Stable的CIO解释与复核层。"
         "规则引擎已经完成交易裁决；你不得修改金额、标的、资金来源或硬风控。"
         "不自动交易、不承诺收益、不预测具体点位。只返回一个JSON对象，不要Markdown。"
         f"JSON必须且只能包含这些字段：{','.join(AI_FIELDS)}。"
@@ -245,7 +258,7 @@ def validate_openai_advice(advice: dict[str, Any], decision: dict[str, Any]) -> 
 
 def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None) -> dict[str, Any]:
     _load_env_file(env_path or PROJECT_ROOT / ".env")
-    enabled = _env_bool("OPENAI_ENABLED", True)
+    enabled = _env_bool("OPENAI_ENABLED", False)
     model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
     if not enabled:
         return _fallback_result("disabled", model=model, enabled=False, called=False)
@@ -288,6 +301,10 @@ def generate_openai_advice(context: dict[str, Any], env_path: Path | None = None
                     "called": True,
                     "success": True,
                     "ai_status": "available",
+                    "openai_status": "called_success",
+                    "call_failed": False,
+                    "fallback_occurred": False,
+                    "description": "OpenAI调用成功并通过规则校验。",
                     "actual_provider": "openai",
                     "fallback_reason": "",
                     "error_category": "",
@@ -361,5 +378,9 @@ def apply_openai_review(decision: dict[str, Any], advice: dict[str, Any]) -> dic
     )
     fallback["validation_errors"] = errors
     fallback["conflict_with_rules"] = True
+    fallback["openai_status"] = "validation_rejected"
+    fallback["call_failed"] = False
+    fallback["fallback_occurred"] = True
+    fallback["description"] = "OpenAI已调用但输出未通过规则校验，规则引擎结论优先。"
     fallback["review_summary"] = "AI复核存在分歧，规则风控优先。"
     return fallback

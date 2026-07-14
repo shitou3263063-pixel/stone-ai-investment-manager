@@ -6,7 +6,7 @@ category,name,amount_wan,currency,quantity,unit,note
 美股,IBKR 盈透证券,4.00,CNY,64,股,来自portfolio_master.yaml
 美股,XLF 美国金融ETF,4.20,CNY,112,股,来自portfolio_master.yaml
 美股,BABA 阿里巴巴,2.80,CNY,44,股,来自portfolio_master.yaml
-港股,南方恒生科技ETF,14.04,CNY,35200,份,实际持仓03033；3067.HK仅作行情代理
+港股,南方东英恒生科技指数ETF,14.04,CNY,35200,份,实际持仓03033.HK；交易币种HKD；3033.HK仅为供应商代码格式
 港股,恒生医疗ETF,9.90,CNY,177600,份,来自portfolio_master.yaml
 港股,香港证券ETF,3.32,CNY,17000,份,来自portfolio_master.yaml
 A股,沪深300ETF,20.60,CNY,42900,份,来自portfolio_master.yaml

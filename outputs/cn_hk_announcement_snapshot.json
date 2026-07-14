@@ -1,0 +1,43 @@
+{
+  "fetched_at": "2026-07-15T02:24:57+08:00",
+  "status": "ok",
+  "cn": {
+    "status": "ok",
+    "source": "cninfo_official",
+    "source_level": 1,
+    "source_type": "official_disclosure_platform",
+    "fetched_at": "2026-07-15T02:24:57+08:00",
+    "market_date": "2026-07-15",
+    "timezone": "Asia/Shanghai",
+    "records": [
+      {
+        "symbol": "002558",
+        "title": "<em>巨人网络</em>：<em>巨人网络集团股份有限公司</em>2026年半年度业绩预告",
+        "published_at": 1783440000000,
+        "document_url": "finalpage/2026-07-08/1225413627.PDF",
+        "source": "cninfo_official"
+      }
+    ],
+    "record_count": 1,
+    "fallback_used": false,
+    "error_message": ""
+  },
+  "hk": {
+    "status": "framework_ready",
+    "source": "hkex_official",
+    "source_level": 1,
+    "source_type": "official_exchange_disclosure",
+    "fetched_at": "2026-07-15T02:24:57+08:00",
+    "market_date": null,
+    "timezone": "Asia/Hong_Kong",
+    "symbols": [
+      "03033"
+    ],
+    "records": [],
+    "record_count": 0,
+    "fallback_used": false,
+    "search_url": "https://www1.hkexnews.hk/search/titlesearch.xhtml",
+    "error_message": "HKEX标题检索需要稳定的证券内部ID映射；P1A仅建立官方读取框架，不伪造公告记录。"
+  },
+  "policy": "仅登记官方公告；接口失败或内部ID未核验时不以其他网页替代。"
+}

@@ -16,6 +16,7 @@ from src.grid.regime_detector import detect_market_regime
 from src.grid.signal_engine import build_signal, dynamic_grid_spacing
 from src.grid.simulator import append_simulated_signal
 from src.grid.validator import review_grid_signal
+from src.macro.macro_calendar import load_macro_events
 from src.reports.grid_report import generate_grid_daily_section, generate_grid_weekly_report
 
 
@@ -29,11 +30,12 @@ def _config(paper: bool = True) -> dict:
 
 def _decision(dqs: int = 90, cash: int = 50000, us_status: str = "严重低配", high_event: bool = False) -> dict:
     return {
+        "date": "2026-07-13",
         "portfolio_value_yuan": 2821100,
         "dqs": {"score": dqs, "mode": "exact" if dqs >= 85 else "safe", "mode_label": "test"},
         "budget": {"confirmed_cash_available_yuan": cash},
         "allocation": [{"category": "美股", "status": us_status}],
-        "events": [{"date": date.today().isoformat(), "level": "high", "name": "CPI"}] if high_event else [],
+        "events": load_macro_events() if high_event else [],
     }
 
 

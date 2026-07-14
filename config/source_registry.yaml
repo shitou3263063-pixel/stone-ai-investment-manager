@@ -1,4 +1,4 @@
-config_version: V12.6_STABLE
+config_version: V12.6.1_STABLE
 config_role: production_data_source_priority_authority
 schema_version: 1
 policy:
@@ -61,6 +61,31 @@ sources:
     name: "yfinance"
     tier: 3
     type: free_aggregator
+  tushare_pro:
+    name: "Tushare Pro"
+    tier: 2
+    type: authorized_api
+  akshare:
+    name: "AKShare (monitored fallback)"
+    tier: 3
+    type: monitored_aggregator_fallback
+    requirements:
+      underlying_provider_required: true
+      schema_validation_required: true
+      stale_data_blocks_high_confidence: true
+      source_conflict_blocks_scoring: true
+  hkma_official:
+    name: "Hong Kong Monetary Authority Open API"
+    tier: 1
+    type: official
+  cninfo_official:
+    name: "CNINFO Official Disclosure Platform"
+    tier: 1
+    type: official
+  hkex_official:
+    name: "HKEXnews"
+    tier: 1
+    type: official
   local_cache:
     name: "Local Cache"
     tier: 3
@@ -145,7 +170,7 @@ critical_metrics:
     backup_source: finnhub
     freshness_limit: 2d
     verification_requirement: dual_source
-  "3067.HK":
+  "03033.HK":
     category: market
     metric_type: price
     evidence_group: market_valuation
@@ -154,6 +179,30 @@ critical_metrics:
     freshness_limit: 2d
     verification_requirement: dual_source
   "510300.SS":
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: finnhub
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "002558.SZ":
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: finnhub
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "513060.SS":
+    category: market
+    metric_type: price
+    evidence_group: market_valuation
+    primary_source: finnhub
+    backup_source: yfinance
+    freshness_limit: 2d
+    verification_requirement: dual_source
+  "513090.SS":
     category: market
     metric_type: price
     evidence_group: market_valuation

@@ -171,6 +171,7 @@ def test_email_failure_is_returned_without_deleting_reports() -> None:
             result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
         assert result["sent"] is False
         assert result["skipped"] is False
-        assert result["error"] == "smtp offline"
+        assert result["error"].startswith("UNKNOWN_ERROR [smtp_send]")
+        assert "smtp offline" not in result["error"]
         for name in ["today_action.md", "daily_report.md", "weekly_report.md", "run_status.json"]:
             assert (reports / name).exists()

@@ -119,7 +119,7 @@ def test_openai_st_buy_is_rejected() -> None:
 def test_rule_commentary_is_complete_when_openai_fails() -> None:
     decision = apply_ai_explanation(_decision(), {"ai_status": "rule_only", "fallback_reason": "rate_limit"})
     commentary = decision["ai"]
-    assert commentary["mode"] in {"RULE_ENHANCED", "SAFE_MODE"}
+    assert commentary["mode"] in {"RULES_ONLY", "SAFE_MODE"}
     assert "当前没有真实可执行买入预算" in commentary["best_action_today"]
     assert commentary["required_trigger_conditions"]
 
@@ -127,13 +127,15 @@ def test_rule_commentary_is_complete_when_openai_fails() -> None:
 def test_unconfirmed_event_is_not_presented_as_confirmed_high_event(tmp_path: Path) -> None:
     settings = tmp_path / "settings.yaml"
     settings.write_text(
-        "macro_events:\n  - name: CPI\n    date: 2026-07-15\n    level: high\n    confirmed: false\n",
+        "macro_events:\n  - name: FOMC\n    date: 2026-08-05\n    level: high\n    confirmed: false\n",
         encoding="utf-8",
     )
-    result = analyze_macro_calendar(today=__import__("datetime").date(2026, 7, 12), settings_path=settings)
+    result = analyze_macro_calendar(today=__import__("datetime").date(2026, 8, 1), settings_path=settings)
     assert result["has_high_event_next_7_days"] is False
-    assert result["has_unconfirmed_high_event_next_7_days"] is True
-    assert result["upcoming_events"][0]["status"] == "日期待确认"
+    assert result["has_unconfirmed_high_event_next_7_days"] is False
+    configured = next(item for item in result["events"] if item["event_name"] == "FOMC")
+    assert configured["verification_status"] == "unverified"
+    assert configured["release_at_utc"] is None
 
 
 def test_daily_report_has_single_trigger_section_and_fixed_order() -> None:
@@ -158,7 +160,7 @@ def test_hard_validation_detects_live_grid_budget_in_simulation() -> None:
         "grid_budget": {"live_available_yuan": 1},
     }
     result = build_consistency_checks(decision)
-    assert result["status"] == "FAILED_VALIDATION"
+    assert result["status"] == "FAIL"
     assert any("模拟网格" in error for error in result["errors"])
 
 
