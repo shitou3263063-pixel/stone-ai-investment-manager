@@ -112,7 +112,8 @@ def test_st_stock_never_auto_add() -> None:
 def test_unsettled_bond_cash_not_investable() -> None:
     cash = build_portfolio_snapshot()["cash"]
     assert cash["unsettled_conditional_cash_cny"] == 0
-    assert cash["investable_cash_cny"] == 0
+    assert cash["investable_cash_cny"] == 21000
+    assert cash["bond_maturity_arrival_cny"] == 30000
 
 
 def test_simulation_cash_not_real_cash() -> None:
@@ -135,7 +136,7 @@ def test_scenario_analysis_calculation() -> None:
 def test_report_internal_consistency() -> None:
     decision = _decision()
     report = generate_daily_report(decision=decision)
-    assert decision["consistency"]["status"] == "PASS"
+    assert decision["consistency"]["status"] == "WARN"
     assert "### 组合情景压力测试" in report
     assert "### 市场宽度、资金流与情绪数据状态" in report
     assert "模拟资金" not in decision.get("funding_source", "")

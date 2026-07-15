@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-15T03:08:42+08:00",
+  "generated_at": "2026-07-16T00:09:11+08:00",
   "items": {
     "002558.SZ": {
       "interface": "002558_fundamental",
@@ -9,15 +9,15 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-15T03:08:53+08:00",
+      "fetched_at": "2026-07-15T03:08:53",
       "market_date": null,
       "reporting_period": "2026-03-31",
       "currency": "CNY",
       "unit": "mixed_financial_units",
-      "status": "ok",
+      "status": "cached",
       "freshness": "fresh",
       "confidence": "medium",
-      "fallback_used": false,
+      "fallback_used": true,
       "error_code": null,
       "error_message": "",
       "scoring_eligible": true,
@@ -83,8 +83,17 @@
       ],
       "period_consistent": true,
       "attempts": 1,
+      "published_at": null,
+      "retrieved_at": "2026-07-16T00:09:21",
+      "freshness_status": "fresh",
+      "cache_used": true,
+      "cache_stale": false,
+      "cache_age_days": 0.88,
+      "warning": "",
+      "upstream_error_code": "NETWORK_ERROR",
+      "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='datacenter.eastmoney.com', port=443): Max retries exceeded with url: /securities/api/data/get?type=RPT_F10_FINANCE_MAINFINADATA&sty=APP_F10_MAINFINADATA&quoteColumns=&filter=%28SECUCODE%3D%22002558.SZ%22%29&p=1&ps=200&sr=-1&st=REPORT_DATE&source=HSF10&client=PC (Caused by NewConnectionError(\"HTTPSConnection(host='datacenter.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))",
       "cashflow_status": "failed",
-      "cashflow_error_code": "TIMEOUT"
+      "cashflow_error_code": "NETWORK_ERROR"
     }
   },
   "selected_sources": {

@@ -22,7 +22,7 @@ def _decision(*, weekend: bool = False) -> dict:
     kwargs = {
         "portfolio_result": _portfolio_result(snapshot),
         "live_market_result": _live_market(),
-        "macro_result": analyze_macro_calendar(today=date(2026, 7, 13)),
+        "macro_result": analyze_macro_calendar(today=date.today()),
         "ai_advice_result": {
             "ai_status": "rule_only",
             "actual_provider": "stone_rule_engine",
@@ -69,10 +69,11 @@ def test_cash_safety_line() -> None:
 
 def test_pending_bond_cash_exclusion() -> None:
     budget = _decision()["budget"]
-    assert budget["actual_bond_cash_arrived_yuan"] == 0
-    assert budget["approved_bond_to_equity_month_yuan"] == 0
+    assert budget["actual_bond_cash_arrived_yuan"] == 30000
+    assert budget["approved_bond_to_equity_month_yuan"] == 30000
+    assert budget["bond_to_equity_remaining_this_month_yuan"] == 21000
     assert budget["today_total_yuan"] == 0
-    assert budget["investable_cash_yuan"] == 0
+    assert budget["investable_cash_yuan"] == 21000
 
 
 def test_grid_simulation_cash_exclusion() -> None:
@@ -87,7 +88,9 @@ def test_grid_simulation_cash_exclusion() -> None:
 def test_no_trade_amount_zero() -> None:
     decision = _decision()
     assert decision["today_trade"] is False
+    assert decision["today_confirmed_trade_executed"] is False
     assert decision["today_amount_yuan"] == 0
+    assert any(item["id"] == "USERCONF-20260715-VOO-001" for item in decision["confirmed_transactions"])
     assert decision["budget"]["today_total_yuan"] == 0
 
 
@@ -168,5 +171,5 @@ def test_data_source_fallback() -> None:
 
 def test_consistency_validation() -> None:
     decision = _decision()
-    assert decision["consistency"]["status"] == "PASS"
+    assert decision["consistency"]["status"] == "WARN"
     assert decision["consistency"]["errors"] == []

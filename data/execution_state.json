@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "updated_at": null,
+  "schema_version": 2,
+  "updated_at": "2026-07-15",
   "status_values": [
     "suggested",
     "pending_confirmation",
@@ -9,12 +9,45 @@
   ],
   "order_types": [
     "base_dca",
-    "opportunity_add"
+    "opportunity_add",
+    "bond_to_equity"
   ],
   "weekly_rules": {
     "base_dca_weekday": "Wednesday",
     "base_dca_max_per_natural_week": 1,
     "non_wednesday_default_trade": false
   },
-  "records": []
+  "bond_to_equity_plan": {
+    "month": "2026-07",
+    "bond_maturity_arrived_cny": 30000,
+    "approved_amount_cny": 30000,
+    "executed_amount_cny": 9000,
+    "remaining_amount_cny": 21000,
+    "remaining_real_investable_cash_cny": 21000,
+    "remaining_funds_status": "arrived_investable_subject_to_market_and_risk_conditions",
+    "source": "user_confirmed"
+  },
+  "records": [
+    {
+      "id": "USERCONF-20260715-VOO-001",
+      "trade_date": "2026-07-15",
+      "natural_week": "2026-W29",
+      "status": "executed",
+      "order_type": "bond_to_equity",
+      "symbol": "VOO",
+      "action": "BUY",
+      "execution_price_usd": 692.5,
+      "invested_amount_cny": 9000,
+      "funding_source": "2026-07-15到期债券资金",
+      "data_source": "user_confirmed",
+      "quantity": null,
+      "actual_fx_rate_cny_per_usd": null,
+      "fee": null,
+      "booked_to_portfolio": true,
+      "real_trade": true,
+      "simulation_trade": false,
+      "valuation_status": "pending_quantity_fx_fee",
+      "note": "只确认成交价格与人民币投入成本；不得推算成交股数、汇率、手续费或最新市值。"
+    }
+  ]
 }

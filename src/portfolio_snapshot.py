@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import json
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +95,7 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "source": holding.get("data_source") or "user_confirmed",
         "last_confirmed_at": confirmed_at,
         "valuation_method": valuation_method,
+        "valuation_status": holding.get("valuation_status") or "confirmed_market_value",
         "valuation_time": str(holding.get("valuation_time") or date.today().isoformat()),
         "confidence": holding.get("confidence") or "medium",
         "account": holding.get("account") or "",
@@ -101,6 +103,12 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "strategy_bucket": holding.get("strategy_bucket") or security.get("strategy_type") or "",
         "manual_override": bool(holding.get("manual_override", False)),
         "gold_price_cny_per_gram": holding.get("gold_price_cny_per_gram"),
+        "reference_symbol": holding.get("reference_symbol"),
+        "execution_price_usd": holding.get("execution_price_usd"),
+        "additional_cost_cny": holding.get("additional_cost_cny"),
+        "actual_quantity": holding.get("actual_quantity"),
+        "actual_fx_rate": holding.get("actual_fx_rate"),
+        "fee": holding.get("fee"),
     }
 
 
@@ -108,6 +116,11 @@ def build_portfolio_snapshot() -> dict[str, Any]:
     root = project_root()
     master_path = root / "data" / "portfolio_master.yaml"
     master = _load_yaml(master_path)
+    execution_state_path = root / "data" / "execution_state.json"
+    try:
+        execution_state = json.loads(execution_state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        execution_state = {}
     labels = master.get("asset_class_labels", {}) or {}
     totals = master.get("totals", {}) or {}
     lookup = _security_lookup()
@@ -129,11 +142,24 @@ def build_portfolio_snapshot() -> dict[str, Any]:
 
     cash_policy = master.get("cash_policy", {}) or {}
     account_cash = round(_to_float(cash_policy.get("account_total_cash_cny"), configured_totals.get("现金", 0)))
-    safety_ratio = _to_float(cash_policy.get("safety_reserve_ratio"), 0.08)
-    safety_reserve = round(total_assets * safety_ratio)
+    safety_reserve_value = cash_policy.get("safety_reserve_cny")
+    if safety_reserve_value not in {None, ""}:
+        safety_reserve = round(_to_float(safety_reserve_value))
+        safety_mode = str(cash_policy.get("safety_reserve_mode") or "fixed_user_confirmed")
+    else:
+        safety_ratio = _to_float(cash_policy.get("safety_reserve_ratio"), 0.08)
+        safety_reserve = round(total_assets * safety_ratio)
+        safety_mode = "ratio_based"
     live_grid_cash = round(_to_float(cash_policy.get("live_grid_cash_cny")))
     other_reserved_cash = round(_to_float(cash_policy.get("other_reserved_cash_cny")))
     investable_cash = max(0, account_cash - safety_reserve - live_grid_cash - other_reserved_cash)
+    bond_to_equity_cash = round(_to_float(cash_policy.get("bond_to_equity_investable_cash_cny"), investable_cash))
+    plan = execution_state.get("bond_to_equity_plan", {}) or {}
+    transactions = [
+        item
+        for item in execution_state.get("records", []) or []
+        if item.get("status") == "executed" and item.get("data_source") == "user_confirmed"
+    ]
 
     gold_detail_total = sum(int(item["market_value_cny"]) for item in holdings if item["asset_class"] == "黄金")
     snapshot_date = str(master.get("as_of") or date.today().isoformat())
@@ -160,13 +186,20 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         "cash": {
             "account_total_cash_cny": account_cash,
             "cash_safety_reserve_cny": safety_reserve,
+            "cash_safety_reserve_mode": safety_mode,
             "investable_cash_cny": investable_cash,
+            "bond_to_equity_investable_cash_cny": bond_to_equity_cash,
+            "opening_cash_before_bond_maturity_cny": round(_to_float(cash_policy.get("opening_cash_before_bond_maturity_cny"))),
+            "bond_maturity_arrival_cny": round(_to_float(cash_policy.get("bond_maturity_arrival_cny"))),
+            "voo_purchase_outflow_cny": round(_to_float(cash_policy.get("voo_purchase_outflow_cny"))),
             "live_grid_cash_cny": live_grid_cash,
             "paper_grid_cash_cny": 0,
             "other_reserved_cash_cny": other_reserved_cash,
             "unsettled_conditional_cash_cny": round(_to_float(cash_policy.get("unsettled_conditional_cash_cny"))),
-            "formula": "可投资现金 = 账户总现金 - 现金安全储备 - 网格实盘现金 - 其他已占用现金",
+            "formula": "可投资现金 = 账户总现金 - 固定现金安全储备 - 网格实盘现金 - 其他已占用现金",
         },
+        "bond_to_equity_plan": plan,
+        "confirmed_transactions": transactions,
         "gold": {
             "class_total_cny": configured_totals.get("黄金", 0),
             "detail_total_cny": gold_detail_total,

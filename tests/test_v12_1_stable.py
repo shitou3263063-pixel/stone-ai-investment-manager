@@ -100,9 +100,9 @@ class V121StableTest(unittest.TestCase):
     def test_status_column_never_empty(self) -> None:
         self.assertTrue(all(row["status"] for row in self.allocation))
 
-    def test_cash_floor_blocks_cash_buy(self) -> None:
+    def test_fixed_cash_reserve_preserves_special_investable_cash(self) -> None:
         budget = build_budget_plan(self.allocation, self.dqs, self.risk, {"has_high_event_next_7_days": False}, self.opportunity, self.strategy)
-        self.assertEqual(budget["confirmed_cash_available_yuan"], 0)
+        self.assertEqual(budget["confirmed_cash_available_yuan"], 21000)
         self.assertEqual(budget["today_total_yuan"], 0)
 
     def test_today_week_month_budget_consistency(self) -> None:
@@ -110,10 +110,12 @@ class V121StableTest(unittest.TestCase):
         self.assertLessEqual(budget["today_total_yuan"], budget["week_confirmed_yuan"])
         self.assertLessEqual(budget["week_confirmed_yuan"], budget["month_confirmed_yuan"])
 
-    def test_bond_to_equity_budget_is_conditional(self) -> None:
+    def test_bond_to_equity_budget_is_arrived_and_partly_executed(self) -> None:
         budget = build_budget_plan(self.allocation, self.dqs, self.risk, {"has_high_event_next_7_days": False}, self.opportunity, self.strategy)
         self.assertGreater(budget["conditional_bond_to_equity_month_yuan"], 0)
-        self.assertEqual(budget["funding_note"].startswith("未到账债券"), True)
+        self.assertIn("已实际到账", budget["funding_note"])
+        self.assertEqual(budget["bond_to_equity_executed_this_month_yuan"], 9000)
+        self.assertEqual(budget["bond_to_equity_remaining_this_month_yuan"], 21000)
 
     def test_dca_date_rule_present(self) -> None:
         budget = build_budget_plan(self.allocation, self.dqs, self.risk, {"has_high_event_next_7_days": False}, self.opportunity, self.strategy)

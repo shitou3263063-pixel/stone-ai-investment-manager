@@ -34,6 +34,7 @@ from src.reports.report_center import (
     build_run_status,
     generate_daily_report,
     generate_monthly_report,
+    generate_portfolio_snapshot_report,
     generate_today_action,
     generate_weekly_report,
 )
@@ -181,6 +182,7 @@ def run(*, send_email: bool = True) -> str:
 
     today_action_path = reports_dir / "today_action.md"
     daily_report_path = reports_dir / "daily_report.md"
+    portfolio_snapshot_path = reports_dir / "portfolio_snapshot.md"
     weekly_report_path = reports_dir / "weekly_report.md"
     run_status_path = reports_dir / "run_status.json"
 
@@ -201,6 +203,7 @@ def run(*, send_email: bool = True) -> str:
         ),
         encoding="utf-8",
     )
+    portfolio_snapshot_path.write_text(generate_portfolio_snapshot_report(decision), encoding="utf-8")
     weekly_result = write_weekly_report_if_due(reports_dir, decision, today)
     (reports_dir / "monthly_report.md").write_text(generate_monthly_report(decision), encoding="utf-8")
     (reports_dir / "system_check_report.md").write_text(_system_check_report(), encoding="utf-8")
@@ -208,6 +211,7 @@ def run(*, send_email: bool = True) -> str:
     fixed_report_files = [
         "reports/today_action.md",
         "reports/daily_report.md",
+        "reports/portfolio_snapshot.md",
         "reports/weekly_report.md",
         "reports/run_status.json",
     ]
