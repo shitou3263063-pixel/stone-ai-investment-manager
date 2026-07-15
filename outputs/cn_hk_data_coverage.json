@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T00:09:11+08:00",
+  "generated_at": "2026-07-16T01:24:28+08:00",
   "scope": "CN_HK_P0_PLUS_P1A",
   "p0_market_completeness": {
     "cn_data_completeness": {
@@ -21,9 +21,9 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "cache:yfinance",
-          "market_date": "2026-07-13",
-          "fetched_at": "2026-07-15T02:22:44",
+          "source": "yfinance",
+          "market_date": "2026-07-14",
+          "fetched_at": "2026-07-16T01:24:24",
           "freshness": "stale",
           "fallback_used": true,
           "missing_fields": [
@@ -47,9 +47,9 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "cache:yfinance",
-          "market_date": "2026-07-13",
-          "fetched_at": "2026-07-15T02:22:45",
+          "source": "yfinance",
+          "market_date": "2026-07-14",
+          "fetched_at": "2026-07-16T01:24:24",
           "freshness": "stale",
           "fallback_used": true,
           "missing_fields": [
@@ -87,9 +87,9 @@
           "currency": "HKD",
           "timezone": "Asia/Hong_Kong",
           "data_status": "VALID",
-          "source": "cache:yfinance",
-          "market_date": "2026-07-13",
-          "fetched_at": "2026-07-15T02:22:44",
+          "source": "yfinance",
+          "market_date": "2026-07-14",
+          "fetched_at": "2026-07-16T01:24:23",
           "freshness": "stale",
           "fallback_used": true,
           "missing_fields": [
@@ -113,9 +113,9 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "cache:yfinance",
-          "market_date": "2026-07-13",
-          "fetched_at": "2026-07-15T02:22:45",
+          "source": "yfinance",
+          "market_date": "2026-07-14",
+          "fetched_at": "2026-07-16T01:24:24",
           "freshness": "stale",
           "fallback_used": true,
           "missing_fields": [
@@ -139,9 +139,9 @@
           "currency": "CNY",
           "timezone": "Asia/Shanghai",
           "data_status": "VALID",
-          "source": "cache:yfinance",
-          "market_date": "2026-07-13",
-          "fetched_at": "2026-07-15T02:22:45",
+          "source": "yfinance",
+          "market_date": "2026-07-14",
+          "fetched_at": "2026-07-16T01:24:25",
           "freshness": "stale",
           "fallback_used": true,
           "missing_fields": [

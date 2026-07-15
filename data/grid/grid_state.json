@@ -1,9 +1,9 @@
 {
-  "version": "Stone AI Investment Manager Pro V12.6.1 Stable",
+  "version": "Stone AI Investment Manager Pro V12.6.2 Stable",
   "symbols": {
     "VOO": {
       "symbol": "VOO",
-      "state": "HOLDING_GRID_POSITION",
+      "state": "SAFE_MODE",
       "anchor_price": 693.86,
       "buy_spacing_pct": 0.0285,
       "sell_spacing_pct": 0.0473,
@@ -24,11 +24,11 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-16T00:09:45"
+      "updated_at": "2026-07-16T01:26:59"
     },
     "QQQ": {
       "symbol": "QQQ",
-      "state": "WAIT_BUY",
+      "state": "SAFE_MODE",
       "anchor_price": 725.51,
       "buy_spacing_pct": 0.0617,
       "sell_spacing_pct": 0.0878,
@@ -49,8 +49,8 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-16T00:09:45"
+      "updated_at": "2026-07-16T01:26:59"
     }
   },
-  "updated_at": "2026-07-16T00:09:45"
+  "updated_at": "2026-07-16T01:26:59"
 }

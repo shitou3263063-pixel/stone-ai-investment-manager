@@ -54,9 +54,9 @@ def _symbol_status_table(symbol: str, item: dict[str, Any]) -> list[str]:
         f"| 距离下一买入价 | {distance_buy} |",
         f"| 下一卖出价 | {next_sell} |",
         f"| 距离下一卖出价 | {distance_sell} |",
-        f"| 核心仓 | {_text(state.get('core_quantity'), '0')} 股 |",
-        f"| 网格仓 | {_text(state.get('grid_quantity'), '0')} 股 |",
-        f"| 网格现金 | {_yuan(state.get('available_grid_cash_yuan'))} |",
+        f"| 模拟核心仓 | {_text(state.get('core_quantity'), '0')} 股 |",
+        f"| 模拟网格仓 | {_text(state.get('grid_quantity'), '0')} 股 |",
+        f"| 模拟网格现金 | {_yuan(state.get('available_grid_cash_yuan'))} |",
         f"| 今日信号 | {_text(signal.get('raw_signal'))} |",
         f"| 总风控结论 | {_text(review.get('final_advice'))} |",
         "",
@@ -71,6 +71,8 @@ def generate_grid_daily_section(grid_result: dict[str, Any]) -> str:
     total_advice = grid_result.get("today_total_advice_yuan", 0)
     lines = [
         "# Stone Smart Grid",
+        "",
+        "SIMULATION_ONLY = true",
         "",
         "## 1. 今日网格结论",
         "",

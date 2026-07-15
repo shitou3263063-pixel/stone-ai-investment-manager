@@ -1,5 +1,5 @@
-schema_version: 1
-as_of: 2026-07-12
+schema_version: 2
+as_of: 2026-07-15
 
 securities:
   - canonical_id: VOO
@@ -9,6 +9,9 @@ securities:
     aliases: [VOO, 标普500ETF, S&P500 ETF]
     pricing_proxy: VOO
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_large_cap_equity
+    listing_market: US
     strategy_type: core_etf
     currency: USD
 
@@ -19,6 +22,9 @@ securities:
     aliases: [QQQ, 纳斯达克100, Nasdaq-100 ETF]
     pricing_proxy: QQQ
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_growth_equity
+    listing_market: US
     strategy_type: growth_etf
     currency: USD
 
@@ -39,6 +45,9 @@ securities:
     aliases: [NVDA, 英伟达, NVIDIA]
     pricing_proxy: NVDA
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_technology_equity
+    listing_market: US
     strategy_type: single_stock
     currency: USD
 
@@ -49,6 +58,9 @@ securities:
     aliases: [GOOG, GOOGL, 谷歌, 谷歌-C, Alphabet]
     pricing_proxy: GOOG
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_technology_equity
+    listing_market: US
     strategy_type: single_stock
     currency: USD
 
@@ -58,7 +70,10 @@ securities:
     exchange: NASDAQ
     aliases: [TLT, 美国长期国债ETF, 长债ETF]
     pricing_proxy: TLT
-    asset_class: 美股
+    asset_class: fixed_income_etf
+    allocation_bucket: bonds
+    economic_exposure: us_long_duration_treasury
+    listing_market: US
     strategy_type: duration_bond_etf
     currency: USD
 
@@ -69,6 +84,9 @@ securities:
     aliases: [IBKR, 盈透证券]
     pricing_proxy: IBKR
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_financials_equity
+    listing_market: US
     strategy_type: single_stock
     currency: USD
 
@@ -79,6 +97,9 @@ securities:
     aliases: [XLF, 美国金融ETF, 金融ETF]
     pricing_proxy: XLF
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: us_financials_equity
+    listing_market: US
     strategy_type: sector_etf
     currency: USD
 
@@ -89,6 +110,9 @@ securities:
     aliases: [BABA, 阿里巴巴]
     pricing_proxy: BABA
     asset_class: 美股
+    allocation_bucket: us_equity
+    economic_exposure: china_equity
+    listing_market: US
     strategy_type: single_stock
     currency: USD
 

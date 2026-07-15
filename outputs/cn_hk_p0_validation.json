@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T00:09:11+08:00",
+  "generated_at": "2026-07-16T01:24:28+08:00",
   "mapping_validation_passed": true,
   "cn_data_completeness": 85.7,
   "hk_data_completeness": 85.7,
@@ -7,40 +7,40 @@
     "510300.SS": {
       "official_name": "沪深300ETF",
       "status": "VALID",
-      "source": "cache:yfinance",
-      "market_date": "2026-07-13",
+      "source": "yfinance",
+      "market_date": "2026-07-14",
       "currency": "CNY",
       "timezone": "Asia/Shanghai"
     },
     "002558.SZ": {
       "official_name": "巨人网络",
       "status": "VALID",
-      "source": "cache:yfinance",
-      "market_date": "2026-07-13",
+      "source": "yfinance",
+      "market_date": "2026-07-14",
       "currency": "CNY",
       "timezone": "Asia/Shanghai"
     },
     "03033.HK": {
       "official_name": "南方东英恒生科技指数ETF",
       "status": "VALID",
-      "source": "cache:yfinance",
-      "market_date": "2026-07-13",
+      "source": "yfinance",
+      "market_date": "2026-07-14",
       "currency": "HKD",
       "timezone": "Asia/Hong_Kong"
     },
     "513060.SS": {
       "official_name": "恒生医疗ETF",
       "status": "VALID",
-      "source": "cache:yfinance",
-      "market_date": "2026-07-13",
+      "source": "yfinance",
+      "market_date": "2026-07-14",
       "currency": "CNY",
       "timezone": "Asia/Shanghai"
     },
     "513090.SS": {
       "official_name": "香港证券ETF",
       "status": "VALID",
-      "source": "cache:yfinance",
-      "market_date": "2026-07-13",
+      "source": "yfinance",
+      "market_date": "2026-07-14",
       "currency": "CNY",
       "timezone": "Asia/Shanghai"
     }

@@ -131,6 +131,9 @@ def build_grid_decision_snapshot(
     *,
     symbols: tuple[str, ...] = ("VOO", "QQQ"),
     max_gap_minutes: int = 30,
+    decision_cutoff_time: str | None = None,
+    dqs_score: int | None = None,
+    require_dqs: int | None = None,
 ) -> dict[str, Any]:
     """Build one comparable decision snapshot while retaining display quotes."""
     display_quotes = {symbol: _quote(live_market_result, symbol) for symbol in symbols}
@@ -144,17 +147,26 @@ def build_grid_decision_snapshot(
         except (TypeError, ValueError, KeyError):
             observed_utc = None
         phase = _session_phase(item)
+        data_stage = str(item.get("data_stage") or "").upper()
         market_date = item.get("comparable_date") or item.get("market_date")
         valid = (
             _price(item) is not None
             and str(item.get("status") or "").lower() in {"ok", "success"}
             and not bool(item.get("stale"))
             and observed_utc is not None
-            and phase != "unknown"
+            and phase == "close"
+            and data_stage in {"", "OFFICIAL_CLOSE"}
             and bool(market_date)
         )
+        if decision_cutoff_time and observed_utc:
+            try:
+                valid = valid and observed_utc <= datetime.fromisoformat(decision_cutoff_time).astimezone(timezone.utc)
+            except ValueError:
+                valid = False
+        if dqs_score is not None and require_dqs is not None:
+            valid = valid and dqs_score >= require_dqs
         if not valid:
-            reasons.append(f"{symbol}缺少可用于决策的带时区新鲜行情。")
+            reasons.append(f"{symbol}缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。")
         normalized[symbol] = {
             "symbol": symbol,
             "price": _price(item),
@@ -308,7 +320,12 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
     grid_budget = build_grid_budget(decision, config)
     quantities = load_portfolio_quantities()
     max_gap_minutes = int(smart.get("risk", {}).get("max_decision_snapshot_gap_minutes", 30) or 30)
-    decision_snapshot = build_grid_decision_snapshot(live_market_result, max_gap_minutes=max_gap_minutes)
+    decision_snapshot = build_grid_decision_snapshot(
+        live_market_result, max_gap_minutes=max_gap_minutes,
+        decision_cutoff_time=(decision.get("data_time_summary", {}) or {}).get("decision_cutoff_time"),
+        dqs_score=int((decision.get("dqs", {}) or {}).get("score", 0) or 0),
+        require_dqs=int((smart.get("risk", {}) or {}).get("require_dqs", 85) or 85),
+    )
     symbols = {}
     for symbol, symbol_cfg in smart.get("symbols", {}).items():
         if not symbol_cfg.get("enabled", False):

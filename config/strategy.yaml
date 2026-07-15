@@ -1,6 +1,6 @@
-config_version: V12.6.1_STABLE
+config_version: V12.6.2_STABLE
 config_role: production_strategy_authority
-version: V12.6.1 Stable
+version: V12.6.2 Stable
 
 target_allocation:
   美股: 0.30
@@ -23,11 +23,12 @@ dqs_thresholds:
   severe_conflict_cap: 59
 
 dqs_weights:
-  market_completeness: 25
-  macro_completeness: 15
-  tier1_coverage: 15
-  dual_source: 20
-  freshness: 15
+  field_completeness: 20
+  timeliness: 15
+  source_quality: 15
+  dual_source_validation: 15
+  valuation_readiness: 15
+  transaction_reconciliation_quality: 10
   consistency: 10
 
 risk_weights:
@@ -84,6 +85,30 @@ scenario_stress:
     A股: -0.20
     债券: 0.05
     黄金: 0.10
+    现金: 0.00
+  equity_bond_drawdown:
+    美股: -0.30
+    港股: -0.35
+    A股: -0.25
+    普通债券: -0.05
+    TLT: -0.15
+    黄金: -0.10
+    现金: 0.00
+  inflation_reacceleration:
+    美股: -0.18
+    港股: -0.20
+    A股: -0.15
+    普通债券: -0.06
+    TLT: -0.18
+    黄金: -0.06
+    现金: 0.00
+  liquidity_shock:
+    美股: -0.28
+    港股: -0.32
+    A股: -0.24
+    普通债券: -0.03
+    TLT: -0.08
+    黄金: -0.08
     现金: 0.00
 
 budget:

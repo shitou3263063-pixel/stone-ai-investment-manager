@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-07-16T00:09:11+08:00",
+  "generated_at": "2026-07-16T01:24:28+08:00",
   "items": {
     "002558.SZ": {
       "api_name": "daily_basic",
       "source": "tushare_pro",
       "source_type": "authorized_api",
       "source_level": 2,
-      "fetched_at": "2026-07-16T00:09:11+08:00",
+      "fetched_at": "2026-07-16T01:24:32+08:00",
       "market_date": null,
       "timezone": "Asia/Shanghai",
       "currency": "CNY",
@@ -15,9 +15,9 @@
       "fallback_used": false,
       "records_count": 0,
       "fields_status": "missing",
-      "error_code": "UNKNOWN_ERROR",
-      "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
-      "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+      "error_code": "PERMISSION_DENIED",
+      "error_summary": "Tushare 接口权限不足：抱歉，您没有接口(daily_basic)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+      "error_message": "Tushare 接口权限不足：抱歉，您没有接口(daily_basic)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
       "last_success_at": null,
       "symbol": "002558.SZ",
       "official_name": "巨人网络",
@@ -46,21 +46,21 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "csindex_official",
-      "fetched_at": "2026-07-15T03:09:28",
-      "market_date": "2026-07-14",
+      "fetched_at": "2026-07-16T01:25:33+08:00",
+      "market_date": "2026-07-15",
       "reporting_period": null,
       "currency": "CNY",
       "unit": "mixed_valuation_units",
-      "status": "cached",
+      "status": "ok",
       "freshness": "fresh",
       "confidence": "high",
-      "fallback_used": true,
+      "fallback_used": false,
       "error_code": null,
       "error_message": "",
       "scoring_eligible": true,
       "valuation_basis": "CSI300_total_share_capital_PE1_DP1",
       "metrics": {
-        "pe_ttm": 14.89,
+        "pe_ttm": 14.9,
         "pb": null,
         "dividend_yield": 2.63
       },
@@ -73,16 +73,7 @@
         "pb"
       ],
       "price_percentile_used_as_valuation": false,
-      "attempts": 1,
-      "published_at": null,
-      "retrieved_at": "2026-07-16T00:09:27",
-      "freshness_status": "fresh",
-      "cache_used": true,
-      "cache_stale": false,
-      "cache_age_days": 0.87,
-      "warning": "",
-      "upstream_error_code": "UNKNOWN_ERROR",
-      "upstream_error_message": "URLError: <urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
+      "attempts": 1
     }
   },
   "selected_sources": {

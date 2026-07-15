@@ -170,7 +170,9 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         self.assertFalse(decision["today_trade"])
-        self.assertEqual(decision["targets"], "不适用")
+        self.assertEqual(decision["targets"], "VOO")
+        self.assertTrue(decision["today_confirmed_trade_executed"])
+        self.assertFalse(decision["decision_card"]["current_recommendation"]["continue_operation"])
 
     def test_decision_can_be_serialized_to_json(self) -> None:
         decision = build_v12_1_decision(
@@ -180,7 +182,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         encoded = json.dumps(decision, ensure_ascii=False, default=str)
-        self.assertIn("Stone AI Investment Manager Pro V12.6.1 Stable", encoded)
+        self.assertIn("Stone AI Investment Manager Pro V12.6.2 Stable", encoded)
 
     def test_report_fields_complete(self) -> None:
         decision = build_v12_1_decision(

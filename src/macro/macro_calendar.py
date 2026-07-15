@@ -60,7 +60,9 @@ def _as_aware_datetime(value: date | datetime, timezone_name: str) -> datetime:
 
 
 def classify_event_status(event: dict[str, Any], report_time: date | datetime, report_timezone: str = DEFAULT_REPORT_TIMEZONE) -> str:
-    """Classify an event against report time using UTC only."""
+    """Classify an event against report time using UTC only and never retain stale UPCOMING states."""
+    if str(event.get("status") or "").upper() == "CANCELLED" or event.get("cancelled"):
+        return "CANCELLED"
     raw_release = event.get("release_at_utc")
     if not raw_release:
         return "INVALID_TIME"
@@ -71,7 +73,18 @@ def classify_event_status(event: dict[str, Any], report_time: date | datetime, r
         current = _as_aware_datetime(report_time, report_timezone).astimezone(timezone.utc)
     except (TypeError, ValueError, KeyError):
         return "INVALID_TIME"
-    return "UPCOMING" if release.astimezone(timezone.utc) > current else "RELEASED"
+    release_utc = release.astimezone(timezone.utc)
+    if current >= release_utc:
+        if event.get("reviewed_at"):
+            return "REVIEWED"
+        # A calendar confirmation verifies timing, not the released economic
+        # value.  Keep post-release data in a safe pending-review state until
+        # a source explicitly confirms the result.
+        return "POST_RELEASE_REVIEW_PENDING" if event.get("release_result_confirmed") is False else "RELEASED"
+    restriction_hours = int(event.get("restriction_window_hours", 0) or 0)
+    if current >= release_utc - timedelta(hours=restriction_hours):
+        return "IN_RESTRICTION_WINDOW"
+    return "UPCOMING"
 
 
 def _normalise_official_event(raw: dict[str, Any], report_timezone: str) -> dict[str, Any]:
@@ -198,8 +211,9 @@ def get_upcoming_high_risk_events(
         if not raw_release:
             continue
         release = datetime.fromisoformat(str(raw_release).replace("Z", "+00:00")).astimezone(timezone.utc)
-        if classify_event_status(event, start, report_timezone) == "UPCOMING" and start < release <= end:
-            selected.append({**event, "status": "UPCOMING"})
+        status = classify_event_status(event, start, report_timezone)
+        if status in {"UPCOMING", "IN_RESTRICTION_WINDOW"} and start < release <= end:
+            selected.append({**event, "status": status})
     return sorted(selected, key=lambda item: item["release_at_utc"])
 
 
@@ -224,8 +238,9 @@ def analyze_macro_calendar(
         < datetime.fromisoformat(str(event["release_at_utc"])).astimezone(timezone.utc)
         <= end_7d
     ]
-    released = [event for event in events if event.get("status") == "RELEASED"]
-    next_review = high_48h[0] if high_48h else high_7d[0] if high_7d else None
+    released = [event for event in events if event.get("status") in {"RELEASED", "POST_RELEASE_REVIEW_PENDING", "REVIEWED"}]
+    pending_review = next((event for event in events if event.get("status") == "POST_RELEASE_REVIEW_PENDING" and event.get("risk_level") == "high"), None)
+    next_review = pending_review or (high_48h[0] if high_48h else high_7d[0] if high_7d else None)
     if high_7d:
         reminder = "未来7天存在已核验高等级宏观事件；事件前暂停机会加仓，基础定投只复核，不自动转为大额交易。"
     elif any(item.get("verification_status") == "unverified" for item in upcoming):
@@ -254,7 +269,9 @@ def analyze_macro_calendar(
             if next_review else None
         ),
         "next_review_reason": (
-            f"等待{next_review.get('event_name')}公布后{EVENT_REVIEW_DELAY_MINUTES}分钟重新复核市场、DQS和交易条件。"
+            (f"{next_review.get('event_name')}已到公布时间，但结果来源尚未确认；在公布后{EVENT_REVIEW_DELAY_MINUTES}分钟复核市场、DQS和交易条件。"
+             if next_review.get("status") == "POST_RELEASE_REVIEW_PENDING"
+             else f"等待{next_review.get('event_name')}公布后{EVENT_REVIEW_DELAY_MINUTES}分钟重新复核市场、DQS和交易条件。")
             if next_review else "未来7天无已核验高等级待发布事件，使用下一基础定投复核时间。"
         ),
         "calendar_confidence": "high" if high_7d else "low" if upcoming else "medium",
