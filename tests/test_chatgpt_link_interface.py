@@ -124,8 +124,29 @@ def test_email_subject_body_and_attachments_are_fixed() -> None:
             "weekly_report.md",
             "run_status.json",
         ]
-        for field in ["报告日期", "数据截止时间", "今日是否执行", "标的和金额", "可投资现金", "下一复核日期", "DQS", "是否存在警告或错误"]:
+        for field in ["运行时段", "报告日期", "数据截止时间", "今日是否执行", "标的和金额", "可投资现金", "下一复核日期", "DQS", "是否存在警告或错误"]:
             assert field in args[2]
+
+
+def test_dual_timezone_email_subject_identifies_us_market_run() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        reports = _write_email_fixture(root)
+        with patch.dict("os.environ", {"REPORT_RUN_LABEL": "美东时间 08:30"}, clear=False):
+            with patch("src.notifier.email_notifier._send_email") as sender:
+                result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
+        assert result["sent"] is True
+        assert sender.call_args.args[1] == f"{DAILY_EMAIL_SUBJECT} | 美东时间 08:30"
+        assert "运行时段：美东时间 08:30" in sender.call_args.args[2]
+
+
+def test_github_daily_workflow_has_beijing_and_new_york_0830() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
+    assert 'cron: "30 8 * * *"' in workflow
+    assert 'timezone: "Asia/Shanghai"' in workflow
+    assert 'cron: "30 8 * * 0-6"' in workflow
+    assert 'timezone: "America/New_York"' in workflow
+    assert "Run Stone AI Investment Manager Pro V12.7.0 Stable" in workflow
 
 
 def test_four_attachments_have_readable_mime_payloads() -> None:
