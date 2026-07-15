@@ -21,6 +21,7 @@ from scripts.preflight_check import (  # noqa: E402
     run_preflight,
 )
 from src.data_sources.source_audit import build_and_write_source_audit  # noqa: E402
+from src.data_sources.decision_time import filter_market_for_cutoff, now_report_time, to_report_iso  # noqa: E402
 from src.portfolio_snapshot import build_portfolio_snapshot  # noqa: E402
 from utils.market_data_provider import fetch_yfinance_market_data  # noqa: E402
 
@@ -116,12 +117,16 @@ def _task_gates(day: date, dqs: dict[str, Any], execution_state: dict[str, Any])
     }
 
 
-def build_snapshot(snapshot_date: date | None = None) -> dict[str, Any]:
+def build_snapshot(snapshot_date: date | None = None, *, decision_cutoff_time: datetime | None = None) -> dict[str, Any]:
     snapshot_date = snapshot_date or date.today()
     master = load_yaml(MASTER_PATH)
     execution_state = load_json(EXECUTION_STATE_PATH)
     market = _market_snapshot()
+    # The default cutoff is captured after all retrievals so retrieved_at can
+    # never be later than the decision boundary. Tests may inject a fixed clock.
+    cutoff = decision_cutoff_time or now_report_time()
     market, source_audit = build_and_write_source_audit(market)
+    market = filter_market_for_cutoff(market, cutoff)
     quality = market.get("data_quality", {}) or {}
     blocking_errors = list(quality.get("blocking_errors", []) or [])
     if quality.get("critical_missing"):
@@ -134,7 +139,9 @@ def build_snapshot(snapshot_date: date | None = None) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "as_of": snapshot_date.isoformat(),
-        "built_at": datetime.now().isoformat(timespec="seconds"),
+        "built_at": to_report_iso(cutoff),
+        "report_generation_time": to_report_iso(cutoff),
+        "decision_cutoff_time": to_report_iso(cutoff),
         "data_priority": [
             "portfolio_master.yaml",
             "broker_and_trade_records",
@@ -159,8 +166,8 @@ def build_snapshot(snapshot_date: date | None = None) -> dict[str, Any]:
     }
 
 
-def write_snapshot(path: Path = SNAPSHOT_PATH) -> dict[str, Any]:
-    snapshot = build_snapshot()
+def write_snapshot(path: Path = SNAPSHOT_PATH, *, decision_cutoff_time: datetime | None = None) -> dict[str, Any]:
+    snapshot = build_snapshot(decision_cutoff_time=decision_cutoff_time)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
     return snapshot

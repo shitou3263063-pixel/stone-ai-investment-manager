@@ -1,4 +1,4 @@
-config_version: V12.5_STABLE
+config_version: V12.7.0_STABLE
 data_role: production_portfolio_authority
 schema_version: 2
 as_of: 2026-07-15
@@ -15,10 +15,10 @@ notes:
   - "黄金分类总额547000元，等于实物金条512000元 + 黄金ETF 35000元。"
 
 totals:
-  us_stock: 394000
+  us_stock: 339000
   hk_stock: 272600
   cn_stock: 266500
-  china_bond: 1100000
+  china_bond: 1155000
   gold: 547000
   cash: 241000
   total_assets: 2821100
@@ -48,6 +48,9 @@ cash_policy:
 holdings:
   - asset_id: us_voo
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: us_large_cap_equity
+    listing_market: US
     security_name: VOO 标普500ETF
     security_code: VOO
     market: US
@@ -63,7 +66,10 @@ holdings:
     strategy_bucket: core_etf
 
   - asset_id: us_voo_20260715_pending_valuation
-    asset_class: us_stock
+    asset_class: equity_etf
+    allocation_bucket: us_equity
+    economic_exposure: us_large_cap_equity
+    listing_market: US
     security_name: VOO 2026-07-15新增投入成本（待估值）
     security_code: VOO_PENDING_20260715
     market: US
@@ -88,6 +94,9 @@ holdings:
 
   - asset_id: us_nvda
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: us_technology_equity
+    listing_market: US
     security_name: NVDA 英伟达
     security_code: NVDA
     market: US
@@ -104,6 +113,9 @@ holdings:
 
   - asset_id: us_goog
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: us_technology_equity
+    listing_market: US
     security_name: GOOG 谷歌-C
     security_code: GOOG
     market: US
@@ -119,7 +131,10 @@ holdings:
     strategy_bucket: single_stock
 
   - asset_id: us_tlt
-    asset_class: us_stock
+    asset_class: fixed_income_etf
+    allocation_bucket: bonds
+    economic_exposure: us_long_duration_treasury
+    listing_market: US
     security_name: TLT 美国长期国债ETF
     security_code: TLT
     market: US
@@ -136,6 +151,9 @@ holdings:
 
   - asset_id: us_ibkr
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: us_financials_equity
+    listing_market: US
     security_name: IBKR 盈透证券
     security_code: IBKR
     market: US
@@ -152,6 +170,9 @@ holdings:
 
   - asset_id: us_xlf
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: us_financials_equity
+    listing_market: US
     security_name: XLF 美国金融ETF
     security_code: XLF
     market: US
@@ -168,6 +189,9 @@ holdings:
 
   - asset_id: us_baba
     asset_class: us_stock
+    allocation_bucket: us_equity
+    economic_exposure: china_equity
+    listing_market: US
     security_name: BABA 阿里巴巴
     security_code: BABA
     market: US
@@ -184,6 +208,9 @@ holdings:
 
   - asset_id: hk_03033
     asset_class: hk_stock
+    allocation_bucket: hk_equity
+    economic_exposure: hong_kong_technology_equity
+    listing_market: HK
     security_name: 南方东英恒生科技指数ETF
     security_code: "03033.HK"
     market: HK
@@ -205,6 +232,9 @@ holdings:
 
   - asset_id: hk_513060
     asset_class: hk_stock
+    allocation_bucket: hk_equity
+    economic_exposure: hong_kong_healthcare_equity
+    listing_market: CN
     security_name: 恒生医疗ETF
     security_code: "513060"
     market: CN
@@ -221,6 +251,9 @@ holdings:
 
   - asset_id: hk_513090
     asset_class: hk_stock
+    allocation_bucket: hk_equity
+    economic_exposure: hong_kong_financials_equity
+    listing_market: CN
     security_name: 香港证券ETF
     security_code: "513090"
     market: CN
@@ -237,6 +270,9 @@ holdings:
 
   - asset_id: cn_510300
     asset_class: cn_stock
+    allocation_bucket: cn_equity
+    economic_exposure: china_equity
+    listing_market: CN
     security_name: 沪深300ETF
     security_code: "510300"
     market: CN
@@ -254,6 +290,9 @@ holdings:
 
   - asset_id: cn_002558
     asset_class: cn_stock
+    allocation_bucket: cn_equity
+    economic_exposure: china_equity
+    listing_market: CN
     security_name: 巨人网络
     security_code: "002558"
     market: CN
@@ -271,6 +310,9 @@ holdings:
 
   - asset_id: cn_st_wentai
     asset_class: cn_stock
+    allocation_bucket: cn_equity
+    economic_exposure: china_equity
+    listing_market: CN
     security_name: "*ST闻泰"
     security_code: ""
     market: CN
@@ -287,6 +329,9 @@ holdings:
 
   - asset_id: bond_cn_core
     asset_class: china_bond
+    allocation_bucket: bonds
+    economic_exposure: china_fixed_income
+    listing_market: CN
     security_name: 中国债券组合（不含10年地债）
     security_code: CN_BOND_CORE
     market: CN
@@ -305,6 +350,9 @@ holdings:
 
   - asset_id: bond_cn_10y_local
     asset_class: china_bond
+    allocation_bucket: bonds
+    economic_exposure: china_local_government_bond
+    listing_market: CN
     security_name: 10年地债
     security_code: CN_LOCAL_BOND_10Y
     market: CN
@@ -323,6 +371,9 @@ holdings:
 
   - asset_id: gold_bar_565g
     asset_class: gold
+    allocation_bucket: gold
+    economic_exposure: gold
+    listing_market: physical
     security_name: 实物金条
     security_code: GOLD_BAR_565G
     market: physical
@@ -341,6 +392,9 @@ holdings:
 
   - asset_id: gold_518880
     asset_class: gold
+    allocation_bucket: gold
+    economic_exposure: gold
+    listing_market: CN
     security_name: 黄金ETF
     security_code: "518880"
     market: CN
@@ -358,6 +412,9 @@ holdings:
 
   - asset_id: cash_total
     asset_class: cash
+    allocation_bucket: cash
+    economic_exposure: cny_cash
+    listing_market: CN
     security_name: 账户总现金
     security_code: CASH_CNY
     market: cash

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 from typing import Any
@@ -32,9 +32,9 @@ def get_quote(symbol: str) -> dict[str, Any]:
         raise RuntimeError(f"Finnhub 返回无效行情: {payload}")
 
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
-    retrieved_at = datetime.now().isoformat(timespec="seconds")
+    retrieved_at = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
     timestamp = payload.get("t")
-    published_at = datetime.fromtimestamp(float(timestamp)).isoformat(timespec="seconds") if timestamp else None
+    published_at = datetime.fromtimestamp(float(timestamp), tz=timezone.utc).isoformat(timespec="seconds") if timestamp else None
     return {
         "close": round(close, 4),
         "previous_close": round(previous_close, 4),
@@ -42,6 +42,7 @@ def get_quote(symbol: str) -> dict[str, Any]:
         "status": "ok",
         "source": "finnhub",
         "published_at": published_at,
+        "quote_timestamp": published_at,
         "retrieved_at": retrieved_at,
         "fetched_at": retrieved_at,
         "freshness_status": "fresh",

@@ -1,4 +1,4 @@
-config_version: V12.6.1_STABLE
+config_version: V12.7.0_STABLE
 config_role: compatibility_macro_and_legacy_planning_inputs
 
 # 仅作为官方日历不可用时的备用来源；CPI/PPI 使用 src/macro/macro_calendar.py

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -22,8 +22,9 @@ def get_quote(symbol: str) -> dict[str, Any]:
     previous_close = float(closes.iloc[-2]) if len(closes) >= 2 else close
     change_pct = 0.0 if previous_close == 0 else (close / previous_close - 1) * 100
     last_index = closes.index[-1]
-    published_at = last_index.isoformat() if hasattr(last_index, "isoformat") else str(last_index)
-    retrieved_at = datetime.now().isoformat(timespec="seconds")
+    daily_index_timestamp = last_index.isoformat() if hasattr(last_index, "isoformat") else str(last_index)
+    market_date = str(getattr(last_index, "date", lambda: str(last_index)[:10])())
+    retrieved_at = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
     volumes = history["Volume"].dropna() if "Volume" in history.columns else []
     volume = float(volumes.iloc[-1]) if len(volumes) else None
     prior_volume_average = float(volumes.iloc[:-1].mean()) if len(volumes) >= 2 else None
@@ -36,7 +37,14 @@ def get_quote(symbol: str) -> dict[str, Any]:
         "volume_ratio": round(volume_ratio, 4) if volume_ratio is not None else None,
         "status": "ok",
         "source": "yfinance",
-        "published_at": published_at,
+        "market_date": market_date,
+        "daily_index_market_date": market_date,
+        "daily_index_timestamp": daily_index_timestamp,
+        "published_at": None,
+        "quote_timestamp": None,
+        "data_frequency": "daily",
+        "daily_bar_finalized": False,
+        "is_finalized": False,
         "retrieved_at": retrieved_at,
         "fetched_at": retrieved_at,
         "freshness_status": "fresh",

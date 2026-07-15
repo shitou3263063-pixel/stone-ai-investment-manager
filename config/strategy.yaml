@@ -1,6 +1,6 @@
-config_version: V12.6.1_STABLE
+config_version: V12.7.0_STABLE
 config_role: production_strategy_authority
-version: V12.6.1 Stable
+version: V12.7.0 Stable
 
 target_allocation:
   美股: 0.30
@@ -23,11 +23,12 @@ dqs_thresholds:
   severe_conflict_cap: 59
 
 dqs_weights:
-  market_completeness: 25
-  macro_completeness: 15
-  tier1_coverage: 15
-  dual_source: 20
-  freshness: 15
+  field_completeness: 20
+  timeliness: 15
+  source_quality: 15
+  dual_source_validation: 15
+  valuation_readiness: 15
+  transaction_reconciliation_quality: 10
   consistency: 10
 
 risk_weights:
@@ -84,6 +85,75 @@ scenario_stress:
     A股: -0.20
     债券: 0.05
     黄金: 0.10
+    现金: 0.00
+  equity_bond_drawdown:
+    美股: -0.30
+    港股: -0.35
+    A股: -0.25
+    普通债券: -0.05
+    TLT: -0.15
+    黄金: -0.10
+    现金: 0.00
+  inflation_reacceleration:
+    美股: -0.18
+    港股: -0.20
+    A股: -0.15
+    普通债券: -0.06
+    TLT: -0.18
+    黄金: -0.06
+    现金: 0.00
+  liquidity_shock:
+    美股: -0.28
+    港股: -0.32
+    A股: -0.24
+    普通债券: -0.03
+    TLT: -0.08
+    黄金: -0.08
+    现金: 0.00
+  financial_crisis_2008:
+    美股: -0.45
+    港股: -0.50
+    A股: -0.35
+    普通债券: -0.10
+    债券: -0.10
+    TLT: -0.25
+    黄金: 0.05
+    现金: 0.00
+  equity_bond_selloff_2022:
+    美股: -0.25
+    港股: -0.30
+    A股: -0.20
+    普通债券: -0.10
+    债券: -0.10
+    TLT: -0.30
+    黄金: -0.05
+    现金: 0.00
+  rates_up_200bp:
+    美股: -0.22
+    港股: -0.25
+    A股: -0.15
+    普通债券: -0.12
+    债券: -0.12
+    TLT: -0.35
+    黄金: -0.12
+    现金: 0.00
+  hk_tech_crash_40:
+    美股: -0.10
+    港股: -0.40
+    A股: -0.12
+    普通债券: 0.01
+    债券: 0.01
+    TLT: 0.03
+    黄金: 0.03
+    现金: 0.00
+  global_liquidity_crisis:
+    美股: -0.55
+    港股: -0.60
+    A股: -0.45
+    普通债券: -0.22
+    债券: -0.22
+    TLT: -0.40
+    黄金: -0.20
     现金: 0.00
 
 budget:

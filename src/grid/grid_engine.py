@@ -17,6 +17,7 @@ from .validator import review_grid_signal
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
 from src.data_sources.time_normalization import normalize_to_utc
+from src.data_sources.normalized_market import market_quote_reference
 
 
 MANUAL_FIELDS = ["trade_id", "date", "symbol", "action", "quantity", "price", "fees", "status", "note"]
@@ -118,12 +119,7 @@ def _price(item: dict[str, Any]) -> float | None:
 
 
 def _session_phase(item: dict[str, Any]) -> str:
-    session = str(item.get("data_session") or "").lower()
-    if session in {"realtime", "intraday_delayed"}:
-        return "intraday"
-    if session in {"official_close", "previous_close"}:
-        return "close"
-    return "unknown"
+    return str(item.get("price_stage") or item.get("data_stage") or "UNKNOWN").upper()
 
 
 def build_grid_decision_snapshot(
@@ -131,38 +127,51 @@ def build_grid_decision_snapshot(
     *,
     symbols: tuple[str, ...] = ("VOO", "QQQ"),
     max_gap_minutes: int = 30,
+    decision_cutoff_time: str | None = None,
+    dqs_score: int | None = None,
+    require_dqs: int | None = None,
 ) -> dict[str, Any]:
     """Build one comparable decision snapshot while retaining display quotes."""
     display_quotes = {symbol: _quote(live_market_result, symbol) for symbol in symbols}
     normalized: dict[str, dict[str, Any]] = {}
     reasons: list[str] = []
     for symbol, item in display_quotes.items():
-        source_timezone = item.get("source_timezone") or item.get("market_timezone") or item.get("timezone")
-        raw_time = item.get("observed_at_utc") or item.get("observed_at") or item.get("published_at")
+        source_timezone = item.get("market_timezone") or item.get("source_timezone") or item.get("timezone")
+        raw_time = item.get("quote_timestamp") or item.get("observed_at_utc")
         try:
             observed_utc = normalize_to_utc(raw_time, source_timezone=str(source_timezone) if source_timezone else None)
         except (TypeError, ValueError, KeyError):
             observed_utc = None
         phase = _session_phase(item)
-        market_date = item.get("comparable_date") or item.get("market_date")
+        data_stage = str(item.get("price_stage") or item.get("data_stage") or "UNKNOWN").upper()
+        market_date = item.get("market_date")
         valid = (
             _price(item) is not None
             and str(item.get("status") or "").lower() in {"ok", "success"}
             and not bool(item.get("stale"))
             and observed_utc is not None
-            and phase != "unknown"
+            and phase == "OFFICIAL_CLOSE"
+            and data_stage == "OFFICIAL_CLOSE"
+            and bool(item.get("is_finalized"))
             and bool(market_date)
         )
+        if decision_cutoff_time and observed_utc:
+            try:
+                valid = valid and observed_utc <= datetime.fromisoformat(decision_cutoff_time).astimezone(timezone.utc)
+            except ValueError:
+                valid = False
+        if dqs_score is not None and require_dqs is not None:
+            valid = valid and dqs_score >= require_dqs
         if not valid:
-            reasons.append(f"{symbol}缺少可用于决策的带时区新鲜行情。")
+            reasons.append(f"{symbol}缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。")
+        quote_ref = market_quote_reference(item, symbol)
         normalized[symbol] = {
-            "symbol": symbol,
-            "price": _price(item),
+            **quote_ref,
+            "price": quote_ref["current_price"],
             "observed_at_utc": observed_utc.isoformat() if observed_utc else None,
             "source_timezone": source_timezone or "unknown",
             "market_date": str(market_date) if market_date else None,
-            "market_phase": phase,
-            "source": item.get("source", "unavailable"),
+            "market_phase": data_stage,
             "valid": valid,
         }
 
@@ -308,7 +317,12 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
     grid_budget = build_grid_budget(decision, config)
     quantities = load_portfolio_quantities()
     max_gap_minutes = int(smart.get("risk", {}).get("max_decision_snapshot_gap_minutes", 30) or 30)
-    decision_snapshot = build_grid_decision_snapshot(live_market_result, max_gap_minutes=max_gap_minutes)
+    decision_snapshot = build_grid_decision_snapshot(
+        live_market_result, max_gap_minutes=max_gap_minutes,
+        decision_cutoff_time=(decision.get("data_time_summary", {}) or {}).get("decision_cutoff_time"),
+        dqs_score=int((decision.get("dqs", {}) or {}).get("score", 0) or 0),
+        require_dqs=int((smart.get("risk", {}) or {}).get("require_dqs", 85) or 85),
+    )
     symbols = {}
     for symbol, symbol_cfg in smart.get("symbols", {}).items():
         if not symbol_cfg.get("enabled", False):

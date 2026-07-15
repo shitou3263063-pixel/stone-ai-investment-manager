@@ -124,7 +124,7 @@ def test_dqs_safe_mode_downgrades_actionable_opportunities() -> None:
     decision = _decision()
     assert decision["dqs"]["mode"] == "safe"
     opportunity = {row["name"]: row for row in decision["opportunity"]}
-    assert opportunity["VOO"]["advice"] == "观察，等待数据质量恢复"
+    assert opportunity["VOO"]["advice"] == "等待条件，今日不交易"
     assert decision["today_trade"] is False
     assert decision["budget"]["today_total_yuan"] == 0
 

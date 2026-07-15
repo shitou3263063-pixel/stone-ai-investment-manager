@@ -1,25 +1,25 @@
 {
-  "fetched_at": "2026-07-16T00:09:44+08:00",
+  "fetched_at": "2026-07-16T02:08:10+08:00",
   "status": "partial",
   "cn": {
     "status": "failed",
     "source": "cninfo_official",
     "source_level": 1,
     "source_type": "official_disclosure_platform",
-    "fetched_at": "2026-07-16T00:09:44+08:00",
+    "fetched_at": "2026-07-16T02:08:10+08:00",
     "market_date": null,
     "timezone": "Asia/Shanghai",
     "records": [],
     "record_count": 0,
     "fallback_used": false,
-    "error_message": "<urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
+    "error_message": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)>"
   },
   "hk": {
     "status": "framework_ready",
     "source": "hkex_official",
     "source_level": 1,
     "source_type": "official_exchange_disclosure",
-    "fetched_at": "2026-07-16T00:09:44+08:00",
+    "fetched_at": "2026-07-16T02:08:10+08:00",
     "market_date": null,
     "timezone": "Asia/Hong_Kong",
     "symbols": [

@@ -1,4 +1,4 @@
-config_version: V12.6.1_STABLE
+config_version: V12.7.0_STABLE
 config_role: production_data_source_priority_authority
 schema_version: 1
 policy:

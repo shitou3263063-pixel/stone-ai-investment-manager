@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 
-GRID_VERSION = "Stone AI Investment Manager Pro V12.6.1 Stable"
+GRID_VERSION = "Stone AI Investment Manager Pro V12.7.0 Stable"
 GRID_STATES = {
     "IDLE",
     "WAIT_BUY",

@@ -7,13 +7,15 @@ from zoneinfo import ZoneInfo
 
 from src.analysis.scenario_analysis import calculate_portfolio_stress_scenarios
 from src.data_sources.cn_hk_p1a import write_scoring_trace
+from src.data_sources.decision_time import filter_market_for_cutoff, item_time_metadata
+from src.data_sources.normalized_market import PRICE_STAGES, classify_price_stage, market_quote_reference
 from src.macro.macro_calendar import get_upcoming_high_risk_events
 from src.portfolio_snapshot import build_portfolio_snapshot
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
 
 
-VERSION_NAME = "Stone AI Investment Manager Pro V12.6.1 Stable"
+VERSION_NAME = "Stone AI Investment Manager Pro V12.7.0 Stable"
 
 DEFAULT_STRATEGY: dict[str, Any] = {
     "cash": {"safety_ratio": 0.08, "hard_floor_ratio": 0.05},
@@ -25,12 +27,9 @@ DEFAULT_STRATEGY: dict[str, Any] = {
         "severe_conflict_cap": 59,
     },
     "dqs_weights": {
-        "market_completeness": 25,
-        "macro_completeness": 15,
-        "tier1_coverage": 15,
-        "dual_source": 20,
-        "freshness": 15,
-        "consistency": 10,
+        "field_completeness": 20, "timeliness": 15, "source_quality": 15,
+        "dual_source_validation": 15, "valuation_readiness": 15,
+        "transaction_reconciliation_quality": 10, "consistency": 10,
     },
     "risk_weights": {
         "valuation": 20,
@@ -82,6 +81,19 @@ SOURCE_TIERS = {
     "manual_fallback": 4,
     "unavailable": 99,
 }
+TRADE_ORIGINS = {
+    "SCHEDULED_BASE_DCA", "SYSTEM_NEW_RECOMMENDATION", "USER_DISCRETIONARY_TRADE",
+    "CONDITIONAL_PLAN_TRIGGERED", "RISK_REDUCTION", "UNKNOWN",
+}
+
+
+def scheduled_dca_event_window_policy(*, already_executed: bool, in_event_window: bool) -> str:
+    """Apply event discipline prospectively without rewriting an executed fact."""
+    if already_executed:
+        return "PRE_AUTHORIZED_EXECUTED_NO_RETROACTIVE_RECLASSIFICATION"
+    if in_event_window:
+        return "PAUSE_AND_REVIEW_BEFORE_EXECUTION"
+    return "ELIGIBLE_SUBJECT_TO_STANDARD_GATES"
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +193,7 @@ def _macro_items(live_market: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
+    timing = item_time_metadata(item)
     value = item.get("close", item.get("value"))
     display = "暂无可靠数据"
     if _is_ok_item(item):
@@ -191,8 +204,8 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "display_value": display,
         "previous": item.get("previous_close", item.get("previous_value")),
         "change_pct": item.get("change_pct"),
-        "timestamp": item.get("observed_at") or item.get("published_at") or item.get("date") or "暂无数据",
-        "observed_at": item.get("observed_at") or item.get("published_at") or item.get("date"),
+        "timestamp": timing.get("source_observation_time") or item.get("observed_at") or item.get("published_at") or item.get("date") or "暂无数据",
+        "observed_at": timing.get("source_observation_time") or item.get("observed_at") or item.get("published_at") or item.get("date"),
         "observed_at_utc": item.get("observed_at_utc"),
         "fetched_at": item.get("fetched_at") or item.get("retrieved_at"),
         "received_at_utc": item.get("received_at_utc"),
@@ -203,9 +216,19 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
         "data_session": item.get("data_session") or ("unavailable" if not _is_ok_item(item) else "unknown"),
         "freshness_status": item.get("freshness_status") or ("unavailable" if not _is_ok_item(item) else "unknown"),
         "age_hours": item.get("age_hours"),
+        "data_age_hours": item.get("data_age_hours", item.get("age_hours")),
+        "price_stage": item.get("price_stage") or timing.get("data_stage"),
+        "data_basis": item.get("data_basis") or timing.get("data_basis"),
+        "market_date": item.get("market_date") or timing.get("market_session_date"),
+        "quote_timestamp": item.get("quote_timestamp") or timing.get("source_observation_time"),
+        "is_finalized": bool(item.get("is_finalized", timing.get("is_finalized"))),
         "source_level": item.get("source_level", _source_tier(item.get("source"))),
         "comparable_date": item.get("comparable_date") or str(item.get("observed_at") or item.get("published_at") or item.get("date") or "")[:10] or None,
-        "retrieved_at": item.get("retrieved_at") or item.get("fetched_at") or "暂无数据",
+        "retrieved_at": timing.get("data_retrieval_time") or item.get("retrieved_at") or item.get("fetched_at") or "暂无数据",
+        "source_observation_time": timing.get("source_observation_time"),
+        "market_session_date": timing.get("market_session_date"),
+        "data_retrieval_time": timing.get("data_retrieval_time"),
+        "data_stage": timing.get("data_stage"),
         "source": item.get("source", "unavailable") if _is_ok_item(item) else "unavailable",
         "source_tier": _source_tier(item.get("source")),
         "success": _is_ok_item(item),
@@ -216,16 +239,19 @@ def _metric_row(name: str, item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-COMPARABLE_INTRADAY_SESSIONS = {"realtime", "intraday_delayed"}
-COMPARABLE_CLOSE_SESSIONS = {"official_close", "previous_close"}
+COMPARABLE_INTRADAY_STAGES = {"INTRADAY"}
+COMPARABLE_CLOSE_STAGES = {"OFFICIAL_CLOSE", "PREVIOUS_OFFICIAL_CLOSE"}
 
 
 def market_points_comparable(left: dict[str, Any], right: dict[str, Any]) -> bool:
     """Only equal dates with like-for-like trading sessions are comparable."""
     if not left.get("comparable_date") or left.get("comparable_date") != right.get("comparable_date"):
         return False
-    sessions = {str(left.get("data_session")), str(right.get("data_session"))}
-    return sessions <= COMPARABLE_INTRADAY_SESSIONS or sessions <= COMPARABLE_CLOSE_SESSIONS
+    stages = {
+        str(left.get("price_stage") or left.get("data_stage") or "UNKNOWN").upper(),
+        str(right.get("price_stage") or right.get("data_stage") or "UNKNOWN").upper(),
+    }
+    return stages <= COMPARABLE_INTRADAY_STAGES or stages <= COMPARABLE_CLOSE_STAGES
 
 
 def aggregate_comparable_market_changes(
@@ -267,88 +293,68 @@ def compute_dqs(
     macro_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     weights = strategy["dqs_weights"]
-    items = _market_items(live_market)
-    macro = _macro_items(live_market)
-    market_ok = [_is_ok_item(items.get(symbol, {})) for symbol in CRITICAL_MARKET]
-    macro_ok = [_is_ok_item(macro.get(series, {})) for series in CRITICAL_MACRO]
+    items, macro = _market_items(live_market), _macro_items(live_market)
     all_rows = [items.get(symbol, {}) for symbol in CRITICAL_MARKET] + [macro.get(series, {}) for series in CRITICAL_MACRO]
     usable_rows = [item for item in all_rows if _is_ok_item(item)]
+    market_ok = [_is_ok_item(items.get(symbol, {})) for symbol in CRITICAL_MARKET]
+    macro_ok = [_is_ok_item(macro.get(series, {})) for series in CRITICAL_MACRO]
     tier1_rows = [item for item in usable_rows if _source_tier(item.get("source")) == 1]
     dual_rows = [item for item in all_rows if _verified_dual_source(item)]
-    fresh_rows = [item for item in usable_rows if _fresh(item)]
-    suspicious_zero = [
-        name
-        for name, item in {**{k: items.get(k, {}) for k in CRITICAL_MARKET}, **{k: macro.get(k, {}) for k in CRITICAL_MACRO}}.items()
-        if _is_ok_item(item) and _to_float(item.get("close", item.get("value"))) == 0.0
-    ]
+    fresh_rows = [item for item in usable_rows if _fresh(item) and item_time_metadata(item).get("data_stage") != "STALE"]
+    suspicious_zero = [name for name, item in {**{k: items.get(k, {}) for k in CRITICAL_MARKET}, **{k: macro.get(k, {}) for k in CRITICAL_MACRO}}.items() if _is_ok_item(item) and _to_float(item.get("close", item.get("value"))) == 0.0]
     conflicts = list((live_market.get("source_audit", {}) or {}).get("data_conflicts", []) or [])
-    akshare_conflicts = (
-        (((live_market.get("cn_hk_p1a", {}) or {}).get("akshare", {}) or {}).get("source_conflicts", []))
-        or []
-    )
-    conflicts.extend(akshare_conflicts)
+    conflicts.extend((((live_market.get("cn_hk_p1a", {}) or {}).get("akshare", {}) or {}).get("source_conflicts", [])) or [])
     required_missing = [row["name"] for row in build_market_table(live_market) if not row["success"]]
-    enhancement_rows = [
-        row for row in (live_market.get("market_context_status", {}) or {}).get("indicators", []) or []
-        if row.get("data_category") == "enhancement_data"
-        and row.get("name") in {"Put/Call Ratio", "市场宽度", "ETF资金流", "AAII情绪"}
-    ]
-    enhancement_missing = [
-        str(row.get("name")) for row in enhancement_rows if row.get("status") not in {"ok", "success"}
-    ]
-    # The four enhancement rows are part of the stable report contract even
-    # when an older cached snapshot predates market_context_status.
-    for name in ["Put/Call Ratio", "市场宽度", "ETF资金流", "AAII情绪"]:
-        if not any(row.get("name") == name and row.get("status") in {"ok", "success"} for row in enhancement_rows):
-            if name not in enhancement_missing:
-                enhancement_missing.append(name)
-    optional_missing: list[str] = []
+    enhancement_missing = ["Put/Call Ratio", "市场宽度", "ETF资金流", "AAII情绪"]
+    enhancement_rows = (live_market.get("market_context_status", {}) or {}).get("indicators", []) or []
+    enhancement_missing = [name for name in enhancement_missing if not any(row.get("name") == name and row.get("status") in {"ok", "success"} for row in enhancement_rows)]
     stale_metrics = [row["name"] for row in build_market_table(live_market) if row.get("stale")]
     market_time = aggregate_comparable_market_changes(live_market)
     non_comparable = [] if market_time["comparable"] else market_time["symbols"]
-
-    market_score = round(sum(market_ok) / len(CRITICAL_MARKET) * weights["market_completeness"])
-    macro_score = round(sum(macro_ok) / len(CRITICAL_MACRO) * weights["macro_completeness"])
-    calendar_confidence = str((macro_result or {}).get("calendar_confidence") or "unknown")
-    if calendar_confidence == "low":
-        macro_score = max(0, macro_score - 1)
-    tier1_score = round((len(tier1_rows) / len(all_rows)) * weights["tier1_coverage"])
-    dual_score = round((len(dual_rows) / len(all_rows)) * weights["dual_source"])
-    freshness_score = round((len(fresh_rows) / len(all_rows)) * weights["freshness"]) if all_rows else 0
-    consistency_score = weights["consistency"]
-    if conflicts:
-        consistency_score -= min(weights["consistency"], len(conflicts) * 3)
-    if suspicious_zero:
-        consistency_score = 0
-    consistency_score = max(0, consistency_score)
-    raw_score = market_score + macro_score + tier1_score + dual_score + freshness_score + consistency_score
-    dual_coverage = len(dual_rows) / len(all_rows) if all_rows else 0.0
-
-    blocking_errors = []
     snapshot = _portfolio_snapshot()
-    holdings_stale = bool(snapshot.get("holdings_stale"))
-    if suspicious_zero:
-        blocking_errors.append(f"关键数据出现异常0值：{', '.join(suspicious_zero)}")
-    if conflicts:
-        blocking_errors.append("关键数据存在来源冲突。")
-    if not _is_ok_item(items.get("VOO", {})) or not _is_ok_item(items.get("^VIX", {})):
-        blocking_errors.append("核心价格或VIX缺失。")
-    if holdings_stale:
-        blocking_errors.append("持仓市值可能滞后。")
-
+    transactions = snapshot.get("confirmed_transactions", []) or []
+    transaction_required = ["symbol", "action", "trade_datetime", "trade_date", "invested_amount_cny", "execution_price_usd", "quantity", "currency", "actual_fx_rate_cny_per_usd", "fee", "funding_source"]
+    reconciliation: list[dict[str, Any]] = []
+    for trade in transactions:
+        missing = [field for field in transaction_required if trade.get(field) in {None, ""}]
+        reconciliation.append({"id": trade.get("id"), "status": "pending_reconciliation" if missing else "reconciled", "missing_fields": missing})
+    pending_valuations = [row.get("security_name") for row in snapshot.get("holdings", []) or [] if str(row.get("valuation_status")) != "confirmed_market_value"]
+    calendar_confidence = str((macro_result or {}).get("calendar_confidence") or "unknown")
+    field_score = round(((sum(market_ok) + sum(macro_ok)) / len(all_rows)) * weights["field_completeness"]) if all_rows else 0
+    if calendar_confidence == "low": field_score = max(0, field_score - 1)
+    timeliness_score = round((len(fresh_rows) / len(all_rows)) * weights["timeliness"]) if all_rows else 0
+    source_score = round((len(tier1_rows) / len(all_rows)) * weights["source_quality"]) if all_rows else 0
+    dual_score = round((len(dual_rows) / len(all_rows)) * weights["dual_source_validation"]) if all_rows else 0
+    valuation_score = weights["valuation_readiness"] if not pending_valuations and not snapshot.get("holdings_stale") else max(0, round(weights["valuation_readiness"] * 0.35))
+    transaction_score = weights["transaction_reconciliation_quality"] if not reconciliation else round(sum((len(transaction_required) - len(item["missing_fields"])) / len(transaction_required) for item in reconciliation) / len(reconciliation) * weights["transaction_reconciliation_quality"])
+    consistency_score = weights["consistency"]
+    if conflicts: consistency_score -= min(weights["consistency"], len(conflicts) * 3)
+    if suspicious_zero: consistency_score = 0
+    consistency_score = max(0, consistency_score)
+    released_data_missing = [
+        event.get("event_name") or event.get("name")
+        for event in (macro_result or {}).get("released_events", []) or []
+        if event.get("event_data_status") == "RELEASED_DATA_MISSING"
+    ]
+    macro_event_data_penalty = min(10, len(released_data_missing) * 5)
+    raw_score = max(0, field_score + timeliness_score + source_score + dual_score + valuation_score + transaction_score + consistency_score - macro_event_data_penalty)
+    dual_coverage = len(dual_rows) / len(all_rows) if all_rows else 0.0
+    blocking_errors: list[str] = []
+    if suspicious_zero: blocking_errors.append(f"关键数据出现异常0值：{', '.join(suspicious_zero)}")
+    if conflicts: blocking_errors.append("关键数据存在来源冲突。")
+    if not _is_ok_item(items.get("VOO", {})) or not _is_ok_item(items.get("^VIX", {})): blocking_errors.append("核心价格或VIX缺失。")
+    if snapshot.get("holdings_stale"): blocking_errors.append("持仓市值可能滞后。")
     capped_score = raw_score
-    if dual_coverage < strategy["dqs_thresholds"]["cap_when_dual_source_below"]:
-        capped_score = min(capped_score, 74)
-    if blocking_errors:
-        capped_score = min(capped_score, strategy["dqs_thresholds"]["severe_conflict_cap"])
-
-    components = [
-        {"item": "行情完整度", "score": market_score, "max": weights["market_completeness"], "reason": f"{sum(market_ok)}/{len(CRITICAL_MARKET)} 个核心行情可用"},
-        {"item": "宏观完整度", "score": macro_score, "max": weights["macro_completeness"], "reason": f"{sum(macro_ok)}/{len(CRITICAL_MACRO)} 个核心宏观指标可用；事件日历置信度={calendar_confidence}"},
-        {"item": "一级来源", "score": tier1_score, "max": weights["tier1_coverage"], "reason": f"{len(tier1_rows)}/{len(all_rows)} 个关键指标来自一级来源"},
-        {"item": "双源验证", "score": dual_score, "max": weights["dual_source"], "reason": f"{len(dual_rows)}/{len(all_rows)} 个关键指标通过双源验证"},
-        {"item": "数据时效性", "score": freshness_score, "max": weights["freshness"], "reason": f"{len(fresh_rows)}/{len(all_rows)} 个可用指标未过期；持仓确认距今{snapshot.get('holding_age_days', '未知')}天"},
-        {"item": "数据一致性", "score": consistency_score, "max": weights["consistency"], "reason": "无异常0值或严重冲突" if consistency_score == weights["consistency"] else "存在冲突或异常0值"},
+    if dual_coverage < strategy["dqs_thresholds"]["cap_when_dual_source_below"]: capped_score = min(capped_score, 74)
+    if blocking_errors: capped_score = min(capped_score, strategy["dqs_thresholds"]["severe_conflict_cap"])
+    legacy_components = [
+        {"item": "field_completeness", "score": field_score, "max": weights["field_completeness"], "reason": f"核心行情与宏观可用{sum(market_ok) + sum(macro_ok)}/{len(all_rows)}"},
+        {"item": "timeliness", "score": timeliness_score, "max": weights["timeliness"], "reason": f"新鲜且非STALE数据{len(fresh_rows)}/{len(all_rows)}"},
+        {"item": "source_quality", "score": source_score, "max": weights["source_quality"], "reason": f"一级来源{len(tier1_rows)}/{len(all_rows)}"},
+        {"item": "dual_source_validation", "score": dual_score, "max": weights["dual_source_validation"], "reason": f"双源验证{len(dual_rows)}/{len(all_rows)}"},
+        {"item": "valuation_readiness", "score": valuation_score, "max": weights["valuation_readiness"], "reason": "存在待估值持仓或持仓市值滞后" if pending_valuations or snapshot.get("holdings_stale") else "持仓估值可用于配置口径"},
+        {"item": "transaction_reconciliation_quality", "score": transaction_score, "max": weights["transaction_reconciliation_quality"], "reason": "无待对账实盘交易" if not reconciliation else f"{sum(1 for item in reconciliation if item['status'] == 'reconciled')}/{len(reconciliation)}笔实盘交易已完成对账"},
+        {"item": "consistency", "score": consistency_score, "max": weights["consistency"], "reason": "无异常0值或严重冲突" if consistency_score == weights["consistency"] else "存在冲突或异常0值"},
     ]
 
     if capped_score >= strategy["dqs_thresholds"]["exact_amount"]:
@@ -364,33 +370,75 @@ def compute_dqs(
         mode = "safe"
         mode_label = "禁止新增仓位建议"
 
+    voo = items.get("VOO", {}) or {}
+    voo_stage = item_time_metadata(voo).get("data_stage")
+    scheduled_inputs = {
+        "核心价格": _is_ok_item(voo) and voo_stage in {"INTRADAY", "OFFICIAL_CLOSE", "PREVIOUS_OFFICIAL_CLOSE"},
+        "现金口径": _to_float((snapshot.get("cash", {}) or {}).get("account_total_cash_cny")) >= 0,
+        "预算状态": bool(snapshot.get("bond_to_equity_plan") is not None),
+        "事件状态": calendar_confidence not in {"low", "unknown"} and not released_data_missing,
+    }
+    scheduled_score = round(sum(25 for ok in scheduled_inputs.values() if ok))
+    allocation_valid = abs(sum(float(value) for value in strategy.get("target_allocation", {}).values()) - 1.0) <= 1e-10
+    strategic_score = round(
+        40 * int(allocation_valid)
+        + 30 * int(not snapshot.get("holdings_stale"))
+        + 30 * (sum(market_ok) / len(market_ok) if market_ok else 0)
+    )
+    opportunity_score = int(capped_score)
+    official_grid_quotes = sum(
+        1 for symbol in ["VOO", "QQQ"]
+        if item_time_metadata(items.get(symbol, {}) or {}).get("data_stage") == "OFFICIAL_CLOSE"
+        and bool((items.get(symbol, {}) or {}).get("is_finalized"))
+    )
+    grid_score = min(int(capped_score), 50 * official_grid_quotes)
+    hard_risk_inputs = [items.get("^VIX", {}) or {}, macro.get("DGS10", {}) or {}]
+    risk_monitoring_score = round(sum(50 for item in hard_risk_inputs if _is_ok_item(item)))
+    transaction_quality_score = round(
+        100 * transaction_score / weights["transaction_reconciliation_quality"]
+        if weights["transaction_reconciliation_quality"] else 0
+    )
+    use_cases = {
+        "scheduled_dca": {"label": "Scheduled DCA DQS", "score": scheduled_score, "threshold": 65, "allowed": scheduled_score >= 65 and scheduled_inputs["核心价格"] and scheduled_inputs["现金口径"] and scheduled_inputs["预算状态"] and scheduled_inputs["事件状态"], "inputs": scheduled_inputs},
+        "strategic_rebalance": {"label": "Strategic Rebalance DQS", "score": strategic_score, "threshold": 75, "allowed": strategic_score >= 75},
+        "opportunity_add": {"label": "Opportunity Add DQS", "score": opportunity_score, "threshold": 85, "allowed": opportunity_score >= 85 and not blocking_errors},
+        "grid": {"label": "Grid DQS", "score": grid_score, "threshold": 85, "allowed": grid_score >= 85 and official_grid_quotes == 2},
+        "risk_monitoring": {"label": "Risk Monitoring DQS", "score": risk_monitoring_score, "threshold": 1, "allowed": risk_monitoring_score > 0},
+        "transaction_reconciliation": {"label": "Transaction Reconciliation Quality", "score": transaction_quality_score, "threshold": 100, "allowed": transaction_quality_score >= 100},
+    }
+
     return {
         "score": int(capped_score),
         "raw_score": int(raw_score),
         "mode": mode,
         "mode_label": mode_label,
-        "components": components,
+        "components": legacy_components,
+        "use_cases": use_cases,
         "market_coverage": sum(market_ok) / len(CRITICAL_MARKET),
         "macro_coverage": sum(macro_ok) / len(CRITICAL_MACRO),
         "tier1_coverage": len(tier1_rows) / len(all_rows) if all_rows else 0.0,
         "dual_source_coverage": dual_coverage,
         "freshness_coverage": len(fresh_rows) / len(all_rows) if all_rows else 0.0,
-        "holding_freshness_ok": not holdings_stale,
+        "holding_freshness_ok": not bool(snapshot.get("holdings_stale")),
         "fx_available": _is_ok_item(items.get("DX-Y.NYB", {})),
         "event_calendar_confidence": calendar_confidence,
         "blocking_errors": blocking_errors,
         "missing_metrics": required_missing,
         "required_core_data": {"missing_count": len(required_missing), "missing_items": required_missing},
         "enhancement_data": {"missing_count": len(enhancement_missing), "missing_items": enhancement_missing},
-        "optional_explanation_data": {"missing_count": len(optional_missing), "missing_items": optional_missing},
+        "optional_explanation_data": {"missing_count": 0, "missing_items": []},
         "required_core_missing_count": len(required_missing),
         "enhancement_missing_count": len(enhancement_missing),
-        "optional_explanation_missing_count": len(optional_missing),
+        "optional_explanation_missing_count": 0,
         "enhancement_missing_items": enhancement_missing,
         "stale_metrics": stale_metrics,
         "non_comparable_metrics": non_comparable,
         "conflicts": conflicts,
         "suspicious_zero": suspicious_zero,
+        "valuation_readiness": {"pending_holdings": pending_valuations, "ready": not pending_valuations and not bool(snapshot.get("holdings_stale"))},
+        "transaction_reconciliation": reconciliation,
+        "released_event_data_missing": released_data_missing,
+        "macro_event_data_penalty": macro_event_data_penalty,
         "conclusion": (
             "核心决策数据基本可用，但增强型市场宽度、资金流和情绪数据不足，禁止生成精确新增仓位建议。"
             if not required_missing and enhancement_missing
@@ -422,12 +470,6 @@ def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]
         current_ratio = current_amount / total if total else 0.0
         target_amount = total * target_ratio
         target_basis = "strategic_ratio"
-        if category == "现金":
-            fixed_reserve = _to_float((_portfolio_snapshot().get("cash", {}) or {}).get("cash_safety_reserve_cny"))
-            if fixed_reserve > 0:
-                target_amount = fixed_reserve
-                target_ratio = fixed_reserve / total if total else 0.0
-                target_basis = "fixed_user_confirmed_cash_reserve"
         deviation_ratio = current_ratio - target_ratio
         deviation_amount = current_amount - target_amount
         abs_dev = abs(deviation_ratio)
@@ -445,6 +487,10 @@ def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]
                 "target_amount_yuan": round(target_amount),
                 "target_ratio": target_ratio,
                 "target_basis": target_basis,
+                "cash_safety_floor_yuan": (
+                    round(_to_float((_portfolio_snapshot().get("cash", {}) or {}).get("cash_safety_reserve_cny")))
+                    if category == "现金" else None
+                ),
                 "deviation_amount_yuan": round(deviation_amount),
                 "deviation_ratio": deviation_ratio,
                 "status": _category_status(deviation_ratio),
@@ -524,7 +570,8 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
         {"item": "政策与地缘", "score": min(policy_geo, weights["policy_geo"]), "weight": weights["policy_geo"], "basis": f"按中性偏谨慎处理；黄金占比{gold_ratio:.1%}，超配提高组合对避险行情反转的敏感度。"},
         {"item": "数据质量", "score": min(data_quality, weights["data_quality"]), "weight": weights["data_quality"], "basis": f"DQS={dqs['score']}。"},
     ]
-    score = int(sum(row["score"] for row in components))
+    market_components = [row for row in components if row["item"] in {"估值", "波动率", "利率", "宏观事件", "趋势", "政策与地缘"}]
+    score = int(sum(row["score"] for row in market_components))
     if score <= 30:
         level = "低风险"
     elif score <= 50:
@@ -535,7 +582,52 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
         level = "高风险"
     else:
         level = "极高风险"
-    return {"score": score, "level": level, "components": components, "market_time_consistency": market_time}
+    equity_ratio = sum(float(class_totals.get(category, 0) or 0) for category in ["美股", "港股", "A股"]) / total_assets if total_assets else 0.0
+    tlt_value = sum(float(row.get("market_value_cny", 0) or 0) for row in snapshot.get("holdings", []) or [] if str(row.get("security_code")) == "TLT")
+    portfolio_components = [
+        {"item": "权益仓位", "score": min(25, round(equity_ratio * 45)), "weight": 25, "basis": f"权益资产占比{equity_ratio:.1%}。"},
+        {"item": "单股集中度", "score": min(20, round(max_single_stock_ratio * 200)), "weight": 20, "basis": f"最大单股占比{max_single_stock_ratio:.1%}。"},
+        {"item": "债券久期", "score": min(15, round((tlt_value / total_assets) * 120)), "weight": 15, "basis": f"TLT作为长久期债券计入债券配置，金额{tlt_value:,.0f}元。"},
+        {"item": "黄金偏离", "score": min(15, round(max(0, gold_ratio - float(strategy['target_allocation']['黄金'])) * 100)), "weight": 15, "basis": f"黄金占比{gold_ratio:.1%}。"},
+        {"item": "现金安全储备", "score": 0 if investable_cash >= 0 else 15, "weight": 15, "basis": "固定现金安全储备独立核算，未被交易建议占用。"},
+        {"item": "相关性与静态压力", "score": min(10, round(max(0, bond_ratio - float(strategy['target_allocation']['债券'])) * 50)), "weight": 10, "basis": "债券、黄金与权益风险在静态压力测试中独立展示。"},
+    ]
+    portfolio_score = int(sum(row["score"] for row in portfolio_components))
+    stages = [item_time_metadata(item).get("data_stage") for item in items.values() if _is_ok_item(item)]
+    execution_components = [
+        {"item": "重大事件窗口", "score": 25 if macro_result.get("has_high_event_next_48_hours") else 8 if macro_result.get("has_high_event_next_7_days") else 0, "weight": 25, "basis": "宏观事件状态机决定限制窗口，不把已发布事件继续当作UPCOMING。"},
+        {"item": "正式收盘可用性", "score": 20 if any(stage not in {"OFFICIAL_CLOSE", "OFFICIAL_LAGGED_MACRO"} for stage in stages) else 0, "weight": 20, "basis": "盘中、延迟或未知数据不能作为正式收盘价使用。"},
+        {"item": "价格缺失或过期", "score": 20 if dqs.get("stale_metrics") or dqs.get("missing_metrics") else 0, "weight": 20, "basis": "缺失或STALE行情会降低执行可行性。"},
+        {"item": "可投资现金确认", "score": 0 if investable_cash >= 0 else 15, "weight": 15, "basis": f"真实可投资现金={investable_cash:,.0f}元，固定安全储备不占用。"},
+        {"item": "预算隔离", "score": 0, "weight": 10, "basis": "实盘、条件性计划与模拟网格预算独立。"},
+        {"item": "人工确认与对账", "score": 10 if any(item.get("status") == "pending_reconciliation" for item in dqs.get("transaction_reconciliation", [])) else 0, "weight": 10, "basis": "所有交易需要人工确认；待对账交易不生成精确收益或市值。"},
+    ]
+    execution_score = int(sum(row["score"] for row in execution_components))
+    return {
+        "score": score, "level": level, "components": market_components,
+        "market_risk": {"score": score, "level": level, "components": market_components},
+        "portfolio_risk": {"score": portfolio_score, "level": _risk_level(portfolio_score), "components": portfolio_components},
+        "data_confidence": {"score": int(dqs["score"]), "level": dqs["mode_label"], "components": dqs.get("components", [])},
+        "execution_risk": {"score": execution_score, "level": _risk_level(execution_score), "components": execution_components},
+        "composite_conclusion": "市场、组合、数据与执行风险分别评估；DQS只表示数据质量，不等同于市场风险。",
+        "market_time_consistency": market_time,
+        "market_quote_contract": {
+            symbol: market_quote_reference(items.get(symbol, {}), symbol)
+            for symbol in ("VOO", "QQQ")
+        },
+    }
+
+
+def _risk_level(score: int) -> str:
+    if score <= 30:
+        return "低风险"
+    if score <= 50:
+        return "中低风险"
+    if score <= 70:
+        return "中高风险"
+    if score <= 85:
+        return "高风险"
+    return "极高风险"
 
 
 def _portfolio_snapshot() -> dict[str, Any]:
@@ -864,6 +956,11 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
             limitations.append("ETF不适用个股财务评分")
         if volume_ratio is None and symbol:
             limitations.append("可靠ETF资金流未接入，成交结构项按低置信度处理")
+        opportunity_group = (
+            "core_etf" if name in {"VOO", "QQQ", "沪深300ETF", "南方东英恒生科技指数ETF"}
+            else "satellite_holding" if name in {"NVDA", "GOOG", "BABA", "IBKR", "巨人网络", "XLF", "恒生医疗ETF", "香港证券ETF", "*ST闻泰"}
+            else "strategic_allocation"
+        )
         rows.append(
             {
                 "symbol": symbol or name,
@@ -888,16 +985,23 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
                 "decision_restricted": decision_restricted,
                 "missing_fields": item.get("missing_fields", []) if symbol else [],
                 "asset_type": asset_type,
+                "opportunity_group": opportunity_group,
                 "deviation": deviation,
                 "financial_model": financial_model,
                 "p1a_inputs_used": list(dict.fromkeys(p1a_inputs_used)),
+                "market_quote_ref": market_quote_reference(item, symbol) if symbol else None,
             }
         )
 
-    ranked = sorted(rows, key=lambda row: row["raw_score"] + row["data_quality_adjustment"] + row["portfolio_constraint_adjustment"], reverse=True)
+    ranked = []
+    for group in ["strategic_allocation", "core_etf", "satellite_holding"]:
+        group_rows = sorted([row for row in rows if row["opportunity_group"] == group], key=lambda row: row["raw_score"] + row["data_quality_adjustment"] + row["portfolio_constraint_adjustment"], reverse=True)
+        ranked.extend(group_rows)
     max_adjustment = int(scoring.get("cross_section_max_adjustment", 8))
-    count = len(ranked)
-    for index, row in enumerate(ranked):
+    for row in ranked:
+        peers = [peer for peer in ranked if peer["opportunity_group"] == row["opportunity_group"]]
+        index = peers.index(row)
+        count = len(peers)
         percentile = 0.5 if count <= 1 else 1 - index / (count - 1)
         cross_adjustment = round((percentile - 0.5) * 2 * max_adjustment)
         row["cross_section_adjustment"] = cross_adjustment
@@ -939,11 +1043,18 @@ def build_opportunity_scores(allocation: list[dict[str, Any]], live_market: dict
         else:
             advice = "风险复核或回避"
         row["advice"] = advice
+        row["allocation_priority"] = "高" if row["portfolio_fit"] >= 80 else "中" if row["portfolio_fit"] >= 50 else "低"
+        row["valuation_attractiveness"] = row["components"]["估值吸引力"]
+        row["tactical_entry_quality"] = round((row["components"]["趋势与市场宽度"] + row["components"]["资金流或成交结构"]) / 2)
+        row["confidence"] = row["scoring_confidence"]
+        row["final_action"] = advice
         row["reason"] = (
             f"{row['positive_factors'][0]}；原始分{row['raw_score']}，横截面{row['cross_section_adjustment']:+d}，"
             f"数据调整{row['data_quality_adjustment']:+d}，组合约束{row['portfolio_constraint_adjustment']:+d}。"
         )
-    return sorted(ranked, key=lambda row: row["score"], reverse=True)
+    # Deliberately preserve group ordering: cash/bonds are not cross-sectionally
+    # ranked against ETF or individual-stock purchase candidates.
+    return sorted(ranked, key=lambda row: (row["opportunity_group"], -row["score"]))
 
 
 def _week_of_month(day: date) -> int:
@@ -982,6 +1093,12 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     snapshot = _portfolio_snapshot()
     cash_detail = snapshot.get("cash", {}) or {}
     confirmed_plan = snapshot.get("bond_to_equity_plan", {}) or {}
+    confirmed_transactions = snapshot.get("confirmed_transactions", []) or []
+    scheduled_base_dca_trades = [
+        trade for trade in confirmed_transactions
+        if trade.get("status") == "executed" and trade.get("trade_origin") == "SCHEDULED_BASE_DCA"
+    ]
+    confirmed_base_dca_amount = sum(_to_float(trade.get("invested_amount_cny")) for trade in scheduled_base_dca_trades)
     cash_yuan = _to_float(cash_detail.get("account_total_cash_cny"), _category_amount_yuan(allocation, "现金"))
     bond_yuan = _category_amount_yuan(allocation, "债券")
     bond_target_yuan = next(row["target_amount_yuan"] for row in allocation if row["category"] == "债券")
@@ -994,7 +1111,7 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     next_dca = _next_dca_date(today + timedelta(days=1), strategy)
     bond_excess = max(0.0, bond_yuan - bond_target_yuan)
     bond_month_cap = min(float(strategy["budget"]["bond_to_equity_monthly_cap_yuan"]), bond_excess)
-    dqs_allows_amount = dqs["mode"] in {"exact", "range"}
+    dqs_allows_amount = bool(((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {}).get("allowed"))
     high_event = bool(macro_result.get("has_high_event_next_7_days"))
 
     base_amount = float(strategy["budget"]["monthly_base_dca_yuan"]) / 2 if is_dca_day else 0.0
@@ -1003,7 +1120,8 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     base_amount = min(base_amount, confirmed_cash_available)
 
     opportunity_amount = 0.0
-    if dqs["mode"] == "exact" and risk["score"] <= 70 and not high_event and confirmed_cash_available > base_amount:
+    opportunity_dqs_allows = bool(((dqs.get("use_cases", {}) or {}).get("opportunity_add", {}) or {}).get("allowed"))
+    if opportunity_dqs_allows and risk["score"] <= 70 and not high_event and confirmed_cash_available > base_amount:
         top_score = opportunity[0]["score"] if opportunity else 0
         if top_score >= 82:
             opportunity_amount = min(confirmed_cash_available - base_amount, total_yuan * strategy["budget"]["single_trade_cash_ratio_cap"])
@@ -1013,8 +1131,8 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
         rebalance_today = 0.0
 
     total_today = base_amount + opportunity_amount + rebalance_today
-    confirmed_week = total_today
-    confirmed_month = total_today
+    confirmed_week = confirmed_base_dca_amount + total_today
+    confirmed_month = confirmed_base_dca_amount + total_today
     conditional_month = bond_month_cap
     actual_bond_cash_arrived = _to_float(confirmed_plan.get("bond_maturity_arrived_cny"))
     approved_bond_to_equity = min(
@@ -1032,22 +1150,26 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     rows = [
         {
             "budget_id": "ACTUAL_BOND_TO_EQUITY_20260715",
-            "type": "用户确认实盘交易",
-            "execute": True,
-            "amount_yuan": round(executed_bond_to_equity),
+            "type": "债券转权益资金来源/迁移属性",
+            "execute": False,
+            "amount_yuan": 0,
+            "attributed_amount_yuan": round(executed_bond_to_equity),
             "targets": "VOO",
             "funding_source": "2026-07-15到期债券资金",
-            "reason": "已执行事实；成交价格692.5美元/份，成交股数、实际汇率和手续费待补充。",
-            "record_type": "confirmed_historical_fact",
+            "reason": "仅记录资金来源和债券转权益迁移属性；实际9,000元已在BUDGET_BASE_DCA中计算，不重复占用预算。",
+            "record_type": "funding_and_migration_attribute",
+            "counts_toward_actual_trade_total": False,
         },
         {
             "budget_id": "BUDGET_BASE_DCA",
             "type": "基础定投",
-            "execute": bool(base_amount > 0),
-            "amount_yuan": round(base_amount),
-            "targets": target_text if base_amount > 0 else "不适用",
-            "funding_source": "现金安全线以上资金" if base_amount > 0 else "未使用资金",
-            "reason": "今日是基础定投日且DQS允许金额。" if base_amount > 0 else ("今日不是基础定投执行日" if not is_dca_day else "现金不足、重大事件或DQS限制。"),
+            "execute": bool(confirmed_base_dca_amount > 0 or base_amount > 0),
+            "amount_yuan": round(confirmed_base_dca_amount if confirmed_base_dca_amount > 0 else base_amount),
+            "targets": "VOO" if confirmed_base_dca_amount > 0 else (target_text if base_amount > 0 else "不适用"),
+            "funding_source": "2026-07-15到期债券资金" if confirmed_base_dca_amount > 0 else ("现金安全线以上资金" if base_amount > 0 else "未使用资金"),
+            "reason": "此前既定周三基础定投计划的用户确认执行结果。" if confirmed_base_dca_amount > 0 else ("今日是基础定投日且DQS允许金额。" if base_amount > 0 else ("今日不是基础定投执行日" if not is_dca_day else "现金不足、重大事件或DQS限制。")),
+            "record_type": "confirmed_actual_trade" if confirmed_base_dca_amount > 0 else "current_recommendation",
+            "counts_toward_actual_trade_total": bool(confirmed_base_dca_amount > 0),
         },
         {
             "budget_id": "BUDGET_OPPORTUNITY_ADD",
@@ -1062,10 +1184,11 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
             "budget_id": "BUDGET_CONDITIONAL_BOND_TO_EQUITY",
             "type": "剩余债券转权益计划",
             "execute": False,
-            "amount_yuan": 0,
+            "amount_yuan": round(remaining_bond_to_equity),
             "targets": "VOO/QQQ、沪深300ETF、恒生科技ETF",
             "funding_source": f"已到账专项可投资现金{remaining_bond_to_equity:,.0f}元",
             "reason": "资金已到账、可投资，但仍须服从后续市场与风险条件，不代表必须一次性投入。",
+            "counts_toward_actual_trade_total": False,
         },
         {
             "budget_id": "BUDGET_RISK_REDUCTION",
@@ -1096,11 +1219,18 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
         "bond_to_equity_executed_this_month_yuan": round(executed_bond_to_equity),
         "bond_to_equity_remaining_this_month_yuan": round(remaining_bond_to_equity),
         "bond_to_equity_remaining_real_cash_yuan": round(_to_float(confirmed_plan.get("remaining_real_investable_cash_cny"), remaining_bond_to_equity)),
+        "base_dca_executed_yuan": round(confirmed_base_dca_amount),
+        "actual_trade_counted_once_yuan": round(confirmed_base_dca_amount),
+        "bond_migration_attributed_yuan": round(executed_bond_to_equity),
+        "event_window_policy_for_scheduled_dca": scheduled_dca_event_window_policy(
+            already_executed=bool(confirmed_base_dca_amount > 0),
+            in_event_window=bool(macro_result.get("has_high_event_next_48_hours")),
+        ),
         "bond_excess_yuan": round(bond_excess),
         "is_dca_day": bool(is_dca_day),
         "next_dca_date": next_dca.isoformat(),
         "rows": rows,
-        "funding_note": "本月债券到期资金30000元已实际到账，其中9000元已用于用户确认的VOO实盘买入，剩余21000元为专项可投资现金；网格模拟现金不计入真实资产。",
+        "funding_note": "本月债券到期资金30000元已实际到账，其中9000元用于此前既定周三基础定投；债券转权益只作为资金来源和迁移属性记录，交易金额只计算一次；剩余21000元为专项可投资现金。",
         "cash_formula": "可投资现金 = 账户总现金 - 固定现金安全储备 - 网格实盘现金 - 其他已占用现金",
     }
 
@@ -1146,6 +1276,11 @@ def build_migration_plan(allocation: list[dict[str, Any]], budget: dict[str, Any
         "estimated_completion": f"预计第{theoretical_full_months}个月完成，但仍以DQS、到账资金和风险条件为准。" if theoretical_full_months else "当前无债券超配迁移需求。",
         "route_title": "未来12个月债券迁移第一阶段路线图",
         "conditional_cap_note": "路线图从下一笔可迁移债券本金起算，不重复计算本月已到账的30000元；仅表示未来月度上限，不保证每月执行，暂停月份的未用额度不得累积到下一月一次性执行。",
+        "natural_maturity_or_redemption_route": "仅使用未来实际到期或赎回并已到账的债券本金；未到账资金不计入当前可投资现金。",
+        "tlt_tactical_route": "TLT计入债券资产配置，但默认战术持有；除非人工确认主动减仓计划，不把TLT视为必须立即卖出的迁移资金。",
+        "tlt_active_sale_planned": False,
+        "future_unarrived_bond_principal_yuan": 0,
+        "unused_monthly_cap_rollover": False,
         "quarterly_reviews": ["第3个月", "第6个月", "第9个月", "第12个月"],
         "pause_conditions": ["DQS低于60", "VIX高于30", "重大宏观事件前后", "市场或交易数据不足"],
         "accelerate_conditions": ["DQS不低于85", "权益资产明显回撤且长期逻辑未变", "债券资金已到账", "现金仍高于安全线"],
@@ -1257,18 +1392,37 @@ def build_data_time_summary(market_table: list[dict[str, Any]], generated_at: st
     sessions = {str(row.get("data_session")) for row in market_table if row.get("success") and row.get("data_session")}
     return {
         "report_timezone": "Asia/Shanghai",
+        "report_generation_time": generated_at,
         "report_generated_at": generated_at,
+        "decision_cutoff_time": generated_at,
         "decision_data_cutoff": generated_at,
         "has_unsynchronized_data": len(comparable_dates) > 1 or len(sessions) > 1,
         "oldest_critical_data_at": observed[0] if observed else None,
         "newest_critical_data_at": observed[-1] if observed else None,
+        "data_stages": sorted({str(row.get("data_stage") or "UNKNOWN") for row in market_table}),
     }
+
+
+def build_stress_exposures(allocation: list[dict[str, Any]], snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    """Split long-duration TLT from ordinary bonds for stress analysis only."""
+    amounts = {row["category"]: _to_float(row.get("current_amount_yuan")) for row in allocation}
+    tlt = sum(_to_float(row.get("market_value_cny")) for row in snapshot.get("holdings", []) or [] if str(row.get("security_code")) == "TLT")
+    bonds = max(0, amounts.get("债券", 0) - tlt)
+    return [
+        {"category": "美股", "current_amount_yuan": amounts.get("美股", 0)},
+        {"category": "港股", "current_amount_yuan": amounts.get("港股", 0)},
+        {"category": "A股", "current_amount_yuan": amounts.get("A股", 0)},
+        {"category": "普通债券", "current_amount_yuan": bonds},
+        {"category": "TLT", "current_amount_yuan": tlt},
+        {"category": "黄金", "current_amount_yuan": amounts.get("黄金", 0)},
+        {"category": "现金", "current_amount_yuan": amounts.get("现金", 0)},
+    ]
 
 
 def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], strategy: dict[str, Any]) -> list[dict[str, Any]]:
     actionable = [row for row in opportunity if row.get("advice") in {"优先加仓", "正常定投", "小额分批"}]
     targets = "、".join(row["name"] for row in actionable[:3]) if actionable else "VOO/QQQ、沪深300ETF"
-    conditional_cap = budget["conditional_bond_to_equity_month_yuan"]
+    conditional_cap = budget.get("bond_to_equity_remaining_real_cash_yuan", 0)
     no_cash = float(budget.get("investable_cash_yuan", 0) or 0) <= 0
     return [
         {
@@ -1276,9 +1430,9 @@ def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], s
             "trigger": "主要指数波动未触发回撤阈值，VIX低于20或维持正常区间",
             "action": "基础定投按计划日执行；非计划日不交易。",
             "amount": (
-                f"真实可执行0元；债券到账后条件性上限{conditional_cap}元，到账前不可执行。"
+                f"真实可执行0元；债券资金未到账前不可执行。"
                 if no_cash
-                else f"确认现金买入上限{budget['month_confirmed_yuan']}元；债券到账后条件性上限{conditional_cap}元。"
+                else f"本月已确认执行{budget['month_confirmed_yuan']}元；已到账剩余专项现金{conditional_cap}元须继续通过市场、DQS与风险复核。"
             ),
             "targets": targets,
         },
@@ -1411,19 +1565,45 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
 
 
 def apply_dqs_to_opportunity(opportunity: list[dict[str, Any]], dqs: dict[str, Any]) -> list[dict[str, Any]]:
-    if dqs.get("mode") not in {"direction", "safe"}:
-        return opportunity
     adjusted: list[dict[str, Any]] = []
+    opportunity_gate = (dqs.get("use_cases", {}) or {}).get("opportunity_add", {}) or {}
+    opportunity_allowed = bool(opportunity_gate.get("allowed"))
     for row in opportunity:
         item = dict(row)
-        if item.get("asset_type") in {"core_etf", "growth_etf", "sector_etf", "thematic_etf"} and item.get("advice") not in {"暂停新增", "风险复核或回避"}:
-            item["advice"] = "观察，等待数据质量恢复"
+        holding = float(item.get("current_holding_yuan", 0) or 0)
+        item["long_term_allocation_priority"] = item.get("allocation_priority", "低")
+        item["today_trade_permission"] = False
+        item["current_holding_action"] = "继续持有" if holding > 0 else "不适用"
+        item["observation_action"] = "保留观察，今日不建仓" if holding <= 0 else "继续观察持仓"
+        if not opportunity_allowed and item.get("asset_type") in {"core_etf", "growth_etf", "sector_etf", "thematic_etf"} and item.get("advice") not in {"暂停新增", "风险复核或回避"}:
+            item["advice"] = "等待条件，今日不交易"
+            item["final_action"] = "等待条件，今日不交易"
             limitations = list(item.get("limitations", []) or [])
-            limitations.append(f"DQS={dqs.get('score')}，当前不允许新增仓位建议")
+            limitations.append(f"Opportunity Add DQS={opportunity_gate.get('score', dqs.get('score'))}，当前不允许新增仓位建议")
             item["limitations"] = list(dict.fromkeys(limitations))
             item["reason"] = f"{item.get('reason', '')} 当前仅代表长期配置优先方向，不代表今日买入机会。"
+        if holding <= 0:
+            item["current_holding_action"] = "不适用"
         adjusted.append(item)
     return adjusted
+
+
+def build_opportunity_groups(allocation: list[dict[str, Any]], opportunity: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Separate allocation priorities from ETF and satellite opportunity views."""
+    strategic = []
+    for row in allocation:
+        priority = "高" if row.get("status") in {"严重低配", "严重超配"} else "中" if row.get("status") in {"低配", "超配"} else "低"
+        strategic.append({
+            "name": row["category"], "category": row["category"], "score": round(min(100, abs(float(row.get("deviation_ratio", 0) or 0)) * 600)),
+            "allocation_priority": priority, "valuation_attractiveness": None, "tactical_entry_quality": None,
+            "confidence": "配置台账", "final_action": "优先修复低配" if "低配" in row.get("status", "") else "暂停新增" if "超配" in row.get("status", "") else "维持",
+            "reason": f"当前{row.get('status')}，偏离{float(row.get('deviation_ratio', 0) or 0):+.1%}。",
+        })
+    return {
+        "strategic_allocation": strategic,
+        "core_etf": [row for row in opportunity if row.get("opportunity_group") == "core_etf"],
+        "satellite_holding": [row for row in opportunity if row.get("opportunity_group") == "satellite_holding"],
+    }
 
 
 def _build_consistency_checks_legacy(decision: dict[str, Any]) -> dict[str, Any]:
@@ -1553,6 +1733,90 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     dqs = decision.get("dqs", {}) or {}
     snapshot = decision.get("portfolio_snapshot", {}) or {}
 
+    canonical_errors: list[str] = []
+    canonical_warnings: list[str] = []
+    allocation = decision.get("allocation", []) or []
+    target_weight_sum = sum(float(row.get("target_ratio", 0) or 0) for row in allocation)
+    target_amount_sum = sum(float(row.get("target_amount_yuan", 0) or 0) for row in allocation)
+    current_amount_sum = sum(float(row.get("current_amount_yuan", 0) or 0) for row in allocation)
+    deviation_sum = sum(float(row.get("deviation_amount_yuan", 0) or 0) for row in allocation)
+    total_assets = float(decision.get("portfolio_value_yuan", snapshot.get("total_assets", 0)) or 0)
+    if allocation:
+        if round(target_weight_sum, 10) != 1.0:
+            canonical_errors.append(f"目标配置合计{target_weight_sum:.10f}，不等于100%。")
+        if abs(target_amount_sum - total_assets) > 1:
+            canonical_errors.append("目标金额合计不等于总资产。")
+        if abs(deviation_sum) > 1 or abs(current_amount_sum - total_assets) > 1:
+            canonical_errors.append("资产配置偏离金额无法闭合。")
+
+    try:
+        cutoff_dt = datetime.fromisoformat(str(decision.get("data_cutoff") or decision.get("generated_at")))
+    except ValueError:
+        cutoff_dt = None
+        canonical_errors.append("决策截止时间无法解析。")
+    quote_stages: dict[str, str] = {}
+    for symbol, quote in (decision.get("normalized_market_quotes", {}) or {}).items():
+        stage = str(quote.get("price_stage") or quote.get("data_stage") or "UNKNOWN").upper()
+        quote_stages[str(symbol)] = stage
+        if stage not in PRICE_STAGES:
+            canonical_errors.append(f"{symbol}使用未知行情阶段{stage}。")
+        for key in ["quote_timestamp", "retrieved_at"]:
+            value = quote.get(key)
+            if not value:
+                continue
+            try:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    canonical_errors.append(f"{symbol}.{key}为无时区时间。")
+            except ValueError:
+                canonical_errors.append(f"{symbol}.{key}无法解析。")
+        quote_ts = _parse_review_datetime(quote.get("quote_timestamp"), timezone_name=str(quote.get("market_timezone") or "Asia/Shanghai")) if quote.get("quote_timestamp") else None
+        retrieved_ts = _parse_review_datetime(quote.get("retrieved_at"), timezone_name="Asia/Shanghai") if quote.get("retrieved_at") else None
+        if quote_ts and retrieved_ts and quote_ts > retrieved_ts:
+            canonical_errors.append(f"{symbol} quote_timestamp晚于retrieved_at。")
+        if cutoff_dt and retrieved_ts and retrieved_ts > cutoff_dt:
+            canonical_errors.append(f"{symbol} retrieved_at晚于报告决策截止时间。")
+        if quote.get("data_age_hours") is not None and not quote.get("quote_timestamp"):
+            canonical_errors.append(f"{symbol}没有可靠quote_timestamp却生成数据年龄。")
+        if cutoff_dt and str(quote.get("market")) == "US" and quote.get("market_date"):
+            expected_stage = classify_price_stage(
+                market="US",
+                market_timezone=str(quote.get("market_timezone") or "America/New_York"),
+                market_date=str(quote.get("market_date")),
+                decision_cutoff=cutoff_dt,
+                source_finalized=bool(quote.get("is_finalized")),
+                status_ok=str(quote.get("status")) in {"ok", "success", "cached"},
+                stale=bool(quote.get("is_stale") or quote.get("stale")),
+            )
+            if stage == "OFFICIAL_CLOSE" and expected_stage != "OFFICIAL_CLOSE":
+                canonical_errors.append(f"{symbol}美股未满足正式结算条件却标记OFFICIAL_CLOSE。")
+
+    for row in decision.get("market_table", []) or []:
+        symbol = str(row.get("name") or "")
+        if symbol in quote_stages and str(row.get("price_stage") or row.get("data_stage") or "UNKNOWN").upper() != quote_stages[symbol]:
+            canonical_errors.append(f"{symbol}在市场表和统一行情对象中的数据阶段不一致。")
+    for event in decision.get("released_events", []) or []:
+        if event.get("risk_level") == "high" and event.get("actual_value") is None and event.get("event_data_status") != "RELEASED_DATA_MISSING":
+            canonical_errors.append(f"已公布重大事件{event.get('event_name')}缺少实际值且未标记RELEASED_DATA_MISSING。")
+    forbidden_actions = ["小额分批", "建议加仓", "优先加仓", "立即配置", "买入"]
+    for item in decision.get("opportunity", []) or []:
+        if float(item.get("current_holding_yuan", 0) or 0) <= 0 and item.get("current_holding_action") == "继续持有":
+            canonical_errors.append(f"零持仓标的{item.get('name')}错误显示继续持有。")
+        if not item.get("today_trade_permission") and any(word in str(item.get("final_action") or "") for word in forbidden_actions):
+            canonical_errors.append(f"{item.get('name')}今日交易权限为否但最终动作仍为买入类动作。")
+    cash = snapshot.get("cash", {}) or {}
+    simulated_cash = float(cash.get("paper_grid_cash_cny", 0) or 0)
+    if simulated_cash and (simulated_cash <= total_assets or simulated_cash <= float(budget.get("investable_cash_yuan", 0) or 0)):
+        canonical_errors.append("模拟网格现金进入真实资产或可投资现金。")
+    for trade in decision.get("confirmed_transactions", []) or []:
+        if trade.get("reconciliation_status") == "pending_reconciliation":
+            if any(trade.get(key) is not None for key in ["quantity", "actual_fx_rate_cny_per_usd", "fee"]):
+                canonical_errors.append("交易对账未完成却填入实际数量、汇率或费用。")
+    grid = decision.get("grid", {}) or {}
+    if grid.get("snapshot_comparable") and any(stage != "OFFICIAL_CLOSE" for stage in quote_stages.values() if stage == "STALE"):
+        canonical_errors.append("使用过期行情生成精确网格价。")
+    record("阻断级统一口径", canonical_errors, canonical_warnings)
+
     # Event consistency: all horizons and grid checks derive from the same event set.
     event_errors: list[str] = []
     event_warnings: list[str] = []
@@ -1659,6 +1923,45 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
             confirmed_trade_errors.append("成交股数、实际汇率或手续费被未经确认地填入。")
         if not voo_trade.get("real_trade") or voo_trade.get("simulation_trade"):
             confirmed_trade_errors.append("VOO实盘交易与网格模拟交易未正确隔离。")
+        if voo_trade.get("trade_origin") not in TRADE_ORIGINS:
+            confirmed_trade_errors.append("VOO交易的trade_origin不在允许枚举中。")
+        if voo_trade.get("trade_origin") == "SCHEDULED_BASE_DCA":
+            expected_flags = {
+                "execution_status": "USER_CONFIRMED_EXECUTED",
+                "system_pre_authorized": True,
+                "opportunity_add": False,
+                "discretionary_trade": False,
+                "event_chasing": False,
+            }
+            for key, expected in expected_flags.items():
+                if voo_trade.get(key) != expected:
+                    confirmed_trade_errors.append(f"计划内周三定投字段{key}与既定分类不一致。")
+            expected_policy = scheduled_dca_event_window_policy(
+                already_executed=True,
+                in_event_window=bool(decision.get("macro_event_high_next_48_hours")),
+            )
+            if voo_trade.get("event_window_policy") != expected_policy:
+                confirmed_trade_errors.append("已执行的事前批准定投被事件窗口事后改写分类。")
+
+        counted_trade_total = sum(
+            float(row.get("amount_yuan", 0) or 0)
+            for row in budget.get("rows", []) or []
+            if row.get("counts_toward_actual_trade_total")
+        )
+        attributed_migration_total = sum(
+            float(row.get("attributed_amount_yuan", 0) or 0)
+            for row in budget.get("rows", []) or []
+            if row.get("record_type") == "funding_and_migration_attribute"
+        )
+        actual_trade_total = float(voo_trade.get("invested_amount_cny", 0) or 0)
+        if abs(counted_trade_total - actual_trade_total) > 10:
+            confirmed_trade_errors.append("基础定投实际金额未按单笔交易只计算一次。")
+        if abs(attributed_migration_total - actual_trade_total) > 10:
+            confirmed_trade_errors.append("债券转权益迁移属性金额与实际基础定投金额不一致。")
+        arrived = float(budget.get("actual_bond_cash_arrived_yuan", 0) or 0)
+        remaining = float(budget.get("bond_to_equity_remaining_this_month_yuan", 0) or 0)
+        if abs(arrived - actual_trade_total - remaining) > 10:
+            confirmed_trade_errors.append("基础定投金额、债券迁移额度与剩余现金变化不一致。")
         confirmed_trade_warnings.append("VOO成交股数、实际汇率和手续费待补充；新增9000元仅按成本暂记，禁止冒充实时市值。")
     if is_user_snapshot_20260715 or voo_trade:
         record("用户确认交易完整性", confirmed_trade_errors, confirmed_trade_warnings)
@@ -1687,8 +1990,8 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     trade_errors: list[str] = []
     grid = decision.get("grid", {}) or {}
     grid_budget = grid.get("grid_budget", {}) or {}
-    if not decision.get("today_trade") and any(float(budget.get(key, 0) or 0) > 0 for key in ["today_total_yuan", "week_confirmed_yuan", "month_confirmed_yuan"]):
-        trade_errors.append("今日是否操作为否，但真实执行预算不为0。")
+    if not decision.get("today_trade") and float(budget.get("today_total_yuan", 0) or 0) > 0:
+        trade_errors.append("Stone CIO当前是否建议操作为否，但今日新增建议预算不为0。")
     if grid.get("paper_mode", True) and (float(grid_budget.get("live_available_yuan", 0) or 0) > 0 or grid.get("live_advice_enabled")):
         trade_errors.append("模拟网格影响了真实执行预算或建议。")
     record("模拟与实盘隔离", trade_errors, [])
@@ -1773,10 +2076,19 @@ def build_v12_1_decision(
 ) -> dict[str, Any]:
     strategy = load_strategy()
     snapshot = _portfolio_snapshot()
+    timing = (live_market_result.get("decision_timing", {}) or {})
+    generated_at = str(timing.get("report_generation_time") or datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds"))
+    try:
+        cutoff = datetime.fromisoformat(str(timing.get("decision_cutoff_time") or generated_at))
+        live_market_result = filter_market_for_cutoff(live_market_result, cutoff)
+    except ValueError:
+        # An invalid cutoff must never cause later-observed data to enter a decision.
+        live_market_result = {**live_market_result, "items": {}, "macro": {"items": {}}, "decision_timing": {**timing, "invalid_cutoff": True}}
     allocation = enrich_allocation(portfolio_result, strategy)
     dqs = compute_dqs(live_market_result, strategy, macro_result)
     risk = compute_risk_score(live_market_result, macro_result, dqs, strategy)
     opportunity = apply_dqs_to_opportunity(build_opportunity_scores(allocation, live_market_result, strategy), dqs)
+    opportunity_groups = build_opportunity_groups(allocation, opportunity)
     try:
         write_scoring_trace(opportunity, live_market_result.get("cn_hk_p1a", {}) or {})
     except Exception as exc:  # noqa: BLE001 - trace output must not break decisions
@@ -1785,10 +2097,9 @@ def build_v12_1_decision(
     migration = build_migration_plan(allocation, budget)
     holding_diagnostics = build_holding_diagnostics(live_market_result, allocation)
     scenarios = build_scenarios(budget, opportunity, strategy)
-    stress_scenarios = calculate_portfolio_stress_scenarios(allocation, strategy.get("scenario_stress", {}))
+    stress_scenarios = calculate_portfolio_stress_scenarios(allocation, strategy.get("scenario_stress", {}), build_stress_exposures(allocation, snapshot))
     ai_mode = build_ai_mode(ai_advice_result, dqs)
     market_table = build_market_table(live_market_result)
-    generated_at = datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds")
     time_summary = build_data_time_summary(market_table, generated_at)
     tushare_calendar = (
         (((live_market_result.get("cn_hk_p1a", {}) or {}).get("tushare", {}) or {}).get("trade_calendar", {}) or {})
@@ -1799,18 +2110,36 @@ def build_v12_1_decision(
         dca_candidate=budget.get("next_dca_date"),
         cn_next_open_date=tushare_calendar.get("next_open_date"),
     )
+    next_daily_review = resolve_next_review_datetime(
+        generated_at,
+        cn_next_open_date=tushare_calendar.get("next_open_date"),
+    )
+    scheduled_review_dt = _parse_review_datetime(budget.get("next_dca_date"))
+    next_scheduled_dca_review = scheduled_review_dt.isoformat(timespec="seconds") if scheduled_review_dt else str(budget.get("next_dca_date"))
+    next_event_trigger_review = {
+        "mode": "IMMEDIATE_ON_TRIGGER",
+        "time": macro_result.get("next_review_date"),
+        "triggers": ["市场回撤", "VIX显著变化", "重大事件公布", "风险门槛触发"],
+        "description": "满足回撤、波动率、重大事件或风险条件时即时进行。",
+    }
     total_yuan = sum(row["current_amount_yuan"] for row in allocation)
     today_trade = budget["today_total_yuan"] > 0
+    for row in opportunity:
+        row["today_trade_permission"] = bool(today_trade and row.get("advice") in {"优先加仓", "小额分批", "正常定投"})
+        if not row["today_trade_permission"] and any(word in str(row.get("final_action") or "") for word in ["加仓", "买入", "配置"]):
+            row["final_action"] = "等待条件，今日不交易"
     confirmed_transactions = snapshot.get("confirmed_transactions", []) or []
-    today_confirmed_transactions = [
-        item for item in confirmed_transactions if str(item.get("trade_date")) == date.today().isoformat()
-    ]
+    decision_date = str(snapshot.get("snapshot_date") or date.today().isoformat())
+    today_confirmed_transactions = [item for item in confirmed_transactions if str(item.get("trade_date")) == decision_date]
     today_confirmed_trade_executed = bool(today_confirmed_transactions)
     confirmed_trade_amount = sum(_to_float(item.get("invested_amount_cny")) for item in today_confirmed_transactions)
+    primary_confirmed_trade = today_confirmed_transactions[0] if today_confirmed_transactions else {}
+    confirmed_trade_origin = str(primary_confirmed_trade.get("trade_origin") or "UNKNOWN")
+    scheduled_base_dca_executed = confirmed_trade_origin == "SCHEDULED_BASE_DCA"
 
     no_trade_reasons = []
     if today_confirmed_trade_executed:
-        no_trade_reasons.append("已完成用户确认的债券转权益实盘交易；剩余专项资金不强制立即投入")
+        no_trade_reasons.append("已完成用户确认的周三基础定投；剩余专项资金不强制立即投入")
     if not budget["is_dca_day"] and not today_confirmed_trade_executed:
         no_trade_reasons.append("今日不是基础定投执行日")
     if dqs["mode"] in {"direction", "safe"}:
@@ -1824,11 +2153,11 @@ def build_v12_1_decision(
 
     decision = {
         "version": VERSION_NAME,
-        "date": date.today().isoformat(),
+        "date": decision_date,
         "generated_at": generated_at,
         "report_timezone": "Asia/Shanghai",
         "data_time_summary": time_summary,
-        "data_cutoff": live_market_result.get("fetched_at") or datetime.now().isoformat(timespec="seconds"),
+        "data_cutoff": (live_market_result.get("decision_timing", {}) or {}).get("decision_cutoff_time") or generated_at,
         "trading_day_status": "周末/非交易时段需以下一交易日为准" if date.today().weekday() >= 5 else "交易日",
         "portfolio_value_yuan": round(total_yuan),
         "portfolio_value_wan": round(total_yuan / 10000, 2),
@@ -1837,6 +2166,7 @@ def build_v12_1_decision(
         "dqs": dqs,
         "risk": risk,
         "opportunity": opportunity,
+        "opportunity_groups": opportunity_groups,
         "budget": budget,
         "migration_plan": migration,
         "holding_diagnostics": holding_diagnostics,
@@ -1847,6 +2177,8 @@ def build_v12_1_decision(
         "cn_hk_p1a": live_market_result.get("cn_hk_p1a", {}),
         "cn_hk_analysis_completeness": live_market_result.get("cn_hk_analysis_completeness", {}),
         "market_table": market_table,
+        "normalized_market_quotes": _market_items(live_market_result),
+        "post_cutoff_data": (live_market_result.get("decision_timing", {}) or {}).get("post_cutoff_data", []),
         "ai": ai_mode,
         "macro_event_high_next_7_days": bool(macro_result.get("has_high_event_next_7_days")),
         "macro_event_high_next_48_hours": bool(macro_result.get("has_high_event_next_48_hours")),
@@ -1857,20 +2189,57 @@ def build_v12_1_decision(
         "released_events": macro_result.get("released_events", []) or [],
         "today_trade": today_trade,
         "today_confirmed_trade_executed": today_confirmed_trade_executed,
+        "trade_origin": confirmed_trade_origin,
+        "execution_status": primary_confirmed_trade.get("execution_status") if today_confirmed_trade_executed else None,
+        "system_pre_authorized": bool(primary_confirmed_trade.get("system_pre_authorized")),
+        "opportunity_add": bool(primary_confirmed_trade.get("opportunity_add")),
+        "discretionary_trade": bool(primary_confirmed_trade.get("discretionary_trade")),
+        "event_chasing": bool(primary_confirmed_trade.get("event_chasing")),
+        "asset_migration_attribute": primary_confirmed_trade.get("asset_migration_attribute") if today_confirmed_trade_executed else None,
+        "event_window_policy": primary_confirmed_trade.get("event_window_policy") if today_confirmed_trade_executed else None,
         "confirmed_transactions": confirmed_transactions,
         "today_confirmed_transactions": today_confirmed_transactions,
-        "trade_type": "债券转权益（用户确认已执行）" if today_confirmed_trade_executed else ("无操作" if not today_trade else "基础定投/机会加仓/再平衡"),
+        "trade_type": (
+            "周三基础定投（用户确认已执行）"
+            if scheduled_base_dca_executed
+            else "用户确认交易（已执行）"
+            if today_confirmed_trade_executed
+            else ("无操作" if not today_trade else "基础定投/机会加仓/再平衡")
+        ),
         "today_amount_yuan": round(confirmed_trade_amount) if today_confirmed_trade_executed else budget["today_total_yuan"],
         "targets": "VOO" if today_confirmed_trade_executed else ("、".join(row["name"] for row in opportunity[:3]) if today_trade and opportunity else "不适用"),
         "funding_source": "2026-07-15到期债券资金；不占用固定现金安全储备" if today_confirmed_trade_executed else ("现金安全线以上资金" if today_trade else "今日不使用资金"),
+        "decision_card": {
+            "actual_trade_facts": today_confirmed_transactions,
+            "actual_trade_classification": {
+                "trade_origin": confirmed_trade_origin,
+                "execution_status": primary_confirmed_trade.get("execution_status"),
+                "system_pre_authorized": bool(primary_confirmed_trade.get("system_pre_authorized")),
+                "trade_purpose": "基础定投" if scheduled_base_dca_executed else "待确认",
+                "funding_source": primary_confirmed_trade.get("funding_source"),
+                "asset_migration_attribute": primary_confirmed_trade.get("asset_migration_attribute"),
+                "actual_amount_yuan": round(confirmed_trade_amount),
+                "counting_rule": "实际交易金额只计算一次；债券转权益仅作为资金来源和迁移属性记录。",
+            },
+            "current_recommendation": {
+                "continue_operation": bool(today_trade), "amount_yuan": round(budget.get("today_total_yuan", 0)),
+                "targets": "、".join(row["name"] for row in opportunity_groups["core_etf"][:2]) if today_trade else "不建议继续操作",
+                "funding_source": "已到账专项可投资现金" if today_trade else "不使用资金",
+                "reason": "DQS、市场数据和风险门槛必须同时通过。", "next_review_time": next_review_date,
+            },
+            "conditional_plans": scenarios,
+        },
         "no_trade_reasons": no_trade_reasons,
         "next_triggers": build_next_triggers(budget, dqs),
-        "next_review_date": next_review_date,
-        "next_review_reason": macro_result.get("next_review_reason") or "按下一基础定投复核时间执行。",
+        "next_review_date": next_daily_review,
+        "next_daily_review": next_daily_review,
+        "next_scheduled_dca_review": next_scheduled_dca_review,
+        "next_event_trigger_review": next_event_trigger_review,
+        "next_review_reason": "下一日常复核为下一个交易日；计划定投和事件触发复核分别列示。",
         "max_risk": max(risk["components"], key=lambda row: row.get("score", 0))["basis"] if risk["components"] else "暂无",
         "max_opportunity": describe_max_opportunity(opportunity, dqs, today_trade),
         "one_sentence": (
-            "2026年7月15日已执行一笔债券转权益交易：以692.5美元/份的价格买入人民币9,000元VOO。该交易资金来源为当日实际到账的债券本金，不占用现金安全储备。"
+            "本次9,000元VOO买入为此前既定周三基础定投计划的执行结果，资金来源为当日到账债券资金，不属于机会加仓、临时追涨或网格交易。"
             if today_confirmed_trade_executed
             else "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。"
         ),
@@ -1889,7 +2258,7 @@ def build_v12_1_decision(
         if not decision.get("today_confirmed_trade_executed"):
             decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
     decision["ai"] = build_rule_enhanced_analysis(decision)
-    write_log(f"V12.6.1 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
+    write_log(f"V12.7.0 决策生成完成：DQS={dqs['score']} market_risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
     return decision
 
 
@@ -1918,10 +2287,10 @@ def build_system_audit_text(context: dict[str, Any], decision: dict[str, Any]) -
     market_result = context.get("market_result", {}) or {}
     execution = context.get("execution_plan_result", {}) or {}
     lines = [
-        "# Stone AI V12.6.1 Stable System Audit",
+        "# Stone AI V12.7.0 Stable System Audit",
         "",
         f"- 审计时间：{datetime.now().isoformat(timespec='seconds')}",
-        "- 当前实际运行入口：根目录 `main.py`（V12.6.1 Stable唯一正式入口）。",
+        "- 当前实际运行入口：根目录 `main.py`（V12.7.0 Stable唯一正式入口）。",
         "- GitHub Actions 应调用：`python main.py`。",
         "- 报告生成模块：`src/reports/report_center.py`。",
         "- 决策核心模块：`src/decision/v12_1_decision.py`。",

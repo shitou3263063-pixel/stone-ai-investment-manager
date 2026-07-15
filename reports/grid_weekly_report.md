@@ -15,8 +15,8 @@
 
 | 标的 | 市场状态 | 今日信号 | 风控结论 | 下周触发价 |
 | -- | -- | -- | -- | -- |
-| VOO | uptrend | NO_TRIGGER | 继续监控，不执行。 | 买674.09/卖726.68 |
-| QQQ | uptrend | NO_TRIGGER | 继续监控，不执行。 | 买680.75/卖789.21 |
+| VOO | uptrend | DATA_NOT_COMPARABLE | 继续监控，不执行。 | DATA_NOT_COMPARABLE（历史参数仅供参考） |
+| QQQ | uptrend | DATA_NOT_COMPARABLE | 继续监控，不执行。 | DATA_NOT_COMPARABLE（历史参数仅供参考） |
 
 ## 下周观察
 

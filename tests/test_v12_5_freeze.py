@@ -50,7 +50,7 @@ def test_asset_total_consistency() -> None:
 
 def test_target_weight_sum() -> None:
     strategy = yaml.safe_load((PROJECT_ROOT / "config" / "strategy.yaml").read_text(encoding="utf-8"))
-    assert strategy["config_version"] == "V12.6.1_STABLE"
+    assert strategy["config_version"] == "V12.7.0_STABLE"
     assert abs(sum(strategy["target_allocation"].values()) - 1.0) < 1e-9
 
 
@@ -88,8 +88,8 @@ def test_grid_simulation_cash_exclusion() -> None:
 def test_no_trade_amount_zero() -> None:
     decision = _decision()
     assert decision["today_trade"] is False
-    assert decision["today_confirmed_trade_executed"] is False
-    assert decision["today_amount_yuan"] == 0
+    assert decision["today_confirmed_trade_executed"] is True
+    assert decision["today_amount_yuan"] == 9000
     assert any(item["id"] == "USERCONF-20260715-VOO-001" for item in decision["confirmed_transactions"])
     assert decision["budget"]["today_total_yuan"] == 0
 

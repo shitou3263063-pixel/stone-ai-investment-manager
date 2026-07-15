@@ -18,6 +18,17 @@ CANONICAL_CATEGORY = {
     "cash": "现金",
 }
 
+# `asset_class` describes the instrument.  Asset allocation must use the
+# economic bucket, not the exchange where the instrument happens to trade.
+ALLOCATION_BUCKET_CATEGORY = {
+    "us_equity": "美股",
+    "hk_equity": "港股",
+    "cn_equity": "A股",
+    "bonds": "债券",
+    "gold": "黄金",
+    "cash": "现金",
+}
+
 
 def _to_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -62,8 +73,10 @@ def _security_for(holding: dict[str, Any], lookup: dict[str, dict[str, Any]]) ->
 
 def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: dict[str, dict[str, Any]]) -> dict[str, Any]:
     security = _security_for(holding, lookup)
-    asset_key = str(holding.get("asset_class", "")).strip()
-    asset_class = labels.get(asset_key) or CANONICAL_CATEGORY.get(asset_key, asset_key)
+    instrument_asset_class = str(holding.get("asset_class", "")).strip()
+    allocation_bucket = str(holding.get("allocation_bucket") or security.get("allocation_bucket") or "").strip()
+    asset_key = allocation_bucket or instrument_asset_class
+    asset_class = ALLOCATION_BUCKET_CATEGORY.get(asset_key) or labels.get(asset_key) or CANONICAL_CATEGORY.get(asset_key, asset_key)
     value_cny = round(_to_float(holding.get("market_value_cny")))
     original_value = _to_float(holding.get("market_value_original"), value_cny)
     raw_exchange_rate = holding.get("exchange_rate")
@@ -78,6 +91,10 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "asset_id": holding.get("asset_id", ""),
         "asset_class_key": asset_key,
         "asset_class": asset_class,
+        "instrument_asset_class": instrument_asset_class or security.get("asset_class") or "unknown",
+        "allocation_bucket": allocation_bucket or asset_key,
+        "economic_exposure": holding.get("economic_exposure") or security.get("economic_exposure") or "unknown",
+        "listing_market": holding.get("listing_market") or security.get("listing_market") or holding.get("market") or security.get("exchange") or "unknown",
         "security_name": holding.get("security_name") or security.get("display_name") or "",
         "security_code": str(holding.get("security_code") or security.get("ticker") or ""),
         "canonical_id": security.get("canonical_id") or holding.get("asset_id", ""),
@@ -171,7 +188,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
     freshness_warning = "持仓市值可能滞后" if holdings_stale else "持仓数据在人工确认有效期内"
     return {
         "snapshot_date": snapshot_date,
-        "built_at": datetime.now().isoformat(timespec="seconds"),
+        "built_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "source_file": str(master_path),
         "source": str(master.get("source") or "user_confirmed"),
         "last_confirmed_at": snapshot_date,
@@ -232,6 +249,10 @@ def portfolio_rows_for_legacy_agents() -> list[dict[str, Any]]:
                 "canonical_id": holding["canonical_id"],
                 "pricing_proxy": holding["pricing_proxy"],
                 "strategy_bucket": holding["strategy_bucket"],
+                "instrument_asset_class": holding["instrument_asset_class"],
+                "allocation_bucket": holding["allocation_bucket"],
+                "economic_exposure": holding["economic_exposure"],
+                "listing_market": holding["listing_market"],
                 "liquidity_status": holding["liquidity_status"],
                 "account": holding["account"],
             }
