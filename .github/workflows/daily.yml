@@ -2,8 +2,13 @@ name: Daily Stone AI Investment Report
 
 on:
   schedule:
-    # 00:30 UTC = 北京时间 08:30
-    - cron: "30 0 * * *"
+    # 中国资产与亚洲市场晨间复核：北京时间每天08:30。
+    - cron: "30 8 * * *"
+      timezone: "Asia/Shanghai"
+    # 美股市场晨间复核：纽约时间每天08:30；自动适配EST/EDT夏令时。
+    # 使用等价但不同的星期表达式，以便邮件主题识别触发来源。
+    - cron: "30 8 * * 0-6"
+      timezone: "America/New_York"
   workflow_dispatch:
 
 concurrency:
@@ -17,6 +22,7 @@ jobs:
 
     env:
       PYTHONIOENCODING: utf-8
+      REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -54,7 +60,7 @@ jobs:
       - name: Run tests
         run: pytest
 
-      - name: Run Stone AI Investment Manager Pro V12.6 Stable
+      - name: Run Stone AI Investment Manager Pro V12.7.0 Stable
         run: python main.py
 
       - name: Upload reports and logs artifact

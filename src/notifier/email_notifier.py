@@ -481,8 +481,11 @@ def send_daily_reports(
 
     action = run_status.get("today_action", {}) or {}
     has_issue = bool(run_status.get("warnings") or run_status.get("errors"))
+    run_label = os.getenv("REPORT_RUN_LABEL", "").strip()
+    email_subject = f"{DAILY_EMAIL_SUBJECT} | {run_label}" if run_label else DAILY_EMAIL_SUBJECT
     plain_body = "\n".join(
         [
+            f"运行时段：{run_label or '本地或未标记运行'}",
             f"报告日期：{run_status.get('report_date')}",
             f"数据截止时间：{run_status.get('data_cutoff_time')}",
             f"今日是否执行：{'是' if action.get('execute') else '否'}",
@@ -495,7 +498,7 @@ def send_daily_reports(
     )
 
     try:
-        _send_email(config, DAILY_EMAIL_SUBJECT, plain_body, attachments, _html_body(DAILY_EMAIL_SUBJECT, plain_body))
+        _send_email(config, email_subject, plain_body, attachments, _html_body(email_subject, plain_body))
         message = f"邮件已发送到 {_mask_email(config['EMAIL_TO'])}"
         write_log(message, filename="email_notifier.log")
         return {"sent": True, "skipped": False, "message": message, "error": ""}
