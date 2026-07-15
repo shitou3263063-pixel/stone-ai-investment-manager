@@ -47,7 +47,7 @@ def test_today_action_is_compact_and_has_only_required_fields() -> None:
         "金额或金额区间",
         "资金来源",
         "执行后账户现金余额",
-        "现金安全线",
+        "固定现金安全储备",
         "DQS",
         "Risk Score",
         "Opportunity Score",
@@ -83,9 +83,12 @@ def test_run_status_contains_fixed_contract_and_baseline_separation() -> None:
     }
     assert required <= status.keys()
     assert status["total_assets"] == 2_821_100
-    assert status["total_cash"] == 220_000
-    assert status["investable_cash"] == 0
+    assert status["total_cash"] == 241_000
+    assert status["cash_safety_reserve"] == 220_000
+    assert status["investable_cash"] == 21_000
     assert status["fund_classification"]["unsettled_bond_cash"] == 0
+    assert status["fund_classification"]["actual_arrived_bond_cash"] == 30_000
+    assert status["fund_classification"]["remaining_bond_to_equity_cash"] == 21_000
     assert status["fund_classification"]["simulated_grid_cash"] == 0
     assert status["fund_classification"]["real_executable_today"] == 0
     assert status["report_files"] == FIXED_REPORTS

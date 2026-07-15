@@ -46,6 +46,8 @@ def _items(values: list[Any] | None) -> str:
 
 
 def _amount_mode_text(decision: dict[str, Any], amount: int | float) -> str:
+    if decision.get("today_confirmed_trade_executed") and float(amount or 0) > 0:
+        return _yuan(amount)
     if not decision.get("today_trade") or float(amount or 0) <= 0:
         return "0元"
     mode = decision.get("dqs", {}).get("mode")
@@ -78,11 +80,13 @@ def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
         if row.get("category") != "现金" and row.get("advice") not in {"暂停新增", "风险复核或回避"}
     ]
     top_opportunity = ranked_candidates[0] if ranked_candidates else {}
-    today_amount = float(budget.get("today_total_yuan", 0) or 0)
+    confirmed_executed = bool(decision.get("today_confirmed_trade_executed"))
+    today_amount = float(decision.get("today_amount_yuan", 0) or 0) if confirmed_executed else float(budget.get("today_total_yuan", 0) or 0)
     account_cash = float(budget.get("account_total_cash_yuan", 0) or 0)
     funding_source = str(decision.get("funding_source") or "不适用")
     cash_funded_amount = today_amount if decision.get("today_trade") and "现金" in funding_source else 0
-    post_execution_cash = max(0, account_cash - cash_funded_amount)
+    cash_snapshot = (decision.get("portfolio_snapshot", {}) or {}).get("cash", {}) or {}
+    post_execution_cash = account_cash if confirmed_executed else max(0, account_cash - cash_funded_amount)
 
     anomalies: list[Any] = []
     anomalies.extend(consistency.get("errors", []) or [])
@@ -101,13 +105,15 @@ def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
     return {
         "report_date": decision.get("date"),
         "data_cutoff_time": decision.get("data_cutoff"),
-        "execute": bool(decision.get("today_trade")),
+        "execute": confirmed_executed or bool(decision.get("today_trade")),
+        "confirmed_executed": confirmed_executed,
         "action_type": decision.get("trade_type") or "无操作",
         "targets": decision.get("targets") or "不适用",
         "amount_yuan": today_amount,
         "amount_or_range": _amount_mode_text(decision, today_amount),
         "funding_source": funding_source,
         "post_execution_cash_yuan": post_execution_cash,
+        "pre_transaction_cash_yuan": float(cash_snapshot.get("opening_cash_before_bond_maturity_cny", 0) or 0),
         "cash_safety_reserve_yuan": float(budget.get("cash_safety_reserve_yuan", 0) or 0),
         "dqs": dqs.get("score"),
         "dqs_mode": dqs.get("mode_label"),
@@ -126,26 +132,27 @@ def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
 
 def generate_today_action(decision: dict[str, Any]) -> str:
     action = build_today_action_payload(decision)
-    no_execute = "；".join(action["no_execute_reasons"]) if not action["execute"] else "不适用"
+    no_execute = "；".join(action["no_execute_reasons"]) if (not action["execute"] or action["confirmed_executed"]) else "不适用"
     anomalies = "；".join(action["data_anomalies_or_baseline_conflicts"]) or "无"
     return "\n".join(
         [
-            "# Stone CIO 今日执行单",
+            "# Stone CIO 今日交易确认单" if action["confirmed_executed"] else "# Stone CIO 今日执行单",
             "",
             f"- 报告日期：{action['report_date']}",
             f"- 数据截止时间：{action['data_cutoff_time']}",
-            f"- 今日是否执行：{_yes_no(action['execute'])}",
+            f"- 今日已确认执行：{_yes_no(action['execute'])}" if action["confirmed_executed"] else f"- 今日是否执行：{_yes_no(action['execute'])}",
             f"- 操作类型：{action['action_type']}",
             f"- 标的：{action['targets']}",
             f"- 金额或金额区间：{action['amount_or_range']}",
             f"- 资金来源：真实可执行资金口径；{action['funding_source']}",
+            f"- 交易前账户现金：{_yuan(action['pre_transaction_cash_yuan'])}" if action["confirmed_executed"] else "- 交易前账户现金：不适用",
             f"- 执行后账户现金余额：{_yuan(action['post_execution_cash_yuan'])}",
-            f"- 现金安全线：{_yuan(action['cash_safety_reserve_yuan'])}",
+            f"- 固定现金安全储备：{_yuan(action['cash_safety_reserve_yuan'])}",
             f"- DQS：{action['dqs']}（{action['dqs_mode']}）",
             f"- Risk Score：{action['risk_score']}（{action['risk_level']}）",
             f"- Opportunity Score：{action['opportunity_score']}",
             f"- 下一复核日期：{action['next_review_date']}",
-            f"- 不执行的核心原因：{no_execute}",
+            f"- 后续不追加投入的核心约束：{no_execute}" if action["confirmed_executed"] else f"- 不执行的核心原因：{no_execute}",
             f"- 数据异常或资产基线冲突：{anomalies}",
         ]
     )
@@ -211,8 +218,11 @@ def build_run_status(
         "fund_classification": {
             "confirmed_fact_total_cash": budget.get("account_total_cash_yuan"),
             "rule_engine_investable_cash": budget.get("investable_cash_yuan"),
-            "conditional_plan_bond_to_equity": budget.get("conditional_bond_to_equity_month_yuan"),
-            "unsettled_bond_cash": budget.get("actual_bond_cash_arrived_yuan"),
+            "approved_bond_to_equity": budget.get("approved_bond_to_equity_month_yuan"),
+            "actual_arrived_bond_cash": budget.get("actual_bond_cash_arrived_yuan"),
+            "unsettled_bond_cash": 0,
+            "remaining_bond_to_equity_cash": budget.get("bond_to_equity_remaining_real_cash_yuan"),
+            "confirmed_executed_trade_today": decision.get("today_amount_yuan") if decision.get("today_confirmed_trade_executed") else 0,
             "simulated_grid_cash": budget.get("paper_grid_cash_yuan"),
             "real_executable_today": budget.get("today_total_yuan"),
         },
@@ -317,13 +327,45 @@ def _cash_table(decision: dict[str, Any]) -> list[str]:
         "| 现金口径 | 金额 | 说明 |",
         "| -- | -: | -- |",
         f"| 账户总现金 | {_yuan(budget.get('account_total_cash_yuan'))} | 用户确认的全部账户现金 |",
-        f"| 现金安全储备 | {_yuan(budget.get('cash_safety_reserve_yuan'))} | 目标配置中必须保留，不用于投资 |",
-        f"| 可投资现金 | {_yuan(budget.get('investable_cash_yuan'))} | 账户总现金扣除安全储备和占用资金后余额 |",
+        f"| 固定现金安全储备 | {_yuan(budget.get('cash_safety_reserve_yuan'))} | 用户明确确认的固定金额，不再按总资产8%动态上调 |",
+        f"| 债券转权益专项可投资现金 | {_yuan(budget.get('bond_to_equity_remaining_real_cash_yuan'))} | 已到账，不占用固定安全储备 |",
+        f"| 当前真实可投资现金 | {_yuan(budget.get('investable_cash_yuan'))} | 账户总现金扣除固定安全储备和占用资金后余额 |",
         f"| 网格实盘专用现金 | {_yuan(budget.get('live_grid_cash_yuan'))} | 当前未启用真实网格交易 |",
         f"| 网格模拟现金 | {_yuan(budget.get('paper_grid_cash_yuan'))} | 只用于SIMULATION，不计入真实资产 |",
-        f"| 条件性未到账资金 | {_yuan(budget.get('actual_bond_cash_arrived_yuan'))} | 未到账债券资金不得当作现金使用 |",
+        "| 条件性未到账资金 | 0元 | 本次30,000元债券到期资金已实际到账 |",
     ]
     return rows
+
+
+def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
+    budget = decision.get("budget", {}) or {}
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    cash = snapshot.get("cash", {}) or {}
+    allocation = {row.get("category"): row for row in decision.get("allocation", []) or []}
+    before_cash = float(cash.get("opening_cash_before_bond_maturity_cny", 0) or 0)
+    arrival = float(cash.get("bond_maturity_arrival_cny", 0) or 0)
+    purchase = float(cash.get("voo_purchase_outflow_cny", 0) or 0)
+    transactions = decision.get("today_confirmed_transactions", []) or []
+    trade = transactions[0] if transactions else {}
+    quantity = trade.get("quantity")
+    fx_rate = trade.get("actual_fx_rate_cny_per_usd")
+    fee = trade.get("fee")
+    return [
+        "| 项目 | 交易前 | 变动 | 交易后 / 当前口径 |",
+        "| -- | --: | --: | -- |",
+        f"| 账户总现金 | {_yuan(before_cash)} | 债券到期 +{arrival:,.0f}元；VOO买入 -{purchase:,.0f}元 | {_yuan(budget.get('account_total_cash_yuan'))} |",
+        f"| 固定现金安全储备 | {_yuan(budget.get('cash_safety_reserve_yuan'))} | 0元 | {_yuan(budget.get('cash_safety_reserve_yuan'))}，未占用 |",
+        f"| 债券本金 | 1,130,000元 | -30,000元 | {_yuan((allocation.get('债券') or {}).get('current_amount_yuan'))} |",
+        "| VOO原确认市值 | 130,000元 | 不机械增加9,000元 | 仍为130,000元（原确认口径）；最新市值待实际股数、最新价格和实际汇率补齐后重算 |",
+        f"| VOO本次新增投入成本 | 0元 | +{purchase:,.0f}元 | {purchase:,.0f}元，单列待估值，不等同于新增市值 |",
+        f"| 当前真实可投资现金 | 0元 | 债券到账后净增加{budget.get('investable_cash_yuan', 0):,.0f}元 | {_yuan(budget.get('investable_cash_yuan'))} |",
+        "",
+        f"- 成交价格：{trade.get('execution_price_usd', '待补充')}美元/份",
+        f"- 成交股数：{quantity if quantity is not None else '待补充'}",
+        f"- 实际换汇汇率：{fx_rate if fx_rate is not None else '待补充'}",
+        f"- 手续费：{fee if fee is not None else '待补充'}",
+        "- VOO最新市值：待实际成交股数、最新市场价格和实际汇率补齐后重新计算。",
+    ]
 
 
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
@@ -665,14 +707,14 @@ def generate_daily_report(
         "",
         "## 1. Stone CIO 今日决策卡",
         "",
-        f"- 今日是否操作：{_yes_no(decision.get('today_trade'))}",
+        f"- 今日是否已确认操作：{_yes_no(decision.get('today_confirmed_trade_executed') or decision.get('today_trade'))}",
         f"- 今日操作类型：{decision.get('trade_type')}",
-        f"- 今日操作金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
+        f"- 今日操作金额：{_amount_mode_text(decision, decision.get('today_amount_yuan', budget.get('today_total_yuan', 0)))}",
         f"- 今日操作标的：{decision.get('targets')}",
         f"- 资金来源：{decision.get('funding_source')}",
         f"- 一句话结论：{decision.get('one_sentence')}",
         "",
-        "### 今日不操作或操作的三个核心原因",
+        "### 今日交易事实与后续约束",
         "",
         _items((decision.get("no_trade_reasons") or [])[:3]),
         "",
@@ -699,9 +741,17 @@ def generate_daily_report(
         "",
         *_cash_table(decision),
         "",
-        f"- 条件性债券转权益月度额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
+        "### 本次交易前后变化",
+        "",
+        *_transaction_change_table(decision),
+        "",
+        f"- 本月债券到期到账金额：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",
+        f"- 本月债券转权益月度额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
         f"- 本月批准债券转权益额度：{_yuan(budget.get('approved_bond_to_equity_month_yuan'))}",
-        f"- 说明：{budget.get('funding_note')} 条件性月度额度仅在债券资金实际到账、现金安全线满足、DQS和事件风控通过后生效。",
+        f"- 本月已执行金额：{_yuan(budget.get('bond_to_equity_executed_this_month_yuan'))}",
+        f"- 本月剩余可投资额度：{_yuan(budget.get('bond_to_equity_remaining_this_month_yuan'))}",
+        f"- 本月剩余真实可投资现金：{_yuan(budget.get('bond_to_equity_remaining_real_cash_yuan'))}",
+        f"- 说明：{budget.get('funding_note')} 剩余资金已到账、可投资，但仍须服从后续市场与风险条件，不代表必须一次性投入。",
         "",
         "## 5. 下一触发条件",
         "",
@@ -710,6 +760,9 @@ def generate_daily_report(
         "## 6. 资产配置与偏离",
         "",
         *_allocation_table(decision),
+        "",
+        "- 现金偏离按用户确认的固定安全储备220,000元计算，不再按总资产比例动态上调现金安全线。",
+        "- 美股当前金额394,000元为配置对账口径，其中9,000元是VOO新增投入成本的暂记值；VOO最新市值并未机械更新为139,000元。",
         "",
         "## 7. 未来12个月债券迁移第一阶段路线图",
         "",
@@ -736,6 +789,7 @@ def generate_daily_report(
         "",
         "- 权重：估值20%、趋势与市场宽度15%、基本面20%、宏观10%、资金流与成交结构10%、组合适配20%、数据置信度5%。",
         "- 最终分 = 原始绝对分 + 温和横截面调整 + 数据质量调整 + 组合约束调整；评分不覆盖现金、预算、DQS和硬风控。",
+        "- 组合约束已使用更新后的美股、债券和现金配置；VOO个券持仓仍保留原确认市值130,000元，新增9,000元成本不冒充实时市值。",
         "",
         *_opportunity_table(decision),
         "",
@@ -770,6 +824,7 @@ def generate_daily_report(
         "",
         f"- 原始分：{dqs.get('raw_score')}",
         f"- 最终分：{dqs.get('score')}",
+        "- DQS处理：本次用户确认交易只更新事实台账，没有手工提高DQS；评分仍按本次最新数据源重新计算。",
         f"- 降级原因：{'；'.join(dqs.get('blocking_errors', [])) or '无硬性降级'}",
         f"- 建议精度影响：{dqs.get('mode_label')}",
         f"- 核心必需数据缺失：{dqs.get('required_core_missing_count', 0)}项",
@@ -842,6 +897,58 @@ def generate_daily_report(
     return "\n".join(lines)
 
 
+def generate_portfolio_snapshot_report(decision: dict[str, Any]) -> str:
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    budget = decision.get("budget", {}) or {}
+    holdings = decision.get("holding_diagnostics", []) or []
+    holding_rows = [
+        "| 持仓 | 类别 | 当前对账金额 | 数量 | 估值说明 |",
+        "| -- | -- | --: | --: | -- |",
+    ]
+    raw_holdings = {row.get("security_name"): row for row in snapshot.get("holdings", []) or []}
+    for item in holdings:
+        raw = raw_holdings.get(item.get("name"), {}) or {}
+        status = raw.get("valuation_status") or raw.get("valuation_method") or "user_confirmed"
+        quantity = raw.get("quantity")
+        holding_rows.append(
+            f"| {item.get('name')} | {item.get('category')} | {_yuan(item.get('amount_yuan'))} | "
+            f"{quantity if quantity is not None else '待补充/不适用'} | {status} |"
+        )
+    return "\n".join(
+        [
+            "# Stone AI 最新持仓快照",
+            "",
+            f"- 持仓确认日期：{snapshot.get('snapshot_date')}",
+            f"- 来源：{snapshot.get('source')}",
+            f"- 组合总资产对账值：{_yuan(snapshot.get('total_assets'))}",
+            f"- 账户总现金：{_yuan(budget.get('account_total_cash_yuan'))}",
+            f"- 固定现金安全储备：{_yuan(budget.get('cash_safety_reserve_yuan'))}",
+            f"- 当前真实可投资现金：{_yuan(budget.get('investable_cash_yuan'))}",
+            "- 估值限制：VOO新增交易的股数、实际汇率和手续费待补充，9,000元仅作为新增投入成本暂记，不是实时市值。",
+            "",
+            "## 资产配置",
+            "",
+            *_allocation_table(decision),
+            "",
+            "## 持仓明细",
+            "",
+            *holding_rows,
+            "",
+            "## 2026-07-15交易前后变化",
+            "",
+            *_transaction_change_table(decision),
+            "",
+            "## 本月债券转权益状态",
+            "",
+            f"- 到期到账：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",
+            f"- 批准额度：{_yuan(budget.get('approved_bond_to_equity_month_yuan'))}",
+            f"- 已执行：{_yuan(budget.get('bond_to_equity_executed_this_month_yuan'))}（VOO，真实实盘）",
+            f"- 剩余额度及真实可投资现金：{_yuan(budget.get('bond_to_equity_remaining_real_cash_yuan'))}",
+            "- 剩余资金已到账，但不代表必须立即或一次性投入；Smart Grid模拟资金继续与实盘严格隔离。",
+        ]
+    )
+
+
 def generate_weekly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     try:
@@ -858,10 +965,12 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
             f"- 报告所属周：{iso_year}-W{iso_week:02d}",
             f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
             f"- 本周确认买入额度：{_yuan(budget.get('week_confirmed_yuan'))}",
-            f"- 条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
+            f"- 本月债券到期到账：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",
+            f"- 本月债券转权益已执行：{_yuan(budget.get('bond_to_equity_executed_this_month_yuan'))}",
+            f"- 本月债券转权益剩余额度：{_yuan(budget.get('bond_to_equity_remaining_this_month_yuan'))}",
             f"- 下一复核日：{decision.get('next_review_date')}",
             f"- 当前风险：{decision.get('risk', {}).get('level')}，DQS={decision.get('dqs', {}).get('score')}",
-            "- 本周纪律：未到账债券资金不得计入现金；重大事件前不追涨。",
+            "- 本周纪律：剩余专项资金已到账但不代表必须立即投入；重大事件前不追涨；模拟网格与实盘隔离。",
             "",
             decision.get("disclaimer", ""),
         ]
@@ -876,10 +985,13 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
             "# Stone AI V12.6.1 Stable 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
-            f"- 本月条件性债券转权益额度：{_yuan(budget.get('conditional_bond_to_equity_month_yuan'))}",
+            f"- 本月债券到期到账：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",
+            f"- 本月批准债券转权益额度：{_yuan(budget.get('approved_bond_to_equity_month_yuan'))}",
+            f"- 本月已执行：{_yuan(budget.get('bond_to_equity_executed_this_month_yuan'))}（VOO）",
+            f"- 本月剩余额度及真实可投资现金：{_yuan(budget.get('bond_to_equity_remaining_real_cash_yuan'))}",
             f"- 理论需转出债券金额：{_yuan(migration.get('theoretical_transfer_yuan'))}",
             f"- 月度上限：{_yuan(migration.get('monthly_cap_yuan'))}",
-            "- 月度原则：先确认资金到账，再分批配置权益ETF；不一次性大额切换。",
+            "- 月度原则：资金已到账；剩余部分继续按市场与风险条件分批复核，不强制一次性投入。",
             "",
             decision.get("disclaimer", ""),
         ]

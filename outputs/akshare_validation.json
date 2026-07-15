@@ -1,32 +1,32 @@
 {
-  "generated_at": "2026-07-15T03:10:20+08:00",
+  "generated_at": "2026-07-16T00:09:42+08:00",
   "akshare_status": "partial",
   "akshare_version": "1.18.64",
-  "akshare_trade_calendar_status": "ok",
-  "akshare_002558_valuation_status": "ok",
-  "akshare_002558_fundamental_status": "ok",
-  "akshare_csi300_valuation_status": "ok",
+  "akshare_trade_calendar_status": "cached",
+  "akshare_002558_valuation_status": "cached",
+  "akshare_002558_fundamental_status": "cached",
+  "akshare_csi300_valuation_status": "cached",
   "akshare_source_conflicts": [],
-  "akshare_last_success_at": "2026-07-15T03:10:20+08:00",
+  "akshare_last_success_at": "2026-07-15T03:10:20",
   "circuit_state": {
     "interfaces": {
-      "trade_calendar": 0,
-      "002558_valuation": 0,
-      "002558_scale": 0,
-      "002558_fundamental": 0,
+      "trade_calendar": 3,
+      "002558_valuation": 3,
+      "002558_scale": 3,
+      "002558_fundamental": 3,
       "002558_cashflow": 3,
-      "csi300_valuation": 0,
+      "csi300_valuation": 3,
       "002558_history": 3,
       "510300_history": 3,
       "513060_history": 3,
       "513090_history": 3,
-      "03033_history": 0,
-      "hstech_history": 0
+      "03033_history": 3,
+      "hstech_history": 3
     },
     "underlying_providers": {
-      "sina_finance": 0,
-      "eastmoney": 15,
-      "csindex_official": 0
+      "sina_finance": 9,
+      "eastmoney": 24,
+      "csindex_official": 3
     },
     "failure_threshold": 3
   },

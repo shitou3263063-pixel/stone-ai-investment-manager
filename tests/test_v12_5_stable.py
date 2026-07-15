@@ -67,7 +67,7 @@ def _decision() -> dict:
     return build_v12_1_decision(
         portfolio_result=_portfolio_result(snapshot),
         live_market_result=_live_market(),
-        macro_result=analyze_macro_calendar(today=__import__("datetime").date(2026, 7, 13)),
+        macro_result=analyze_macro_calendar(today=__import__("datetime").date.today()),
         ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则增强模式"},
     )
 
@@ -79,11 +79,13 @@ def test_portfolio_snapshot_totals_are_reconciled() -> None:
     assert snapshot["asset_class_totals"] == snapshot["holding_class_totals"]
 
 
-def test_cash_buckets_are_explicit_and_investable_cash_is_zero() -> None:
+def test_cash_buckets_are_explicit_and_match_user_confirmed_fixed_reserve() -> None:
     cash = build_portfolio_snapshot()["cash"]
-    assert cash["account_total_cash_cny"] == 220000
-    assert cash["cash_safety_reserve_cny"] > cash["account_total_cash_cny"]
-    assert cash["investable_cash_cny"] == 0
+    assert cash["account_total_cash_cny"] == 241000
+    assert cash["cash_safety_reserve_cny"] == 220000
+    assert cash["cash_safety_reserve_mode"] == "fixed_user_confirmed"
+    assert cash["investable_cash_cny"] == 21000
+    assert cash["bond_to_equity_investable_cash_cny"] == 21000
     assert cash["paper_grid_cash_cny"] == 0
 
 
@@ -100,7 +102,7 @@ def test_opportunity_score_uses_real_holdings_not_proxy_tickers() -> None:
     assert opportunity["南方东英恒生科技指数ETF"]["current_holding_yuan"] == 140400
     assert opportunity["沪深300ETF"]["current_holding_yuan"] == 206000
     assert opportunity["黄金"]["current_holding_yuan"] == 547000
-    assert opportunity["现金"]["current_holding_yuan"] == 220000
+    assert opportunity["现金"]["current_holding_yuan"] == 241000
 
 
 def test_overweight_gold_and_bonds_do_not_generate_add_advice() -> None:
@@ -129,7 +131,7 @@ def test_dqs_safe_mode_downgrades_actionable_opportunities() -> None:
 
 def test_consistency_validation_is_real_pass() -> None:
     decision = _decision()
-    assert decision["consistency"]["status"] == "PASS"
+    assert decision["consistency"]["status"] == "WARN"
     assert decision["consistency"]["errors"] == []
 
 
@@ -137,5 +139,24 @@ def test_conditional_bond_plan_is_not_cash() -> None:
     decision = _decision()
     budget = decision["budget"]
     assert budget["conditional_bond_to_equity_month_yuan"] == 30000
-    assert budget["approved_bond_to_equity_month_yuan"] == 0
-    assert budget["investable_cash_yuan"] == 0
+    assert budget["approved_bond_to_equity_month_yuan"] == 30000
+    assert budget["actual_bond_cash_arrived_yuan"] == 30000
+    assert budget["bond_to_equity_executed_this_month_yuan"] == 9000
+    assert budget["bond_to_equity_remaining_this_month_yuan"] == 21000
+    assert budget["investable_cash_yuan"] == 21000
+
+
+def test_voo_trade_keeps_unknown_execution_fields_and_does_not_fake_market_value() -> None:
+    snapshot = build_portfolio_snapshot()
+    original = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo")
+    pending = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo_20260715_pending_valuation")
+    trade = snapshot["confirmed_transactions"][0]
+    assert original["market_value_cny"] == 130000
+    assert original["quantity"] == 28
+    assert pending["market_value_cny"] == 9000
+    assert pending["valuation_status"] == "pending_actual_quantity_fx_fee"
+    assert trade["quantity"] is None
+    assert trade["actual_fx_rate_cny_per_usd"] is None
+    assert trade["fee"] is None
+    assert trade["real_trade"] is True
+    assert trade["simulation_trade"] is False

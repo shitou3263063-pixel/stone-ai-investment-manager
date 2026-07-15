@@ -1,5 +1,6 @@
 category,name,amount_wan,currency,quantity,unit,note
 美股,VOO 标普500ETF,13.00,CNY,28,股,来自portfolio_master.yaml
+美股,VOO 2026-07-15新增投入成本（待估值）,0.90,CNY,,待补充,用户确认成本；成交股数、实际换汇汇率、手续费及最新市值待补充
 美股,NVDA 英伟达,6.80,CNY,51,股,来自portfolio_master.yaml
 美股,GOOG 谷歌-C,2.20,CNY,9,股,来自portfolio_master.yaml
 美股,TLT 美国长期国债ETF,5.50,CNY,95,股,美国长期国债ETF；高久期利率资产
@@ -12,8 +13,8 @@ category,name,amount_wan,currency,quantity,unit,note
 A股,沪深300ETF,20.60,CNY,42900,份,来自portfolio_master.yaml
 A股,巨人网络,4.10,CNY,1500,股,代码002558
 A股,*ST闻泰,1.95,CNY,500,股,高风险个股；仅记录持仓，不自动建议加仓
-债券,中国债券组合（不含10年地债）,99.78,CNY,,组合,10年地债另列但仍包含在债券总额中
+债券,中国债券组合（不含10年地债）,96.78,CNY,,组合,2026-07-15组合层面冲减到期本金3万元；具体到期券种待补充
 债券,10年地债,13.22,CNY,1100,份,已包含在中国债券113万元中，不重复计算
 黄金,实物金条,51.20,CNY,565,克,人工覆盖估值；黄金分类总额需与portfolio_master一致
 黄金,黄金ETF,3.50,CNY,4000,份,代码518880
-现金,账户总现金,22.00,CNY,,元,统一现金口径；可投资现金需扣除现金安全储备
+现金,账户总现金,24.10,CNY,,元,固定安全储备22万元；债券转权益专项可投资现金2.10万元

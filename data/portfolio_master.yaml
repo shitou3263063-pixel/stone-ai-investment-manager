@@ -1,23 +1,26 @@
 config_version: V12.5_STABLE
 data_role: production_portfolio_authority
 schema_version: 2
-as_of: 2026-07-11
+as_of: 2026-07-15
 currency: CNY
 source: user_confirmed
 
 notes:
   - "portfolio_master.yaml 是最高优先级资产事实来源。"
   - "10年地债约132200元已包含在中国债券中，不得重复计算。"
-  - "现金统一按用户最新确认的220000元处理。"
+  - "2026-07-15交易后账户总现金为241000元，其中220000元为固定现金安全储备，21000元为已到账的债券转权益专项可投资现金。"
+  - "2026-07-15债券到期到账30000元，债券本金由1130000元降至1100000元；具体到期券种待补充，组合层面先冲减中国债券核心组合。"
+  - "2026-07-15以692.5美元/份买入VOO，人民币投入成本9000元；成交股数、实际换汇汇率和手续费待补充。"
+  - "VOO原确认市值130000元不机械更新为139000元；新增9000元单列为待估值成本，待成交字段补齐后按实际股数、最新价格和实际汇率重估。"
   - "黄金分类总额547000元，等于实物金条512000元 + 黄金ETF 35000元。"
 
 totals:
-  us_stock: 385000
+  us_stock: 394000
   hk_stock: 272600
   cn_stock: 266500
-  china_bond: 1130000
+  china_bond: 1100000
   gold: 547000
-  cash: 220000
+  cash: 241000
   total_assets: 2821100
 
 asset_class_labels:
@@ -29,12 +32,18 @@ asset_class_labels:
   cash: 现金
 
 cash_policy:
-  account_total_cash_cny: 220000
-  safety_reserve_ratio: 0.08
+  account_total_cash_cny: 241000
+  safety_reserve_cny: 220000
+  safety_reserve_mode: fixed_user_confirmed
+  safety_reserve_ratio: null
+  bond_to_equity_investable_cash_cny: 21000
+  opening_cash_before_bond_maturity_cny: 220000
+  bond_maturity_arrival_cny: 30000
+  voo_purchase_outflow_cny: 9000
   live_grid_cash_cny: 0
   other_reserved_cash_cny: 0
   unsettled_conditional_cash_cny: 0
-  note: "网格模拟现金不属于真实资产，不计入账户现金或可投资现金。"
+  note: "固定现金安全储备为220000元；21000元全部属于已到账的债券转权益专项可投资资金。网格模拟现金不属于真实资产，不计入账户现金或可投资现金。"
 
 holdings:
   - asset_id: us_voo
@@ -52,6 +61,30 @@ holdings:
     account: IBKR
     liquidity_status: liquid
     strategy_bucket: core_etf
+
+  - asset_id: us_voo_20260715_pending_valuation
+    asset_class: us_stock
+    security_name: VOO 2026-07-15新增投入成本（待估值）
+    security_code: VOO_PENDING_20260715
+    market: US
+    currency: CNY
+    quantity: null
+    unit: pending
+    market_value_cny: 9000
+    data_source: user_confirmed
+    valuation_time: 2026-07-15
+    confidence: pending
+    account: IBKR
+    liquidity_status: pending_trade_details
+    strategy_bucket: pending_valuation
+    valuation_method: confirmed_cost_pending_quantity_fx_fee
+    valuation_status: pending_actual_quantity_fx_fee
+    reference_symbol: VOO
+    execution_price_usd: 692.5
+    additional_cost_cny: 9000
+    actual_quantity: null
+    actual_fx_rate: null
+    fee: null
 
   - asset_id: us_nvda
     asset_class: us_stock
@@ -260,13 +293,15 @@ holdings:
     currency: CNY
     quantity: null
     unit: portfolio
-    market_value_cny: 997800
+    market_value_cny: 967800
     data_source: user_confirmed
-    valuation_time: 2026-07-11
+    valuation_time: 2026-07-15
     confidence: high
     account: bond_account
     liquidity_status: scheduled_liquidity
     strategy_bucket: defensive_bond
+    valuation_method: user_confirmed_portfolio_level_principal_after_maturity
+    note: "2026-07-15组合层面冲减到期本金30000元；具体到期券种待补充。"
 
   - asset_id: bond_cn_10y_local
     asset_class: china_bond
@@ -329,9 +364,9 @@ holdings:
     currency: CNY
     quantity: null
     unit: cny
-    market_value_cny: 220000
+    market_value_cny: 241000
     data_source: user_confirmed
-    valuation_time: 2026-07-11
+    valuation_time: 2026-07-15
     confidence: high
     account: cash_accounts
     liquidity_status: immediately_available

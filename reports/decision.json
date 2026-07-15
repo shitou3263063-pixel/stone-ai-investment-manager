@@ -1,46 +1,46 @@
 {
   "version": "Stone AI Investment Manager Pro V12.6.1 Stable",
   "date": "2026-07-15",
-  "generated_at": "2026-07-15T03:10:52+08:00",
+  "generated_at": "2026-07-15T00:00:00+08:00",
   "report_timezone": "Asia/Shanghai",
   "data_time_summary": {
     "report_timezone": "Asia/Shanghai",
-    "report_generated_at": "2026-07-15T03:10:52+08:00",
-    "decision_data_cutoff": "2026-07-15T03:10:52+08:00",
+    "report_generated_at": "2026-07-15T00:00:00+08:00",
+    "decision_data_cutoff": "2026-07-15T00:00:00+08:00",
     "has_unsynchronized_data": true,
     "oldest_critical_data_at": "2026-01-01T00:00:00-05:00",
     "newest_critical_data_at": "2026-07-14T00:00:00-04:00"
   },
-  "data_cutoff": "2026-07-15T03:10:52",
+  "data_cutoff": "2026-07-16T00:09:44",
   "trading_day_status": "交易日",
   "portfolio_value_yuan": 2821100,
   "portfolio_value_wan": 282.11,
   "portfolio_snapshot": {
-    "snapshot_date": "2026-07-11",
-    "built_at": "2026-07-15T03:10:52",
+    "snapshot_date": "2026-07-15",
+    "built_at": "2026-07-16T00:09:45",
     "source_file": "C:\\Users\\1\\Documents\\New project\\investment_ai_manager\\data\\portfolio_master.yaml",
     "source": "user_confirmed",
-    "last_confirmed_at": "2026-07-11",
+    "last_confirmed_at": "2026-07-15",
     "valuation_method": "user_confirmed_portfolio_snapshot",
-    "holding_age_days": 4,
+    "holding_age_days": 0,
     "holdings_stale": false,
     "freshness_warning": "持仓数据在人工确认有效期内",
     "total_assets": 2821100,
     "asset_class_totals": {
-      "美股": 385000,
+      "美股": 394000,
       "港股": 272600,
       "A股": 266500,
-      "债券": 1130000,
+      "债券": 1100000,
       "黄金": 547000,
-      "现金": 220000
+      "现金": 241000
     },
     "holding_class_totals": {
-      "美股": 385000,
+      "美股": 394000,
       "港股": 272600,
       "A股": 266500,
-      "债券": 1130000,
+      "债券": 1100000,
       "黄金": 547000,
-      "现金": 220000
+      "现金": 241000
     },
     "holdings": [
       {
@@ -65,13 +65,57 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "core_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
+      },
+      {
+        "snapshot_date": "2026-07-15",
+        "asset_id": "us_voo_20260715_pending_valuation",
+        "asset_class_key": "us_stock",
+        "asset_class": "美股",
+        "security_name": "VOO 2026-07-15新增投入成本（待估值）",
+        "security_code": "VOO_PENDING_20260715",
+        "canonical_id": "us_voo_20260715_pending_valuation",
+        "pricing_proxy": "VOO_PENDING_20260715",
+        "market": "US",
+        "currency": "CNY",
+        "quantity": null,
+        "unit": "pending",
+        "market_value_original": 9000,
+        "market_value_original_currency": "CNY",
+        "exchange_rate": null,
+        "fx_status": "not_applied_user_confirmed_cny",
+        "market_value_cny": 9000,
+        "data_source": "user_confirmed",
+        "source": "user_confirmed",
+        "last_confirmed_at": "2026-07-15",
+        "valuation_method": "confirmed_cost_pending_quantity_fx_fee",
+        "valuation_status": "pending_actual_quantity_fx_fee",
+        "valuation_time": "2026-07-15",
+        "confidence": "pending",
+        "account": "IBKR",
+        "liquidity_status": "pending_trade_details",
+        "strategy_bucket": "pending_valuation",
+        "manual_override": false,
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": "VOO",
+        "execution_price_usd": 692.5,
+        "additional_cost_cny": 9000,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -95,13 +139,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "single_stock",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -125,13 +176,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "single_stock",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -155,13 +213,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "duration_bond_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -185,13 +250,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "single_stock",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -215,13 +287,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "sector_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -245,13 +324,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "IBKR",
         "liquidity_status": "liquid",
         "strategy_bucket": "single_stock",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -275,13 +361,20 @@
         "source": "user_confirmed_category_reconciled",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_cny_no_live_fx",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "medium",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "core_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -305,13 +398,20 @@
         "source": "user_confirmed_category_reconciled",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "medium",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "thematic_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -335,13 +435,20 @@
         "source": "user_confirmed_category_reconciled",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "medium",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "thematic_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -365,13 +472,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "core_etf",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -395,13 +509,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "single_stock",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -425,16 +546,23 @@
         "source": "user_confirmed_category_reconciled",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "medium",
         "account": "securities_account",
         "liquidity_status": "restricted_watch",
         "strategy_bucket": "single_stock_high_risk",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
-        "snapshot_date": "2026-07-11",
+        "snapshot_date": "2026-07-15",
         "asset_id": "bond_cn_core",
         "asset_class_key": "china_bond",
         "asset_class": "债券",
@@ -446,22 +574,29 @@
         "currency": "CNY",
         "quantity": null,
         "unit": "portfolio",
-        "market_value_original": 997800,
+        "market_value_original": 967800,
         "market_value_original_currency": "CNY",
         "exchange_rate": null,
         "fx_status": "not_applied_user_confirmed_cny",
-        "market_value_cny": 997800,
+        "market_value_cny": 967800,
         "data_source": "user_confirmed",
         "source": "user_confirmed",
-        "last_confirmed_at": "2026-07-11",
-        "valuation_method": "user_confirmed_market_value",
-        "valuation_time": "2026-07-11",
+        "last_confirmed_at": "2026-07-15",
+        "valuation_method": "user_confirmed_portfolio_level_principal_after_maturity",
+        "valuation_status": "confirmed_market_value",
+        "valuation_time": "2026-07-15",
         "confidence": "high",
         "account": "bond_account",
         "liquidity_status": "scheduled_liquidity",
         "strategy_bucket": "defensive_bond",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -485,13 +620,20 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "bond_account",
         "liquidity_status": "scheduled_liquidity",
         "strategy_bucket": "defensive_bond",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -515,13 +657,20 @@
         "source": "user_confirmed_manual_override",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "manual_override",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "medium",
         "account": "physical_gold",
         "liquidity_status": "illiquid",
         "strategy_bucket": "defensive_gold",
         "manual_override": true,
-        "gold_price_cny_per_gram": 906.19
+        "gold_price_cny_per_gram": 906.19,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
         "snapshot_date": "2026-07-11",
@@ -545,16 +694,23 @@
         "source": "user_confirmed",
         "last_confirmed_at": "2026-07-11",
         "valuation_method": "user_confirmed_market_value",
+        "valuation_status": "confirmed_market_value",
         "valuation_time": "2026-07-11",
         "confidence": "high",
         "account": "securities_account",
         "liquidity_status": "liquid",
         "strategy_bucket": "defensive_gold",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       },
       {
-        "snapshot_date": "2026-07-11",
+        "snapshot_date": "2026-07-15",
         "asset_id": "cash_total",
         "asset_class_key": "cash",
         "asset_class": "现金",
@@ -566,34 +722,79 @@
         "currency": "CNY",
         "quantity": null,
         "unit": "cny",
-        "market_value_original": 220000,
+        "market_value_original": 241000,
         "market_value_original_currency": "CNY",
         "exchange_rate": null,
         "fx_status": "not_applied_user_confirmed_cny",
-        "market_value_cny": 220000,
+        "market_value_cny": 241000,
         "data_source": "user_confirmed",
         "source": "user_confirmed",
-        "last_confirmed_at": "2026-07-11",
+        "last_confirmed_at": "2026-07-15",
         "valuation_method": "user_confirmed_market_value",
-        "valuation_time": "2026-07-11",
+        "valuation_status": "confirmed_market_value",
+        "valuation_time": "2026-07-15",
         "confidence": "high",
         "account": "cash_accounts",
         "liquidity_status": "immediately_available",
         "strategy_bucket": "cash_reserve",
         "manual_override": false,
-        "gold_price_cny_per_gram": null
+        "gold_price_cny_per_gram": null,
+        "reference_symbol": null,
+        "execution_price_usd": null,
+        "additional_cost_cny": null,
+        "actual_quantity": null,
+        "actual_fx_rate": null,
+        "fee": null
       }
     ],
     "cash": {
-      "account_total_cash_cny": 220000,
-      "cash_safety_reserve_cny": 225688,
-      "investable_cash_cny": 0,
+      "account_total_cash_cny": 241000,
+      "cash_safety_reserve_cny": 220000,
+      "cash_safety_reserve_mode": "fixed_user_confirmed",
+      "investable_cash_cny": 21000,
+      "bond_to_equity_investable_cash_cny": 21000,
+      "opening_cash_before_bond_maturity_cny": 220000,
+      "bond_maturity_arrival_cny": 30000,
+      "voo_purchase_outflow_cny": 9000,
       "live_grid_cash_cny": 0,
       "paper_grid_cash_cny": 0,
       "other_reserved_cash_cny": 0,
       "unsettled_conditional_cash_cny": 0,
-      "formula": "可投资现金 = 账户总现金 - 现金安全储备 - 网格实盘现金 - 其他已占用现金"
+      "formula": "可投资现金 = 账户总现金 - 固定现金安全储备 - 网格实盘现金 - 其他已占用现金"
     },
+    "bond_to_equity_plan": {
+      "month": "2026-07",
+      "bond_maturity_arrived_cny": 30000,
+      "approved_amount_cny": 30000,
+      "executed_amount_cny": 9000,
+      "remaining_amount_cny": 21000,
+      "remaining_real_investable_cash_cny": 21000,
+      "remaining_funds_status": "arrived_investable_subject_to_market_and_risk_conditions",
+      "source": "user_confirmed"
+    },
+    "confirmed_transactions": [
+      {
+        "id": "USERCONF-20260715-VOO-001",
+        "trade_date": "2026-07-15",
+        "natural_week": "2026-W29",
+        "status": "executed",
+        "order_type": "bond_to_equity",
+        "symbol": "VOO",
+        "action": "BUY",
+        "execution_price_usd": 692.5,
+        "invested_amount_cny": 9000,
+        "funding_source": "2026-07-15到期债券资金",
+        "data_source": "user_confirmed",
+        "quantity": null,
+        "actual_fx_rate_cny_per_usd": null,
+        "fee": null,
+        "booked_to_portfolio": true,
+        "real_trade": true,
+        "simulation_trade": false,
+        "valuation_status": "pending_quantity_fx_fee",
+        "note": "只确认成交价格与人民币投入成本；不得推算成交股数、汇率、手续费或最新市值。"
+      }
+    ],
     "gold": {
       "class_total_cny": 547000,
       "detail_total_cny": 547000,
@@ -601,43 +802,45 @@
     },
     "validation_inputs": {
       "configured_totals": {
-        "美股": 385000,
+        "美股": 394000,
         "港股": 272600,
         "A股": 266500,
-        "债券": 1130000,
+        "债券": 1100000,
         "黄金": 547000,
-        "现金": 220000
+        "现金": 241000
       },
       "class_totals_from_holdings": {
-        "美股": 385000,
+        "美股": 394000,
         "港股": 272600,
         "A股": 266500,
-        "债券": 1130000,
+        "债券": 1100000,
         "黄金": 547000,
-        "现金": 220000
+        "现金": 241000
       }
     }
   },
   "allocation": [
     {
       "category": "美股",
-      "current_amount_yuan": 385000,
-      "current_ratio": 0.13647158909645174,
+      "current_amount_yuan": 394000,
+      "current_ratio": 0.13966183403636878,
       "target_amount_yuan": 846330,
       "target_ratio": 0.3,
-      "deviation_amount_yuan": -461330,
-      "deviation_ratio": -0.16352841090354825,
+      "target_basis": "strategic_ratio",
+      "deviation_amount_yuan": -452330,
+      "deviation_ratio": -0.1603381659636312,
       "status": "严重低配",
       "priority": "高"
     },
     {
       "category": "债券",
-      "current_amount_yuan": 1130000,
-      "current_ratio": 0.4005529757895856,
+      "current_amount_yuan": 1100000,
+      "current_ratio": 0.3899188259898621,
       "target_amount_yuan": 705275,
       "target_ratio": 0.25,
-      "deviation_amount_yuan": 424725,
-      "deviation_ratio": 0.1505529757895856,
+      "target_basis": "strategic_ratio",
+      "deviation_amount_yuan": 394725,
+      "deviation_ratio": 0.1399188259898621,
       "status": "严重超配",
       "priority": "高"
     },
@@ -647,6 +850,7 @@
       "current_ratio": 0.19389599801495871,
       "target_amount_yuan": 423165,
       "target_ratio": 0.15,
+      "target_basis": "strategic_ratio",
       "deviation_amount_yuan": 123835,
       "deviation_ratio": 0.04389599801495872,
       "status": "接近目标",
@@ -658,8 +862,21 @@
       "current_ratio": 0.09662897451348765,
       "target_amount_yuan": 338532,
       "target_ratio": 0.12,
+      "target_basis": "strategic_ratio",
       "deviation_amount_yuan": -65932,
       "deviation_ratio": -0.023371025486512348,
+      "status": "接近目标",
+      "priority": "低"
+    },
+    {
+      "category": "现金",
+      "current_amount_yuan": 241000,
+      "current_ratio": 0.08542767005777888,
+      "target_amount_yuan": 220000,
+      "target_ratio": 0.07798376519797243,
+      "target_basis": "fixed_user_confirmed_cash_reserve",
+      "deviation_amount_yuan": 21000,
+      "deviation_ratio": 0.0074439048598064494,
       "status": "接近目标",
       "priority": "低"
     },
@@ -669,26 +886,16 @@
       "current_ratio": 0.09446669738754386,
       "target_amount_yuan": 282110,
       "target_ratio": 0.1,
+      "target_basis": "strategic_ratio",
       "deviation_amount_yuan": -15610,
       "deviation_ratio": -0.005533302612456145,
-      "status": "接近目标",
-      "priority": "低"
-    },
-    {
-      "category": "现金",
-      "current_amount_yuan": 220000,
-      "current_ratio": 0.07798376519797243,
-      "target_amount_yuan": 225688,
-      "target_ratio": 0.08,
-      "deviation_amount_yuan": -5688,
-      "deviation_ratio": -0.002016234802027575,
       "status": "接近目标",
       "priority": "低"
     }
   ],
   "dqs": {
-    "score": 64,
-    "raw_score": 64,
+    "score": 65,
+    "raw_score": 65,
     "mode": "direction",
     "mode_label": "只允许方向性建议",
     "components": [
@@ -718,9 +925,9 @@
       },
       {
         "item": "数据时效性",
-        "score": 9,
+        "score": 10,
         "max": 15,
-        "reason": "9/15 个可用指标未过期；持仓确认距今4天"
+        "reason": "10/15 个可用指标未过期；持仓确认距今0天"
       },
       {
         "item": "数据一致性",
@@ -733,7 +940,7 @@
     "macro_coverage": 1.0,
     "tier1_coverage": 0.3333333333333333,
     "dual_source_coverage": 0.0,
-    "freshness_coverage": 0.6,
+    "freshness_coverage": 0.6666666666666666,
     "holding_freshness_ok": true,
     "fx_available": true,
     "event_calendar_confidence": "high",
@@ -770,8 +977,7 @@
       "510300.SS",
       "002558.SZ",
       "513060.SS",
-      "513090.SS",
-      "GDP"
+      "513090.SS"
     ],
     "non_comparable_metrics": [],
     "conflicts": [],
@@ -779,7 +985,7 @@
     "conclusion": "核心决策数据基本可用，但增强型市场宽度、资金流和情绪数据不足，禁止生成精确新增仓位建议。"
   },
   "risk": {
-    "score": 67,
+    "score": 62,
     "level": "中高风险",
     "components": [
       {
@@ -802,9 +1008,9 @@
       },
       {
         "item": "流动性",
-        "score": 10,
+        "score": 5,
         "weight": 10,
-        "basis": "真实可投资现金=0元；安全储备不可用于投资。"
+        "basis": "真实可投资现金=21,000元；安全储备不可用于投资。"
       },
       {
         "item": "宏观事件",
@@ -828,7 +1034,7 @@
         "item": "数据质量",
         "score": 2,
         "weight": 5,
-        "basis": "DQS=64。"
+        "basis": "DQS=65。"
       }
     ],
     "market_time_consistency": {
@@ -845,67 +1051,13 @@
   },
   "opportunity": [
     {
-      "symbol": "现金",
-      "name": "现金",
-      "category": "现金",
-      "raw_score": 66,
-      "data_quality_adjustment": 0,
-      "portfolio_constraint_adjustment": 0,
-      "cross_section_adjustment": 8,
-      "components": {
-        "估值吸引力": 62,
-        "趋势与市场宽度": 62.0,
-        "基本面或盈利质量": 78,
-        "宏观环境适配": 58,
-        "资金流或成交结构": 24,
-        "组合适配度": 90,
-        "数据置信度": 48
-      },
-      "weights": {
-        "valuation": 0.2,
-        "trend_breadth": 0.15,
-        "fundamentals": 0.2,
-        "macro": 0.1,
-        "flow": 0.1,
-        "portfolio_fit": 0.2,
-        "data_confidence": 0.05
-      },
-      "current_holding_yuan": 220000,
-      "portfolio_fit": 90,
-      "limitations": [
-        "无硬性限制"
-      ],
-      "positive_factors": [
-        "用于安全储备与流动性，不等于可投资现金",
-        "现金偏离目标-0.2个百分点"
-      ],
-      "negative_factors": [
-        "暂无额外硬性扣分"
-      ],
-      "data_ok": true,
-      "data_status": "NOT_APPLICABLE",
-      "market_data_completeness": null,
-      "analysis_data_completeness": null,
-      "scoring_confidence": "低",
-      "decision_restricted": false,
-      "missing_fields": [],
-      "asset_type": "cash",
-      "deviation": -0.002016234802027575,
-      "financial_model": "not_connected",
-      "p1a_inputs_used": [],
-      "score": 74,
-      "advice_band": "70—79：可分批关注",
-      "advice": "维持现金安全垫",
-      "reason": "用于安全储备与流动性，不等于可投资现金；原始分66，横截面+8，数据调整+0，组合约束+0。"
-    },
-    {
       "symbol": "VOO",
       "name": "VOO",
       "category": "美股",
       "raw_score": 66,
       "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "cross_section_adjustment": 7,
+      "cross_section_adjustment": 8,
       "components": {
         "估值吸引力": 58,
         "趋势与市场宽度": 64.45,
@@ -928,11 +1080,11 @@
       "portfolio_fit": 88,
       "limitations": [
         "ETF不适用个股财务评分",
-        "DQS=64，当前不允许新增仓位建议"
+        "DQS=65，当前不允许新增仓位建议"
       ],
       "positive_factors": [
         "核心宽基ETF，优先用于长期修复美股低配",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "ETF不适用个股财务评分"
@@ -945,13 +1097,13 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "core_etf",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_applicable_etf",
       "p1a_inputs_used": [],
-      "score": 70,
+      "score": 71,
       "advice_band": "70—79：可分批关注",
       "advice": "观察，等待数据质量恢复",
-      "reason": "核心宽基ETF，优先用于长期修复美股低配；原始分66，横截面+7，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+      "reason": "核心宽基ETF，优先用于长期修复美股低配；原始分66，横截面+8，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "QQQ",
@@ -960,7 +1112,7 @@
       "raw_score": 64,
       "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "cross_section_adjustment": 6,
+      "cross_section_adjustment": 7,
       "components": {
         "估值吸引力": 49,
         "趋势与市场宽度": 68.9,
@@ -983,11 +1135,11 @@
       "portfolio_fit": 88,
       "limitations": [
         "ETF不适用个股财务评分",
-        "DQS=64，当前不允许新增仓位建议"
+        "DQS=65，当前不允许新增仓位建议"
       ],
       "positive_factors": [
         "成长宽基ETF，需兼顾估值、波动与科技重叠",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "ETF不适用个股财务评分"
@@ -1000,13 +1152,13 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "growth_etf",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_applicable_etf",
       "p1a_inputs_used": [],
-      "score": 67,
+      "score": 68,
       "advice_band": "60—69：持有或等待",
       "advice": "观察，等待数据质量恢复",
-      "reason": "成长宽基ETF，需兼顾估值、波动与科技重叠；原始分64，横截面+6，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+      "reason": "成长宽基ETF，需兼顾估值、波动与科技重叠；原始分64，横截面+7，数据调整-3，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
     },
     {
       "symbol": "510300.SS",
@@ -1015,7 +1167,7 @@
       "raw_score": 66,
       "data_quality_adjustment": -6,
       "portfolio_constraint_adjustment": 0,
-      "cross_section_adjustment": 5,
+      "cross_section_adjustment": 6,
       "components": {
         "估值吸引力": 78.0,
         "趋势与市场宽度": 53.2,
@@ -1038,7 +1190,7 @@
       "portfolio_fit": 60,
       "limitations": [
         "ETF不适用个股财务评分",
-        "DQS=64，当前不允许新增仓位建议"
+        "DQS=65，当前不允许新增仓位建议"
       ],
       "positive_factors": [
         "A股核心宽基ETF",
@@ -1061,10 +1213,64 @@
       "p1a_inputs_used": [
         "akshare（底层：csindex_official）估值:CSI300_total_share_capital_PE1_DP1"
       ],
-      "score": 65,
+      "score": 66,
       "advice_band": "60—69：持有或等待",
       "advice": "观察，等待数据质量恢复",
-      "reason": "A股核心宽基ETF；原始分66，横截面+5，数据调整-6，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+      "reason": "A股核心宽基ETF；原始分66，横截面+6，数据调整-6，组合约束+0。 当前仅代表长期配置优先方向，不代表今日买入机会。"
+    },
+    {
+      "symbol": "现金",
+      "name": "现金",
+      "category": "现金",
+      "raw_score": 60,
+      "data_quality_adjustment": 0,
+      "portfolio_constraint_adjustment": 0,
+      "cross_section_adjustment": 5,
+      "components": {
+        "估值吸引力": 62,
+        "趋势与市场宽度": 62.0,
+        "基本面或盈利质量": 78,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
+        "组合适配度": 60,
+        "数据置信度": 48
+      },
+      "weights": {
+        "valuation": 0.2,
+        "trend_breadth": 0.15,
+        "fundamentals": 0.2,
+        "macro": 0.1,
+        "flow": 0.1,
+        "portfolio_fit": 0.2,
+        "data_confidence": 0.05
+      },
+      "current_holding_yuan": 241000,
+      "portfolio_fit": 60,
+      "limitations": [
+        "无硬性限制"
+      ],
+      "positive_factors": [
+        "用于安全储备与流动性，不等于可投资现金",
+        "现金偏离目标+0.7个百分点"
+      ],
+      "negative_factors": [
+        "暂无额外硬性扣分"
+      ],
+      "data_ok": true,
+      "data_status": "NOT_APPLICABLE",
+      "market_data_completeness": null,
+      "analysis_data_completeness": null,
+      "scoring_confidence": "低",
+      "decision_restricted": false,
+      "missing_fields": [],
+      "asset_type": "cash",
+      "deviation": 0.0074439048598064494,
+      "financial_model": "not_connected",
+      "p1a_inputs_used": [],
+      "score": 65,
+      "advice_band": "60—69：持有或等待",
+      "advice": "维持现金安全垫",
+      "reason": "用于安全储备与流动性，不等于可投资现金；原始分60，横截面+5，数据调整+0，组合约束+0。"
     },
     {
       "symbol": "XLF",
@@ -1099,7 +1305,7 @@
       ],
       "positive_factors": [
         "行业ETF，不因美股低配获得宽基同等优先级",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "ETF不适用个股财务评分"
@@ -1112,7 +1318,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "sector_etf",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_applicable_etf",
       "p1a_inputs_used": [],
       "score": 59,
@@ -1265,7 +1471,7 @@
       ],
       "positive_factors": [
         "科技单股，不因美股低配自动加仓",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "个股不得仅因资产类别低配而加仓"
@@ -1278,7 +1484,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "single_stock",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 43,
@@ -1319,7 +1525,7 @@
       ],
       "positive_factors": [
         "券商周期个股，需盈利和估值数据确认",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "个股不得仅因资产类别低配而加仓"
@@ -1332,7 +1538,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "single_stock",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 42,
@@ -1429,7 +1635,7 @@
       ],
       "positive_factors": [
         "大型科技个股，需财报、估值与集中度共同确认",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "个股不得仅因资产类别低配而加仓"
@@ -1442,7 +1648,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "single_stock",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 40,
@@ -1483,7 +1689,7 @@
       ],
       "positive_factors": [
         "中概个股，与港股风险存在重叠",
-        "美股偏离目标-16.4个百分点"
+        "美股偏离目标-16.0个百分点"
       ],
       "negative_factors": [
         "个股不得仅因资产类别低配而加仓"
@@ -1496,7 +1702,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "single_stock",
-      "deviation": -0.16352841090354825,
+      "deviation": -0.1603381659636312,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 39,
@@ -1645,14 +1851,14 @@
         "portfolio_fit": 0.2,
         "data_confidence": 0.05
       },
-      "current_holding_yuan": 997800,
+      "current_holding_yuan": 967800,
       "portfolio_fit": 12,
       "limitations": [
         "资产类别已高于目标，占比修复优先于市场机会"
       ],
       "positive_factors": [
         "防守资产，当前债券超配时暂停新增",
-        "债券偏离目标+15.1个百分点"
+        "债券偏离目标+14.0个百分点"
       ],
       "negative_factors": [
         "资产类别已高于目标，占比修复优先于市场机会"
@@ -1665,7 +1871,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "defensive_bond",
-      "deviation": 0.1505529757895856,
+      "deviation": 0.1399188259898621,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 24,
@@ -1706,7 +1912,7 @@
       ],
       "positive_factors": [
         "已包含在中国债券总额中，不重复计算",
-        "债券偏离目标+15.1个百分点"
+        "债券偏离目标+14.0个百分点"
       ],
       "negative_factors": [
         "资产类别已高于目标，占比修复优先于市场机会"
@@ -1719,7 +1925,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "defensive_bond",
-      "deviation": 0.1505529757895856,
+      "deviation": 0.1399188259898621,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 23,
@@ -1760,7 +1966,7 @@
       ],
       "positive_factors": [
         "美国长期国债ETF，承受高久期利率风险",
-        "债券偏离目标+15.1个百分点"
+        "债券偏离目标+14.0个百分点"
       ],
       "negative_factors": [
         "资产类别已高于目标，占比修复优先于市场机会"
@@ -1773,7 +1979,7 @@
       "decision_restricted": false,
       "missing_fields": [],
       "asset_type": "duration_bond_etf",
-      "deviation": 0.1505529757895856,
+      "deviation": 0.1399188259898621,
       "financial_model": "not_connected",
       "p1a_inputs_used": [],
       "score": 20,
@@ -1837,27 +2043,38 @@
     }
   ],
   "budget": {
-    "cash_yuan": 220000,
-    "account_total_cash_yuan": 220000,
-    "cash_floor_yuan": 225688,
-    "cash_safety_reserve_yuan": 225688,
+    "cash_yuan": 241000,
+    "account_total_cash_yuan": 241000,
+    "cash_floor_yuan": 220000,
+    "cash_safety_reserve_yuan": 220000,
     "live_grid_cash_yuan": 0,
     "paper_grid_cash_yuan": 0,
     "other_reserved_cash_yuan": 0,
-    "confirmed_cash_available_yuan": 0,
-    "investable_cash_yuan": 0,
+    "confirmed_cash_available_yuan": 21000,
+    "investable_cash_yuan": 21000,
     "today_total_yuan": 0,
     "week_confirmed_yuan": 0,
     "month_confirmed_yuan": 0,
     "conditional_bond_to_equity_month_yuan": 30000,
-    "approved_bond_to_equity_month_yuan": 0,
-    "actual_bond_cash_arrived_yuan": 0,
-    "bond_to_equity_executed_this_month_yuan": 0,
-    "bond_to_equity_remaining_this_month_yuan": 0,
-    "bond_excess_yuan": 424725,
+    "approved_bond_to_equity_month_yuan": 30000,
+    "actual_bond_cash_arrived_yuan": 30000,
+    "bond_to_equity_executed_this_month_yuan": 9000,
+    "bond_to_equity_remaining_this_month_yuan": 21000,
+    "bond_to_equity_remaining_real_cash_yuan": 21000,
+    "bond_excess_yuan": 394725,
     "is_dca_day": true,
     "next_dca_date": "2026-08-05",
     "rows": [
+      {
+        "budget_id": "ACTUAL_BOND_TO_EQUITY_20260715",
+        "type": "用户确认实盘交易",
+        "execute": true,
+        "amount_yuan": 9000,
+        "targets": "VOO",
+        "funding_source": "2026-07-15到期债券资金",
+        "reason": "已执行事实；成交价格692.5美元/份，成交股数、实际汇率和手续费待补充。",
+        "record_type": "confirmed_historical_fact"
+      },
       {
         "budget_id": "BUDGET_BASE_DCA",
         "type": "基础定投",
@@ -1878,12 +2095,12 @@
       },
       {
         "budget_id": "BUDGET_CONDITIONAL_BOND_TO_EQUITY",
-        "type": "再平衡",
+        "type": "剩余债券转权益计划",
         "execute": false,
         "amount_yuan": 0,
         "targets": "VOO/QQQ、沪深300ETF、恒生科技ETF",
-        "funding_source": "待债券到期或赎回到账",
-        "reason": "债券超配，但未到账资金不得视作可用现金。"
+        "funding_source": "已到账专项可投资现金21,000元",
+        "reason": "资金已到账、可投资，但仍须服从后续市场与风险条件，不代表必须一次性投入。"
       },
       {
         "budget_id": "BUDGET_RISK_REDUCTION",
@@ -1895,24 +2112,24 @@
         "reason": "当前未触发必须减仓规则。"
       }
     ],
-    "funding_note": "未到账债券赎回资金只列为条件性计划，不计入今日/本周可用现金；网格模拟现金不计入真实资产。",
-    "cash_formula": "可投资现金 = 账户总现金 - 现金安全储备 - 网格实盘现金 - 其他已占用现金"
+    "funding_note": "本月债券到期资金30000元已实际到账，其中9000元已用于用户确认的VOO实盘买入，剩余21000元为专项可投资现金；网格模拟现金不计入真实资产。",
+    "cash_formula": "可投资现金 = 账户总现金 - 固定现金安全储备 - 网格实盘现金 - 其他已占用现金"
   },
   "migration_plan": {
-    "current_bond_yuan": 1130000,
+    "current_bond_yuan": 1100000,
     "target_bond_yuan": 705275,
-    "theoretical_transfer_yuan": 424725,
+    "theoretical_transfer_yuan": 394725,
     "monthly_cap_yuan": 30000,
-    "approved_this_month_yuan": 0,
-    "actual_arrived_yuan": 0,
-    "executed_this_month_yuan": 0,
-    "remaining_this_month_yuan": 0,
-    "theoretical_full_months": 15,
+    "approved_this_month_yuan": 30000,
+    "actual_arrived_yuan": 30000,
+    "executed_this_month_yuan": 9000,
+    "remaining_this_month_yuan": 21000,
+    "theoretical_full_months": 14,
     "twelve_month_transfer_yuan": 360000,
-    "remaining_after_12_months_yuan": 64725,
-    "estimated_completion": "预计第15个月完成，但仍以DQS、到账资金和风险条件为准。",
+    "remaining_after_12_months_yuan": 34725,
+    "estimated_completion": "预计第14个月完成，但仍以DQS、到账资金和风险条件为准。",
     "route_title": "未来12个月债券迁移第一阶段路线图",
-    "conditional_cap_note": "路线图仅表示条件性月度上限，不保证每月执行；暂停月份的未用额度不得累积到下一月一次性执行。",
+    "conditional_cap_note": "路线图从下一笔可迁移债券本金起算，不重复计算本月已到账的30000元；仅表示未来月度上限，不保证每月执行，暂停月份的未用额度不得累积到下一月一次性执行。",
     "quarterly_reviews": [
       "第3个月",
       "第6个月",
@@ -1921,10 +2138,9 @@
     ],
     "pause_conditions": [
       "DQS低于60",
-      "现金低于安全线",
       "VIX高于30",
       "重大宏观事件前后",
-      "债券赎回资金未到账"
+      "市场或交易数据不足"
     ],
     "accelerate_conditions": [
       "DQS不低于85",
@@ -1941,73 +2157,73 @@
       {
         "month": 1,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 394725,
+        "remaining_excess_yuan": 364725,
         "review": "月度跟踪"
       },
       {
         "month": 2,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 364725,
+        "remaining_excess_yuan": 334725,
         "review": "月度跟踪"
       },
       {
         "month": 3,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 334725,
+        "remaining_excess_yuan": 304725,
         "review": "季度复核"
       },
       {
         "month": 4,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 304725,
+        "remaining_excess_yuan": 274725,
         "review": "月度跟踪"
       },
       {
         "month": 5,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 274725,
+        "remaining_excess_yuan": 244725,
         "review": "月度跟踪"
       },
       {
         "month": 6,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 244725,
+        "remaining_excess_yuan": 214725,
         "review": "季度复核"
       },
       {
         "month": 7,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 214725,
+        "remaining_excess_yuan": 184725,
         "review": "月度跟踪"
       },
       {
         "month": 8,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 184725,
+        "remaining_excess_yuan": 154725,
         "review": "月度跟踪"
       },
       {
         "month": 9,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 154725,
+        "remaining_excess_yuan": 124725,
         "review": "季度复核"
       },
       {
         "month": 10,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 124725,
+        "remaining_excess_yuan": 94725,
         "review": "月度跟踪"
       },
       {
         "month": 11,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 94725,
+        "remaining_excess_yuan": 64725,
         "review": "月度跟踪"
       },
       {
         "month": 12,
         "planned_transfer_yuan": 30000,
-        "remaining_excess_yuan": 64725,
+        "remaining_excess_yuan": 34725,
         "review": "季度复核"
       }
     ]
@@ -2026,6 +2242,20 @@
       "advice": "继续持有",
       "add_condition": "到计划定投日，且DQS、现金、预算和事件风控均通过",
       "reduce_condition": "资产类别严重超配、风险预算触发或长期目标变化"
+    },
+    {
+      "name": "VOO 2026-07-15新增投入成本（待估值）",
+      "category": "美股",
+      "amount_yuan": 9000,
+      "portfolio_ratio": 0.0031902449399170535,
+      "quantity": "不适用",
+      "fundamental_status": "长期逻辑未单独异常；需结合最新财报复核",
+      "trend_status": "暂无可靠行情",
+      "risk": "组合层面风险可控",
+      "overlap": "与权益Beta相关",
+      "advice": "继续持有",
+      "add_condition": "DQS>=85且资产仍低配，或到计划定投日",
+      "reduce_condition": "基本面恶化、仓位过度集中、或组合风控触发"
     },
     {
       "name": "NVDA 英伟达",
@@ -2198,8 +2428,8 @@
     {
       "name": "中国债券组合（不含10年地债）",
       "category": "债券",
-      "amount_yuan": 997800,
-      "portfolio_ratio": 0.35369182233880403,
+      "amount_yuan": 967800,
+      "portfolio_ratio": 0.3430576725390805,
       "quantity": "不适用",
       "fundamental_status": "防守或流动性资产",
       "trend_status": "暂无可靠行情",
@@ -2254,15 +2484,15 @@
     {
       "name": "账户总现金",
       "category": "现金",
-      "amount_yuan": 220000,
-      "portfolio_ratio": 0.07798376519797243,
+      "amount_yuan": 241000,
+      "portfolio_ratio": 0.08542767005777888,
       "quantity": "不适用",
       "fundamental_status": "流动性资产，不适用股票基本面模板",
       "trend_status": "不适用",
-      "risk": "账户总现金低于目标安全储备，当前可投资现金为0",
+      "risk": "固定安全储备220000元完整；专项可投资现金21000元不得与模拟网格资金混用",
       "overlap": "不适用；用于安全储备和流动性管理",
-      "advice": "保留安全储备",
-      "add_condition": "通过新增现金或已到账资金恢复至安全线以上",
+      "advice": "保留固定安全储备；专项现金分批待复核",
+      "add_condition": "专项资金已到账；仅在市场、DQS和风险条件通过后分批评估",
       "reduce_condition": "仅可使用安全储备以上且未被其他预算占用的现金"
     }
   ],
@@ -2271,14 +2501,14 @@
       "scenario": "市场平稳",
       "trigger": "主要指数波动未触发回撤阈值，VIX低于20或维持正常区间",
       "action": "基础定投按计划日执行；非计划日不交易。",
-      "amount": "真实可执行0元；债券到账后条件性上限30000元，到账前不可执行。",
+      "amount": "确认现金买入上限0元；债券到账后条件性上限30000元。",
       "targets": "VOO/QQQ、沪深300ETF"
     },
     {
       "scenario": "指数回撤",
       "trigger": "以最近确认交易日收盘价为参考：回撤约3%观察，约5%小额分批，约8%及以上才考虑机会加仓",
       "action": "只有DQS>=85、长期逻辑未破坏、且资金来源确认时，才启用机会加仓。",
-      "amount": "当前真实可执行0元；债券资金到账并通过复核后，单次条件性上限15000元。",
+      "amount": "单次不超过15000元，且不突破月度条件性上限。",
       "targets": "VOO/QQQ、沪深300ETF"
     },
     {
@@ -2301,18 +2531,18 @@
         "黄金": -0.05,
         "现金": 0.0
       },
-      "portfolio_return": 0.031413,
-      "portfolio_change_yuan": 88620,
+      "portfolio_return": 0.03237,
+      "portfolio_change_yuan": 91320,
       "contributions": [
         {
           "category": "美股",
           "assumption": 0.2,
-          "impact_yuan": 77000
+          "impact_yuan": 78800
         },
         {
           "category": "债券",
           "assumption": -0.03,
-          "impact_yuan": -33900
+          "impact_yuan": -33000
         },
         {
           "category": "黄金",
@@ -2325,21 +2555,21 @@
           "impact_yuan": 40890
         },
         {
-          "category": "A股",
-          "assumption": 0.12,
-          "impact_yuan": 31980
-        },
-        {
           "category": "现金",
           "assumption": 0.0,
           "impact_yuan": 0
+        },
+        {
+          "category": "A股",
+          "assumption": 0.12,
+          "impact_yuan": 31980
         }
       ],
       "largest_contributors": [
         {
           "category": "美股",
           "assumption": 0.2,
-          "impact_yuan": 77000
+          "impact_yuan": 78800
         },
         {
           "category": "港股",
@@ -2349,7 +2579,7 @@
         {
           "category": "债券",
           "assumption": -0.03,
-          "impact_yuan": -33900
+          "impact_yuan": -33000
         }
       ],
       "exceeds_tolerance_low": false,
@@ -2367,18 +2597,18 @@
         "黄金": 0.03,
         "现金": 0.0
       },
-      "portfolio_return": 0.023486,
-      "portfolio_change_yuan": 66255,
+      "portfolio_return": 0.023432,
+      "portfolio_change_yuan": 66105,
       "contributions": [
         {
           "category": "美股",
           "assumption": 0.05,
-          "impact_yuan": 19250
+          "impact_yuan": 19700
         },
         {
           "category": "债券",
           "assumption": 0.02,
-          "impact_yuan": 22600
+          "impact_yuan": 22000
         },
         {
           "category": "黄金",
@@ -2391,26 +2621,26 @@
           "impact_yuan": 0
         },
         {
-          "category": "A股",
-          "assumption": 0.03,
-          "impact_yuan": 7995
-        },
-        {
           "category": "现金",
           "assumption": 0.0,
           "impact_yuan": 0
+        },
+        {
+          "category": "A股",
+          "assumption": 0.03,
+          "impact_yuan": 7995
         }
       ],
       "largest_contributors": [
         {
           "category": "债券",
           "assumption": 0.02,
-          "impact_yuan": 22600
+          "impact_yuan": 22000
         },
         {
           "category": "美股",
           "assumption": 0.05,
-          "impact_yuan": 19250
+          "impact_yuan": 19700
         },
         {
           "category": "黄金",
@@ -2433,18 +2663,18 @@
         "黄金": 0.1,
         "现金": 0.0
       },
-      "portfolio_return": -0.042583,
-      "portfolio_change_yuan": -120130,
+      "portfolio_return": -0.043912,
+      "portfolio_change_yuan": -123880,
       "contributions": [
         {
           "category": "美股",
           "assumption": -0.25,
-          "impact_yuan": -96250
+          "impact_yuan": -98500
         },
         {
           "category": "债券",
           "assumption": 0.05,
-          "impact_yuan": 56500
+          "impact_yuan": 55000
         },
         {
           "category": "黄金",
@@ -2457,21 +2687,21 @@
           "impact_yuan": -81780
         },
         {
-          "category": "A股",
-          "assumption": -0.2,
-          "impact_yuan": -53300
-        },
-        {
           "category": "现金",
           "assumption": 0.0,
           "impact_yuan": 0
+        },
+        {
+          "category": "A股",
+          "assumption": -0.2,
+          "impact_yuan": -53300
         }
       ],
       "largest_contributors": [
         {
           "category": "美股",
           "assumption": -0.25,
-          "impact_yuan": -96250
+          "impact_yuan": -98500
         },
         {
           "category": "港股",
@@ -2481,7 +2711,7 @@
         {
           "category": "债券",
           "assumption": 0.05,
-          "impact_yuan": 56500
+          "impact_yuan": 55000
         }
       ],
       "exceeds_tolerance_low": false,
@@ -2496,7 +2726,7 @@
         "value": 16.42,
         "previous_value": 17.16,
         "timestamp": "2026-07-14 19:07:41",
-        "source": "cboe_official",
+        "source": "cache:cboe_official",
         "source_level": 1,
         "status": "ok",
         "stale": false,
@@ -2504,12 +2734,12 @@
         "note": "Cboe优先，其他行情源仅用于交叉验证。",
         "data_category": "enhancement_data",
         "observed_at": "2026-07-14 19:07:41",
-        "fetched_at": "2026-07-14T19:08:41+00:00",
+        "fetched_at": "2026-07-15T03:08:41",
         "market_timezone": "UTC",
         "data_frequency": "quote",
         "data_session": "intraday_delayed",
         "freshness_status": "fresh",
-        "age_hours": 0.0,
+        "age_hours": 8.0,
         "comparable_date": "2026-07-14"
       },
       {
@@ -2601,7 +2831,7 @@
         "value": 4.56,
         "previous_value": 4.54,
         "timestamp": "2026-07-10T00:00:00-04:00",
-        "source": "fred",
+        "source": "cache:fred",
         "source_level": 1,
         "status": "ok",
         "stale": false,
@@ -2609,11 +2839,11 @@
         "note": "FRED一级来源；属于官方滞后数据。",
         "data_category": "enhancement_data",
         "observed_at": "2026-07-10T00:00:00-04:00",
-        "fetched_at": "2026-07-15T03:10:37.737545+08:00",
+        "fetched_at": "2026-07-15T03:10:37",
         "market_timezone": "America/New_York",
         "data_frequency": "daily",
         "data_session": "official_lagged_macro",
-        "freshness_status": "official_lagged",
+        "freshness_status": "fresh",
         "age_hours": 111.2,
         "comparable_date": "2026-07-10"
       },
@@ -2622,7 +2852,7 @@
         "value": 4.21,
         "previous_value": 4.16,
         "timestamp": "2026-07-10T00:00:00-04:00",
-        "source": "fred",
+        "source": "cache:fred",
         "source_level": 1,
         "status": "ok",
         "stale": false,
@@ -2630,11 +2860,11 @@
         "note": "FRED一级来源；属于官方滞后数据。",
         "data_category": "enhancement_data",
         "observed_at": "2026-07-10T00:00:00-04:00",
-        "fetched_at": "2026-07-15T03:10:40.000046+08:00",
+        "fetched_at": "2026-07-15T03:10:40",
         "market_timezone": "America/New_York",
         "data_frequency": "daily",
         "data_session": "official_lagged_macro",
-        "freshness_status": "official_lagged",
+        "freshness_status": "fresh",
         "age_hours": 111.2,
         "comparable_date": "2026-07-10"
       },
@@ -2643,7 +2873,7 @@
         "value": 0.36,
         "previous_value": 0.35,
         "timestamp": "2026-07-13T00:00:00-04:00",
-        "source": "fred",
+        "source": "cache:fred",
         "source_level": 1,
         "status": "ok",
         "stale": false,
@@ -2651,11 +2881,11 @@
         "note": "FRED一级来源；属于官方滞后数据。",
         "data_category": "enhancement_data",
         "observed_at": "2026-07-13T00:00:00-04:00",
-        "fetched_at": "2026-07-15T03:10:42.575111+08:00",
+        "fetched_at": "2026-07-15T03:10:42",
         "market_timezone": "America/New_York",
         "data_frequency": "daily",
         "data_session": "official_lagged_macro",
-        "freshness_status": "official_lagged",
+        "freshness_status": "fresh",
         "age_hours": 39.2,
         "comparable_date": "2026-07-13"
       },
@@ -2664,7 +2894,7 @@
         "value": 2.69,
         "previous_value": 2.69,
         "timestamp": "2026-07-13T00:00:00-04:00",
-        "source": "fred",
+        "source": "cache:fred",
         "source_level": 1,
         "status": "ok",
         "stale": false,
@@ -2672,11 +2902,11 @@
         "note": "FRED一级来源；属于官方滞后数据。",
         "data_category": "enhancement_data",
         "observed_at": "2026-07-13T00:00:00-04:00",
-        "fetched_at": "2026-07-15T03:10:44.340355+08:00",
+        "fetched_at": "2026-07-15T03:10:44",
         "market_timezone": "America/New_York",
         "data_frequency": "daily",
         "data_session": "official_lagged_macro",
-        "freshness_status": "official_lagged",
+        "freshness_status": "fresh",
         "age_hours": 39.2,
         "comparable_date": "2026-07-13"
       }
@@ -2853,68 +3083,68 @@
   "cn_hk_p1a": {
     "schema_version": 1,
     "scope": "CN_HK_P1A_AUTHORITY_BASE_DATA",
-    "generated_at": "2026-07-15T03:08:42+08:00",
+    "generated_at": "2026-07-16T00:09:11+08:00",
     "tushare": {
       "provider": "tushare_pro",
       "transport": "official_rest_api",
       "uses_python_sdk": false,
-      "configured": false,
-      "status": "disabled",
-      "error_code": "TOKEN_INVALID",
-      "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+      "configured": true,
+      "status": "failed",
+      "error_code": "UNKNOWN_ERROR",
+      "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
       "last_success_at": null,
-      "fetched_at": "2026-07-15T03:08:42+08:00",
+      "fetched_at": "2026-07-16T00:09:11+08:00",
       "trade_calendar": {
         "api_name": "trade_cal",
         "source": "tushare_pro",
         "source_type": "authorized_api",
         "source_level": 2,
-        "fetched_at": "2026-07-15T03:08:42+08:00",
+        "fetched_at": "2026-07-16T00:09:11+08:00",
         "market_date": null,
         "timezone": "Asia/Shanghai",
         "currency": "CNY",
-        "status": "disabled",
+        "status": "failed",
         "freshness": "unavailable",
         "fallback_used": false,
         "records_count": 0,
         "fields_status": "missing",
-        "error_code": "TOKEN_INVALID",
-        "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-        "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+        "error_code": "UNKNOWN_ERROR",
+        "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+        "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
         "last_success_at": null,
         "exchange": "SSE",
         "latest_open_date": null,
         "next_open_date": null,
         "today_is_open": false,
-        "requested_start_date": "20260625",
-        "requested_end_date": "20260725",
+        "requested_start_date": "20260626",
+        "requested_end_date": "20260726",
         "unit": "calendar_day"
       },
       "valuation": {
         "source": "tushare_pro",
-        "configured": false,
-        "status": "disabled",
-        "error_code": "TOKEN_INVALID",
-        "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+        "configured": true,
+        "status": "failed",
+        "error_code": "UNKNOWN_ERROR",
+        "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
         "last_success_at": null,
         "interfaces": {
           "002558_valuation": {
             "api_name": "daily_basic",
-            "status": "disabled",
+            "status": "failed",
             "market_date": null,
             "rows_count": 0,
             "fields_status": "missing",
-            "error_code": "TOKEN_INVALID",
-            "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)"
+            "error_code": "UNKNOWN_ERROR",
+            "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。"
           },
           "csi300_valuation": {
             "api_name": "index_dailybasic",
-            "status": "disabled",
+            "status": "failed",
             "market_date": null,
             "rows_count": 0,
             "fields_status": "missing",
-            "error_code": "TOKEN_INVALID",
-            "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)"
+            "error_code": "UNKNOWN_ERROR",
+            "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。"
           }
         },
         "items": {
@@ -2923,18 +3153,18 @@
             "source": "tushare_pro",
             "source_type": "authorized_api",
             "source_level": 2,
-            "fetched_at": "2026-07-15T03:08:42+08:00",
+            "fetched_at": "2026-07-16T00:09:11+08:00",
             "market_date": null,
             "timezone": "Asia/Shanghai",
             "currency": "CNY",
-            "status": "disabled",
+            "status": "failed",
             "freshness": "unavailable",
             "fallback_used": false,
             "records_count": 0,
             "fields_status": "missing",
-            "error_code": "TOKEN_INVALID",
-            "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-            "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+            "error_code": "UNKNOWN_ERROR",
+            "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+            "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
             "last_success_at": null,
             "symbol": "002558.SZ",
             "official_name": "巨人网络",
@@ -2960,18 +3190,18 @@
             "source": "tushare_pro",
             "source_type": "authorized_api",
             "source_level": 2,
-            "fetched_at": "2026-07-15T03:08:42+08:00",
+            "fetched_at": "2026-07-16T00:09:11+08:00",
             "market_date": null,
             "timezone": "Asia/Shanghai",
             "currency": "CNY",
-            "status": "disabled",
+            "status": "failed",
             "freshness": "unavailable",
             "fallback_used": false,
             "records_count": 0,
             "fields_status": "missing",
-            "error_code": "TOKEN_INVALID",
-            "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-            "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+            "error_code": "UNKNOWN_ERROR",
+            "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+            "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
             "last_success_at": null,
             "symbol": "510300.SS",
             "official_name": "沪深300ETF",
@@ -2990,7 +3220,7 @@
             "source": "tushare_pro",
             "source_type": "authorized_api",
             "source_level": 2,
-            "fetched_at": "2026-07-15T03:08:42+08:00",
+            "fetched_at": "2026-07-16T00:09:11+08:00",
             "market_date": null,
             "timezone": "Asia/Shanghai",
             "currency": "CNY",
@@ -3014,7 +3244,7 @@
             "source": "tushare_pro",
             "source_type": "authorized_api",
             "source_level": 2,
-            "fetched_at": "2026-07-15T03:08:42+08:00",
+            "fetched_at": "2026-07-16T00:09:11+08:00",
             "market_date": null,
             "timezone": "Asia/Shanghai",
             "currency": "CNY",
@@ -3042,12 +3272,12 @@
           "model": "single_stock_fundamental",
           "source": "tushare_pro",
           "source_level": 2,
-          "configured": false,
-          "status": "disabled",
+          "configured": true,
+          "status": "failed",
           "successful_statement_count": 0,
           "total_statement_count": 4,
-          "error_code": "TOKEN_INVALID",
-          "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+          "error_code": "UNKNOWN_ERROR",
+          "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
           "last_success_at": null,
           "statements": {
             "financial_indicators": {
@@ -3055,18 +3285,18 @@
               "source": "tushare_pro",
               "source_type": "authorized_api",
               "source_level": 2,
-              "fetched_at": "2026-07-15T03:08:42+08:00",
+              "fetched_at": "2026-07-16T00:09:11+08:00",
               "market_date": null,
               "timezone": "Asia/Shanghai",
               "currency": "CNY",
-              "status": "disabled",
+              "status": "failed",
               "freshness": "unavailable",
               "fallback_used": false,
               "records_count": 0,
               "fields_status": "missing",
-              "error_code": "TOKEN_INVALID",
-              "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-              "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+              "error_code": "UNKNOWN_ERROR",
+              "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+              "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
               "last_success_at": null,
               "report_period": null,
               "announcement_date": null,
@@ -3077,18 +3307,18 @@
               "source": "tushare_pro",
               "source_type": "authorized_api",
               "source_level": 2,
-              "fetched_at": "2026-07-15T03:08:42+08:00",
+              "fetched_at": "2026-07-16T00:09:11+08:00",
               "market_date": null,
               "timezone": "Asia/Shanghai",
               "currency": "CNY",
-              "status": "disabled",
+              "status": "failed",
               "freshness": "unavailable",
               "fallback_used": false,
               "records_count": 0,
               "fields_status": "missing",
-              "error_code": "TOKEN_INVALID",
-              "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-              "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+              "error_code": "UNKNOWN_ERROR",
+              "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+              "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
               "last_success_at": null,
               "report_period": null,
               "announcement_date": null,
@@ -3099,18 +3329,18 @@
               "source": "tushare_pro",
               "source_type": "authorized_api",
               "source_level": 2,
-              "fetched_at": "2026-07-15T03:08:42+08:00",
+              "fetched_at": "2026-07-16T00:09:11+08:00",
               "market_date": null,
               "timezone": "Asia/Shanghai",
               "currency": "CNY",
-              "status": "disabled",
+              "status": "failed",
               "freshness": "unavailable",
               "fallback_used": false,
               "records_count": 0,
               "fields_status": "missing",
-              "error_code": "TOKEN_INVALID",
-              "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-              "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+              "error_code": "UNKNOWN_ERROR",
+              "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+              "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
               "last_success_at": null,
               "report_period": null,
               "announcement_date": null,
@@ -3121,25 +3351,25 @@
               "source": "tushare_pro",
               "source_type": "authorized_api",
               "source_level": 2,
-              "fetched_at": "2026-07-15T03:08:42+08:00",
+              "fetched_at": "2026-07-16T00:09:11+08:00",
               "market_date": null,
               "timezone": "Asia/Shanghai",
               "currency": "CNY",
-              "status": "disabled",
+              "status": "failed",
               "freshness": "unavailable",
               "fallback_used": false,
               "records_count": 0,
               "fields_status": "missing",
-              "error_code": "TOKEN_INVALID",
-              "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-              "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+              "error_code": "UNKNOWN_ERROR",
+              "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+              "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
               "last_success_at": null,
               "report_period": null,
               "announcement_date": null,
               "metrics": {}
             }
           },
-          "fetched_at": "2026-07-15T03:08:42+08:00",
+          "fetched_at": "2026-07-16T00:09:11+08:00",
           "note": "仅用于002558个股基本面；ETF不得继承本模型。"
         }
       },
@@ -3151,7 +3381,7 @@
       "version": "1.18.64",
       "status": "partial",
       "source_level": 3,
-      "fetched_at": "2026-07-15T03:10:20+08:00",
+      "fetched_at": "2026-07-16T00:09:42+08:00",
       "trade_calendar": {
         "interface": "trade_calendar",
         "symbol": "SSE",
@@ -3160,22 +3390,31 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "sina_finance",
-        "fetched_at": "2026-07-15T03:08:45+08:00",
+        "fetched_at": "2026-07-15T03:08:45",
         "market_date": "2026-07-15",
         "reporting_period": null,
         "currency": "CNY",
         "unit": "calendar_day",
-        "status": "ok",
+        "status": "cached",
         "freshness": "fresh",
         "confidence": "medium",
-        "fallback_used": false,
+        "fallback_used": true,
         "error_code": null,
         "error_message": "",
         "scoring_eligible": true,
         "latest_open_date": "2026-07-15",
         "next_open_date": "2026-07-16",
         "records_count": 400,
-        "attempts": 1
+        "attempts": 1,
+        "published_at": null,
+        "retrieved_at": "2026-07-16T00:09:14",
+        "freshness_status": "fresh",
+        "cache_used": true,
+        "cache_stale": false,
+        "cache_age_days": 0.88,
+        "warning": "",
+        "upstream_error_code": "NETWORK_ERROR",
+        "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/klc_td_sh.txt (Caused by NewConnectionError(\"HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))"
       },
       "valuation": {
         "status": "ok",
@@ -3188,15 +3427,15 @@
             "source_level": 3,
             "source_type": "monitored_aggregator_fallback",
             "underlying_provider": "eastmoney",
-            "fetched_at": "2026-07-15T03:08:48+08:00",
+            "fetched_at": "2026-07-15T03:08:48",
             "market_date": null,
             "reporting_period": null,
             "currency": "CNY",
             "unit": "multiple",
-            "status": "ok",
+            "status": "cached",
             "freshness": "unknown",
             "confidence": "low",
-            "fallback_used": false,
+            "fallback_used": true,
             "error_code": null,
             "error_message": "",
             "scoring_eligible": false,
@@ -3213,7 +3452,16 @@
             },
             "missing_fields": [],
             "attempts": 1,
-            "scale_status": "ok",
+            "published_at": null,
+            "retrieved_at": "2026-07-16T00:09:16",
+            "freshness_status": "fresh",
+            "cache_used": true,
+            "cache_stale": false,
+            "cache_age_days": 0.88,
+            "warning": "",
+            "upstream_error_code": "NETWORK_ERROR",
+            "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='datacenter.eastmoney.com', port=443): Max retries exceeded with url: /securities/api/data/v1/get?reportName=RPT_PCF10_INDUSTRY_CVALUE&columns=ALL&quoteColumns=&filter=%28SECUCODE%3D%22002558.SZ%22%29&pageNumber=&pageSize=&sortTypes=1&sortColumns=PAIMING&source=HSF10&client=PC (Caused by NewConnectionError(\"HTTPSConnection(host='datacenter.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套",
+            "scale_status": "cached",
             "scale_error_code": null
           },
           "510300.SS": {
@@ -3224,15 +3472,15 @@
             "source_level": 3,
             "source_type": "monitored_aggregator_fallback",
             "underlying_provider": "csindex_official",
-            "fetched_at": "2026-07-15T03:09:28+08:00",
+            "fetched_at": "2026-07-15T03:09:28",
             "market_date": "2026-07-14",
             "reporting_period": null,
             "currency": "CNY",
             "unit": "mixed_valuation_units",
-            "status": "ok",
+            "status": "cached",
             "freshness": "fresh",
             "confidence": "high",
-            "fallback_used": false,
+            "fallback_used": true,
             "error_code": null,
             "error_message": "",
             "scoring_eligible": true,
@@ -3251,7 +3499,16 @@
               "pb"
             ],
             "price_percentile_used_as_valuation": false,
-            "attempts": 1
+            "attempts": 1,
+            "published_at": null,
+            "retrieved_at": "2026-07-16T00:09:27",
+            "freshness_status": "fresh",
+            "cache_used": true,
+            "cache_stale": false,
+            "cache_age_days": 0.87,
+            "warning": "",
+            "upstream_error_code": "UNKNOWN_ERROR",
+            "upstream_error_message": "URLError: <urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
           }
         },
         "interfaces": {
@@ -3263,15 +3520,15 @@
             "source_level": 3,
             "source_type": "monitored_aggregator_fallback",
             "underlying_provider": "eastmoney",
-            "fetched_at": "2026-07-15T03:08:48+08:00",
+            "fetched_at": "2026-07-15T03:08:48",
             "market_date": null,
             "reporting_period": null,
             "currency": "CNY",
             "unit": "multiple",
-            "status": "ok",
+            "status": "cached",
             "freshness": "unknown",
             "confidence": "low",
-            "fallback_used": false,
+            "fallback_used": true,
             "error_code": null,
             "error_message": "",
             "scoring_eligible": false,
@@ -3288,7 +3545,16 @@
             },
             "missing_fields": [],
             "attempts": 1,
-            "scale_status": "ok",
+            "published_at": null,
+            "retrieved_at": "2026-07-16T00:09:16",
+            "freshness_status": "fresh",
+            "cache_used": true,
+            "cache_stale": false,
+            "cache_age_days": 0.88,
+            "warning": "",
+            "upstream_error_code": "NETWORK_ERROR",
+            "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='datacenter.eastmoney.com', port=443): Max retries exceeded with url: /securities/api/data/v1/get?reportName=RPT_PCF10_INDUSTRY_CVALUE&columns=ALL&quoteColumns=&filter=%28SECUCODE%3D%22002558.SZ%22%29&pageNumber=&pageSize=&sortTypes=1&sortColumns=PAIMING&source=HSF10&client=PC (Caused by NewConnectionError(\"HTTPSConnection(host='datacenter.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套",
+            "scale_status": "cached",
             "scale_error_code": null
           },
           "csi300_valuation": {
@@ -3299,15 +3565,15 @@
             "source_level": 3,
             "source_type": "monitored_aggregator_fallback",
             "underlying_provider": "csindex_official",
-            "fetched_at": "2026-07-15T03:09:28+08:00",
+            "fetched_at": "2026-07-15T03:09:28",
             "market_date": "2026-07-14",
             "reporting_period": null,
             "currency": "CNY",
             "unit": "mixed_valuation_units",
-            "status": "ok",
+            "status": "cached",
             "freshness": "fresh",
             "confidence": "high",
-            "fallback_used": false,
+            "fallback_used": true,
             "error_code": null,
             "error_message": "",
             "scoring_eligible": true,
@@ -3326,7 +3592,16 @@
               "pb"
             ],
             "price_percentile_used_as_valuation": false,
-            "attempts": 1
+            "attempts": 1,
+            "published_at": null,
+            "retrieved_at": "2026-07-16T00:09:27",
+            "freshness_status": "fresh",
+            "cache_used": true,
+            "cache_stale": false,
+            "cache_age_days": 0.87,
+            "warning": "",
+            "upstream_error_code": "UNKNOWN_ERROR",
+            "upstream_error_message": "URLError: <urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
           }
         }
       },
@@ -3339,15 +3614,15 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-15T03:08:53+08:00",
+          "fetched_at": "2026-07-15T03:08:53",
           "market_date": null,
           "reporting_period": "2026-03-31",
           "currency": "CNY",
           "unit": "mixed_financial_units",
-          "status": "ok",
+          "status": "cached",
           "freshness": "fresh",
           "confidence": "medium",
-          "fallback_used": false,
+          "fallback_used": true,
           "error_code": null,
           "error_message": "",
           "scoring_eligible": true,
@@ -3413,8 +3688,17 @@
           ],
           "period_consistent": true,
           "attempts": 1,
+          "published_at": null,
+          "retrieved_at": "2026-07-16T00:09:21",
+          "freshness_status": "fresh",
+          "cache_used": true,
+          "cache_stale": false,
+          "cache_age_days": 0.88,
+          "warning": "",
+          "upstream_error_code": "NETWORK_ERROR",
+          "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='datacenter.eastmoney.com', port=443): Max retries exceeded with url: /securities/api/data/get?type=RPT_F10_FINANCE_MAINFINADATA&sty=APP_F10_MAINFINADATA&quoteColumns=&filter=%28SECUCODE%3D%22002558.SZ%22%29&p=1&ps=200&sr=-1&st=REPORT_DATE&source=HSF10&client=PC (Caused by NewConnectionError(\"HTTPSConnection(host='datacenter.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))",
           "cashflow_status": "failed",
-          "cashflow_error_code": "TIMEOUT"
+          "cashflow_error_code": "NETWORK_ERROR"
         }
       },
       "market_references": {
@@ -3447,14 +3731,14 @@
           "display_only": true,
           "attempts": 1,
           "published_at": null,
-          "retrieved_at": "2026-07-15T03:09:40",
+          "retrieved_at": "2026-07-16T00:09:29",
           "freshness_status": "fresh",
           "cache_used": true,
           "cache_stale": false,
-          "cache_age_days": 0.06,
+          "cache_age_days": 0.94,
           "warning": "",
           "upstream_error_code": "NETWORK_ERROR",
-          "upstream_error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&secid=0.002558&beg=20260531&end=20260715 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+          "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&secid=0.002558&beg=20260601&end=20260716 (Caused by NewConnectionError(\"HTTPSConnection(host='push2his.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一",
           "comparison_source": "cache:yfinance",
           "comparison_status": "not_comparable",
           "comparison_reason": "交易日不一致(2026-07-14/2026-07-13)"
@@ -3467,7 +3751,7 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-15T03:09:51+08:00",
+          "fetched_at": "2026-07-16T00:09:32+08:00",
           "market_date": null,
           "reporting_period": null,
           "currency": "CNY",
@@ -3477,7 +3761,7 @@
           "confidence": "low",
           "fallback_used": false,
           "error_code": "NETWORK_ERROR",
-          "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260531&end=20260715&secid=1.510300 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+          "error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.510300 (Caused by NewConnectionError(\"HTTPSConnection(host='push2his.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一",
           "scoring_eligible": false
         },
         "513060.SS": {
@@ -3488,7 +3772,7 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-15T03:10:02+08:00",
+          "fetched_at": "2026-07-16T00:09:34+08:00",
           "market_date": null,
           "reporting_period": null,
           "currency": "CNY",
@@ -3498,7 +3782,7 @@
           "confidence": "low",
           "fallback_used": false,
           "error_code": "NETWORK_ERROR",
-          "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260531&end=20260715&secid=1.513060 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+          "error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513060 (Caused by NewConnectionError(\"HTTPSConnection(host='push2his.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一",
           "scoring_eligible": false
         },
         "513090.SS": {
@@ -3509,7 +3793,7 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-15T03:10:13+08:00",
+          "fetched_at": "2026-07-16T00:09:37+08:00",
           "market_date": null,
           "reporting_period": null,
           "currency": "CNY",
@@ -3519,7 +3803,7 @@
           "confidence": "low",
           "fallback_used": false,
           "error_code": "NETWORK_ERROR",
-          "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260531&end=20260715&secid=1.513090 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+          "error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513090 (Caused by NewConnectionError(\"HTTPSConnection(host='push2his.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一",
           "scoring_eligible": false
         },
         "03033.HK": {
@@ -3530,15 +3814,15 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "sina_finance",
-          "fetched_at": "2026-07-15T03:10:18+08:00",
+          "fetched_at": "2026-07-15T03:10:18",
           "market_date": "2026-07-14",
           "reporting_period": null,
           "currency": "HKD",
           "unit": "HKD_per_share_or_unit",
-          "status": "ok",
+          "status": "cached",
           "freshness": "fresh",
           "confidence": "medium",
-          "fallback_used": false,
+          "fallback_used": true,
           "error_code": null,
           "error_message": "",
           "scoring_eligible": true,
@@ -3550,6 +3834,15 @@
           "adjustment": "qfq",
           "display_only": true,
           "attempts": 1,
+          "published_at": null,
+          "retrieved_at": "2026-07-16T00:09:39",
+          "freshness_status": "fresh",
+          "cache_used": true,
+          "cache_stale": false,
+          "cache_age_days": 0.87,
+          "warning": "",
+          "upstream_error_code": "NETWORK_ERROR",
+          "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /stock/hkstock/03033/klc2_kl.js (Caused by NewConnectionError(\"HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))",
           "comparison_source": "cache:yfinance",
           "comparison_status": "not_comparable",
           "comparison_reason": "交易日不一致(2026-07-14/2026-07-13)"
@@ -3562,15 +3855,15 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "sina_finance",
-          "fetched_at": "2026-07-15T03:10:20+08:00",
+          "fetched_at": "2026-07-15T03:10:20",
           "market_date": "2026-07-14",
           "reporting_period": null,
           "currency": "HKD",
           "unit": "index_points",
-          "status": "ok",
+          "status": "cached",
           "freshness": "fresh",
           "confidence": "medium",
-          "fallback_used": false,
+          "fallback_used": true,
           "error_code": null,
           "error_message": "",
           "scoring_eligible": true,
@@ -3581,30 +3874,39 @@
           },
           "adjustment": "not_applicable",
           "display_only": true,
-          "attempts": 1
+          "attempts": 1,
+          "published_at": null,
+          "retrieved_at": "2026-07-16T00:09:42",
+          "freshness_status": "fresh",
+          "cache_used": true,
+          "cache_stale": false,
+          "cache_age_days": 0.87,
+          "warning": "",
+          "upstream_error_code": "NETWORK_ERROR",
+          "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /stock/hkstock/HSTECH/klc2_kl.js?d=2023_5_01 (Caused by NewConnectionError(\"HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))"
         }
       },
       "source_conflicts": [],
-      "last_success_at": "2026-07-15T03:10:20+08:00",
+      "last_success_at": "2026-07-15T03:10:20",
       "circuit_state": {
         "interfaces": {
-          "trade_calendar": 0,
-          "002558_valuation": 0,
-          "002558_scale": 0,
-          "002558_fundamental": 0,
+          "trade_calendar": 3,
+          "002558_valuation": 3,
+          "002558_scale": 3,
+          "002558_fundamental": 3,
           "002558_cashflow": 3,
-          "csi300_valuation": 0,
+          "csi300_valuation": 3,
           "002558_history": 3,
           "510300_history": 3,
           "513060_history": 3,
           "513090_history": 3,
-          "03033_history": 0,
-          "hstech_history": 0
+          "03033_history": 3,
+          "hstech_history": 3
         },
         "underlying_providers": {
-          "sina_finance": 0,
-          "eastmoney": 15,
-          "csindex_official": 0
+          "sina_finance": 9,
+          "eastmoney": 24,
+          "csindex_official": 3
         },
         "failure_threshold": 3
       },
@@ -3619,22 +3921,31 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "sina_finance",
-        "fetched_at": "2026-07-15T03:08:45+08:00",
+        "fetched_at": "2026-07-15T03:08:45",
         "market_date": "2026-07-15",
         "reporting_period": null,
         "currency": "CNY",
         "unit": "calendar_day",
-        "status": "ok",
+        "status": "cached",
         "freshness": "fresh",
         "confidence": "medium",
-        "fallback_used": false,
+        "fallback_used": true,
         "error_code": null,
         "error_message": "",
         "scoring_eligible": true,
         "latest_open_date": "2026-07-15",
         "next_open_date": "2026-07-16",
         "records_count": 400,
-        "attempts": 1
+        "attempts": 1,
+        "published_at": null,
+        "retrieved_at": "2026-07-16T00:09:14",
+        "freshness_status": "fresh",
+        "cache_used": true,
+        "cache_stale": false,
+        "cache_age_days": 0.88,
+        "warning": "",
+        "upstream_error_code": "NETWORK_ERROR",
+        "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/klc_td_sh.txt (Caused by NewConnectionError(\"HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))"
       },
       "valuation": {
         "items": {
@@ -3643,18 +3954,18 @@
             "source": "tushare_pro",
             "source_type": "authorized_api",
             "source_level": 2,
-            "fetched_at": "2026-07-15T03:08:42+08:00",
+            "fetched_at": "2026-07-16T00:09:11+08:00",
             "market_date": null,
             "timezone": "Asia/Shanghai",
             "currency": "CNY",
-            "status": "disabled",
+            "status": "failed",
             "freshness": "unavailable",
             "fallback_used": false,
             "records_count": 0,
             "fields_status": "missing",
-            "error_code": "TOKEN_INVALID",
-            "error_summary": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
-            "error_message": "未配置 TUSHARE_TOKEN (TUSHARE_TOKEN_NOT_CONFIGURED)",
+            "error_code": "UNKNOWN_ERROR",
+            "error_summary": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
+            "error_message": "Tushare 网络请求失败：[WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。",
             "last_success_at": null,
             "symbol": "002558.SZ",
             "official_name": "巨人网络",
@@ -3683,15 +3994,15 @@
             "source_level": 3,
             "source_type": "monitored_aggregator_fallback",
             "underlying_provider": "csindex_official",
-            "fetched_at": "2026-07-15T03:09:28+08:00",
+            "fetched_at": "2026-07-15T03:09:28",
             "market_date": "2026-07-14",
             "reporting_period": null,
             "currency": "CNY",
             "unit": "mixed_valuation_units",
-            "status": "ok",
+            "status": "cached",
             "freshness": "fresh",
             "confidence": "high",
-            "fallback_used": false,
+            "fallback_used": true,
             "error_code": null,
             "error_message": "",
             "scoring_eligible": true,
@@ -3710,7 +4021,16 @@
               "pb"
             ],
             "price_percentile_used_as_valuation": false,
-            "attempts": 1
+            "attempts": 1,
+            "published_at": null,
+            "retrieved_at": "2026-07-16T00:09:27",
+            "freshness_status": "fresh",
+            "cache_used": true,
+            "cache_stale": false,
+            "cache_age_days": 0.87,
+            "warning": "",
+            "upstream_error_code": "UNKNOWN_ERROR",
+            "upstream_error_message": "URLError: <urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
           }
         }
       },
@@ -3723,15 +4043,15 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-15T03:08:53+08:00",
+          "fetched_at": "2026-07-15T03:08:53",
           "market_date": null,
           "reporting_period": "2026-03-31",
           "currency": "CNY",
           "unit": "mixed_financial_units",
-          "status": "ok",
+          "status": "cached",
           "freshness": "fresh",
           "confidence": "medium",
-          "fallback_used": false,
+          "fallback_used": true,
           "error_code": null,
           "error_message": "",
           "scoring_eligible": true,
@@ -3797,8 +4117,17 @@
           ],
           "period_consistent": true,
           "attempts": 1,
+          "published_at": null,
+          "retrieved_at": "2026-07-16T00:09:21",
+          "freshness_status": "fresh",
+          "cache_used": true,
+          "cache_stale": false,
+          "cache_age_days": 0.88,
+          "warning": "",
+          "upstream_error_code": "NETWORK_ERROR",
+          "upstream_error_message": "AKShare底层网络失败：ConnectionError: HTTPSConnectionPool(host='datacenter.eastmoney.com', port=443): Max retries exceeded with url: /securities/api/data/get?type=RPT_F10_FINANCE_MAINFINADATA&sty=APP_F10_MAINFINADATA&quoteColumns=&filter=%28SECUCODE%3D%22002558.SZ%22%29&p=1&ps=200&sr=-1&st=REPORT_DATE&source=HSF10&client=PC (Caused by NewConnectionError(\"HTTPSConnection(host='datacenter.eastmoney.com', port=443): Failed to establish a new connection: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。\"))",
           "cashflow_status": "failed",
-          "cashflow_error_code": "TIMEOUT"
+          "cashflow_error_code": "NETWORK_ERROR"
         }
       },
       "selected_sources": {
@@ -3813,7 +4142,7 @@
       "provider": "hkma_official",
       "source_level": 1,
       "status": "partial",
-      "fetched_at": "2026-07-15T03:10:29+08:00",
+      "fetched_at": "2026-07-16T00:09:44+08:00",
       "market_date": "2026-07-14",
       "timezone": "Asia/Hong_Kong",
       "currency": "HKD",
@@ -3837,85 +4166,88 @@
       },
       "datasets": {
         "liquidity": {
-          "status": "ok",
+          "status": "cached",
           "source": "hkma_official",
           "source_level": 1,
-          "source_type": "official",
+          "source_type": "official_cache",
           "underlying_provider": "hkma_open_api",
-          "fetched_at": "2026-07-15T03:10:23+08:00",
+          "fetched_at": "2026-07-16T00:09:43+08:00",
           "market_date": "2026-07-14",
           "timezone": "Asia/Hong_Kong",
           "freshness": "fresh",
           "stale": false,
-          "age_days": 1,
-          "fallback_used": false,
-          "error_code": null,
-          "error_message": "",
-          "attempts": 1,
-          "circuit_open": false
+          "age_days": 2,
+          "fallback_used": true,
+          "error_code": "UNKNOWN_ERROR",
+          "error_message": "<urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>",
+          "cache_age_days": 0.87,
+          "attempts": 3,
+          "circuit_open": true
         },
         "hibor": {
-          "status": "ok",
+          "status": "cached",
           "source": "hkma_official",
           "source_level": 1,
-          "source_type": "official",
+          "source_type": "official_cache",
           "underlying_provider": "hkma_open_api",
-          "fetched_at": "2026-07-15T03:10:25+08:00",
+          "fetched_at": "2026-07-16T00:09:43+08:00",
           "market_date": "2026-06-30",
           "timezone": "Asia/Hong_Kong",
           "freshness": "stale",
           "stale": true,
-          "age_days": 15,
-          "fallback_used": false,
-          "error_code": null,
-          "error_message": "",
-          "attempts": 1,
-          "circuit_open": false
+          "age_days": 16,
+          "fallback_used": true,
+          "error_code": "UNKNOWN_ERROR",
+          "error_message": "<urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>",
+          "cache_age_days": 0.87,
+          "attempts": 3,
+          "circuit_open": true
         },
         "exchange_rate": {
-          "status": "ok",
+          "status": "cached",
           "source": "hkma_official",
           "source_level": 1,
-          "source_type": "official",
+          "source_type": "official_cache",
           "underlying_provider": "hkma_open_api",
-          "fetched_at": "2026-07-15T03:10:29+08:00",
+          "fetched_at": "2026-07-16T00:09:44+08:00",
           "market_date": "2026-06-30",
           "timezone": "Asia/Hong_Kong",
           "freshness": "stale",
           "stale": true,
-          "age_days": 15,
-          "fallback_used": false,
-          "error_code": null,
-          "error_message": "",
-          "attempts": 1,
-          "circuit_open": false
+          "age_days": 16,
+          "fallback_used": true,
+          "error_code": "UNKNOWN_ERROR",
+          "error_message": "<urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>",
+          "cache_age_days": 0.87,
+          "attempts": 3,
+          "circuit_open": true
         }
       },
-      "fallback_used": false,
+      "fallback_used": true,
       "missing_fields": []
     },
     "announcements": {
-      "fetched_at": "2026-07-15T03:10:34+08:00",
+      "fetched_at": "2026-07-16T00:09:44+08:00",
       "status": "partial",
       "cn": {
         "status": "failed",
         "source": "cninfo_official",
         "source_level": 1,
         "source_type": "official_disclosure_platform",
-        "fetched_at": "2026-07-15T03:10:34+08:00",
+        "fetched_at": "2026-07-16T00:09:44+08:00",
         "market_date": null,
         "timezone": "Asia/Shanghai",
         "records": [],
         "record_count": 0,
         "fallback_used": false,
-        "error_message": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)>"
+        "error_message": "<urlopen error [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。>"
       },
       "hk": {
         "status": "framework_ready",
         "source": "hkex_official",
         "source_level": 1,
         "source_type": "official_exchange_disclosure",
-        "fetched_at": "2026-07-15T03:10:34+08:00",
+        "fetched_at": "2026-07-16T00:09:44+08:00",
         "market_date": null,
         "timezone": "Asia/Hong_Kong",
         "symbols": [
@@ -4067,12 +4399,12 @@
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quote",
-      "data_session": "official_close",
+      "data_session": "previous_close",
       "freshness_status": "fresh",
       "age_hours": 26.4,
       "source_level": 3,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-15T03:08:19",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4096,12 +4428,12 @@
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quote",
-      "data_session": "official_close",
+      "data_session": "previous_close",
       "freshness_status": "fresh",
       "age_hours": 26.4,
       "source_level": 3,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-15T03:08:20",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4125,12 +4457,12 @@
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quote",
-      "data_session": "official_close",
+      "data_session": "previous_close",
       "freshness_status": "fresh",
       "age_hours": 26.4,
       "source_level": 3,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-15T03:08:36",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4154,12 +4486,12 @@
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quote",
-      "data_session": "official_close",
+      "data_session": "previous_close",
       "freshness_status": "fresh",
       "age_hours": 26.4,
       "source_level": 3,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-15T03:08:35",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4177,24 +4509,24 @@
       "timestamp": "2026-07-14 19:07:41",
       "observed_at": "2026-07-14 19:07:41",
       "observed_at_utc": "2026-07-14T19:07:41+00:00",
-      "fetched_at": "2026-07-14T19:08:41+00:00",
-      "received_at_utc": "2026-07-14T19:08:41+00:00",
+      "fetched_at": "2026-07-15T03:08:41",
+      "received_at_utc": "2026-07-15T03:08:41+00:00",
       "source_timezone": "UTC",
       "time_status": "ok",
       "market_timezone": "UTC",
       "data_frequency": "quote",
       "data_session": "intraday_delayed",
       "freshness_status": "fresh",
-      "age_hours": 0.0,
+      "age_hours": 8.0,
       "source_level": 1,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-14T19:08:41+00:00",
-      "source": "cboe_official",
+      "retrieved_at": "2026-07-16T00:09:11",
+      "source": "cache:cboe_official",
       "source_tier": 1,
       "success": true,
       "stale": false,
       "error": "",
-      "fallback_used": false,
+      "fallback_used": true,
       "dual_verified": false
     },
     {
@@ -4212,12 +4544,12 @@
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quote",
-      "data_session": "official_close",
+      "data_session": "previous_close",
       "freshness_status": "fresh",
       "age_hours": 26.4,
       "source_level": 3,
       "comparable_date": "2026-07-14",
-      "retrieved_at": "2026-07-15T03:08:39",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4246,7 +4578,7 @@
       "age_hours": 50.4,
       "source_level": 3,
       "comparable_date": "2026-07-13",
-      "retrieved_at": "2026-07-15T03:08:28",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4275,7 +4607,7 @@
       "age_hours": 50.4,
       "source_level": 3,
       "comparable_date": "2026-07-13",
-      "retrieved_at": "2026-07-15T03:08:30",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4304,7 +4636,7 @@
       "age_hours": 50.4,
       "source_level": 3,
       "comparable_date": "2026-07-13",
-      "retrieved_at": "2026-07-15T03:08:31",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4333,7 +4665,7 @@
       "age_hours": 50.4,
       "source_level": 3,
       "comparable_date": "2026-07-13",
-      "retrieved_at": "2026-07-15T03:08:32",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4362,7 +4694,7 @@
       "age_hours": 50.4,
       "source_level": 3,
       "comparable_date": "2026-07-13",
-      "retrieved_at": "2026-07-15T03:08:33",
+      "retrieved_at": "2026-07-16T00:09:11",
       "source": "cache:yfinance",
       "source_tier": 3,
       "success": true,
@@ -4380,24 +4712,24 @@
       "timestamp": "2026-07-10T00:00:00-04:00",
       "observed_at": "2026-07-10T00:00:00-04:00",
       "observed_at_utc": "2026-07-10T04:00:00+00:00",
-      "fetched_at": "2026-07-15T03:10:37.737545+08:00",
-      "received_at_utc": "2026-07-14T19:10:37.737545+00:00",
+      "fetched_at": "2026-07-15T03:10:37",
+      "received_at_utc": "2026-07-15T07:10:37+00:00",
       "source_timezone": "America/New_York",
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "daily",
       "data_session": "official_lagged_macro",
-      "freshness_status": "official_lagged",
+      "freshness_status": "fresh",
       "age_hours": 111.2,
       "source_level": 1,
       "comparable_date": "2026-07-10",
-      "retrieved_at": "2026-07-15T03:10:37.737545+08:00",
-      "source": "fred",
+      "retrieved_at": "2026-07-16T00:09:44",
+      "source": "cache:fred",
       "source_tier": 1,
       "success": true,
       "stale": false,
       "error": "",
-      "fallback_used": false,
+      "fallback_used": true,
       "dual_verified": false
     },
     {
@@ -4409,24 +4741,24 @@
       "timestamp": "2026-06-01T00:00:00-04:00",
       "observed_at": "2026-06-01T00:00:00-04:00",
       "observed_at_utc": "2026-06-01T04:00:00+00:00",
-      "fetched_at": "2026-07-15T03:10:46.638972+08:00",
-      "received_at_utc": "2026-07-14T19:10:46.638972+00:00",
+      "fetched_at": "2026-07-15T03:10:46",
+      "received_at_utc": "2026-07-15T07:10:46+00:00",
       "source_timezone": "America/New_York",
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "monthly",
       "data_session": "official_lagged_macro",
-      "freshness_status": "official_lagged",
+      "freshness_status": "fresh",
       "age_hours": 1047.2,
       "source_level": 1,
       "comparable_date": "2026-06-01",
-      "retrieved_at": "2026-07-15T03:10:46.638972+08:00",
-      "source": "fred",
+      "retrieved_at": "2026-07-16T00:09:44",
+      "source": "cache:fred",
       "source_tier": 1,
       "success": true,
       "stale": false,
       "error": "",
-      "fallback_used": false,
+      "fallback_used": true,
       "dual_verified": false
     },
     {
@@ -4438,24 +4770,24 @@
       "timestamp": "2026-06-01T00:00:00-04:00",
       "observed_at": "2026-06-01T00:00:00-04:00",
       "observed_at_utc": "2026-06-01T04:00:00+00:00",
-      "fetched_at": "2026-07-15T03:10:50.661140+08:00",
-      "received_at_utc": "2026-07-14T19:10:50.661140+00:00",
+      "fetched_at": "2026-07-15T03:10:50",
+      "received_at_utc": "2026-07-15T07:10:50+00:00",
       "source_timezone": "America/New_York",
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "monthly",
       "data_session": "official_lagged_macro",
-      "freshness_status": "official_lagged",
+      "freshness_status": "fresh",
       "age_hours": 1047.2,
       "source_level": 1,
       "comparable_date": "2026-06-01",
-      "retrieved_at": "2026-07-15T03:10:50.661140+08:00",
-      "source": "fred",
+      "retrieved_at": "2026-07-16T00:09:44",
+      "source": "cache:fred",
       "source_tier": 1,
       "success": true,
       "stale": false,
       "error": "",
-      "fallback_used": false,
+      "fallback_used": true,
       "dual_verified": false
     },
     {
@@ -4467,24 +4799,24 @@
       "timestamp": "2026-01-01T00:00:00-05:00",
       "observed_at": "2026-01-01T00:00:00-05:00",
       "observed_at_utc": "2026-01-01T05:00:00+00:00",
-      "fetched_at": "2026-07-15T03:10:52.578086+08:00",
-      "received_at_utc": "2026-07-14T19:10:52.578086+00:00",
+      "fetched_at": "2026-07-15T03:10:52",
+      "received_at_utc": "2026-07-15T07:10:52+00:00",
       "source_timezone": "America/New_York",
       "time_status": "ok",
       "market_timezone": "America/New_York",
       "data_frequency": "quarterly",
-      "data_session": "stale",
-      "freshness_status": "stale",
+      "data_session": "official_lagged_macro",
+      "freshness_status": "fresh",
       "age_hours": 4671.2,
       "source_level": 1,
       "comparable_date": "2026-01-01",
-      "retrieved_at": "2026-07-15T03:10:52.578086+08:00",
-      "source": "fred",
+      "retrieved_at": "2026-07-16T00:09:44",
+      "source": "cache:fred",
       "source_tier": 1,
       "success": true,
-      "stale": true,
+      "stale": false,
       "error": "",
-      "fallback_used": false,
+      "fallback_used": true,
       "dual_verified": false
     }
   ],
@@ -4507,19 +4839,19 @@
     "model": "gpt-4o-mini",
     "validation_errors": [],
     "impact": "OpenAI是可选解释层；本次由规则引擎完成全部核心分析，DQS、预算和风控结论不受影响。",
-    "market_regime": "规则风险等级为中高风险，DQS=64，结论置信度服从数据质量门槛。",
-    "summary": "组合总资产约282.11万元；美股为严重低配，债券为严重超配。当前DQS=64、风险评分=67，规则结论为今日不交易。",
+    "market_regime": "规则风险等级为中高风险，DQS=65，结论置信度服从数据质量门槛。",
+    "summary": "组合总资产约282.11万元；美股为严重低配，债券为严重超配。当前DQS=65、风险评分=62，规则结论为已记录用户确认的实盘交易，后续不追加操作。",
     "most_important_risk": "未来7天存在高等级事件。",
-    "best_action_today": "今日不交易；可投资现金为0元。当前没有真实可执行买入预算。下一复核日为2026-07-15T20:45:00+08:00，只在DQS、资金到账和事件纪律同时满足后执行。",
-    "avoid_action_today": "不要使用现金安全线以内资金；不要向债券追加常规资金；不要把未到账债券资金或模拟网格资金当作真实可用现金。",
+    "best_action_today": "已记录用户确认的实盘交易，后续不追加操作；可投资现金为21,000元。下一复核日为2026-07-15T20:45:00+08:00，剩余专项资金只在DQS、市场和事件纪律同时满足后分批评估。",
+    "avoid_action_today": "不要使用现金安全线以内资金；不要向债券追加常规资金；不要把已到账等同于必须立即投入；模拟网格资金仍与实盘严格隔离。",
     "required_trigger_conditions": [
-      "下一个基础定投复核日：2026-08-05；若DQS>=75且现金高于安全线，可按计划执行。",
-      "若债券到期或赎回资金到账，本月可在条件性额度内分2-3次转向权益ETF。",
+      "下一个基础定投复核日：2026-08-05；若DQS>=75且市场与风险条件通过，可按计划复核。",
+      "本月债券资金已到账，剩余专项现金21,000元可分批评估，但不代表必须立即或一次性投入。",
       "若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。",
       "若DQS低于60或关键价格缺失，继续禁止新增仓位建议。"
     ],
     "best_opportunity": "VOO是长期配置优先方向，但当前只允许方向性建议，短期不追涨，等待资金和数据条件确认。",
-    "one_sentence": "DQS=64，只允许方向性建议；现金低于或接近安全线；未来7天存在高等级宏观事件，事件前不追涨；待资金和数据条件满足后再执行分批计划。"
+    "one_sentence": "2026年7月15日已执行一笔债券转权益交易：以692.5美元/份的价格买入人民币9,000元VOO。该交易资金来源为当日实际到账的债券本金，不占用现金安全储备。"
   },
   "macro_event_high_next_7_days": true,
   "macro_event_high_next_48_hours": true,
@@ -4654,18 +4986,65 @@
     }
   ],
   "today_trade": false,
-  "trade_type": "无操作",
-  "today_amount_yuan": 0,
-  "targets": "不适用",
-  "funding_source": "今日不使用资金",
+  "today_confirmed_trade_executed": true,
+  "confirmed_transactions": [
+    {
+      "id": "USERCONF-20260715-VOO-001",
+      "trade_date": "2026-07-15",
+      "natural_week": "2026-W29",
+      "status": "executed",
+      "order_type": "bond_to_equity",
+      "symbol": "VOO",
+      "action": "BUY",
+      "execution_price_usd": 692.5,
+      "invested_amount_cny": 9000,
+      "funding_source": "2026-07-15到期债券资金",
+      "data_source": "user_confirmed",
+      "quantity": null,
+      "actual_fx_rate_cny_per_usd": null,
+      "fee": null,
+      "booked_to_portfolio": true,
+      "real_trade": true,
+      "simulation_trade": false,
+      "valuation_status": "pending_quantity_fx_fee",
+      "note": "只确认成交价格与人民币投入成本；不得推算成交股数、汇率、手续费或最新市值。"
+    }
+  ],
+  "today_confirmed_transactions": [
+    {
+      "id": "USERCONF-20260715-VOO-001",
+      "trade_date": "2026-07-15",
+      "natural_week": "2026-W29",
+      "status": "executed",
+      "order_type": "bond_to_equity",
+      "symbol": "VOO",
+      "action": "BUY",
+      "execution_price_usd": 692.5,
+      "invested_amount_cny": 9000,
+      "funding_source": "2026-07-15到期债券资金",
+      "data_source": "user_confirmed",
+      "quantity": null,
+      "actual_fx_rate_cny_per_usd": null,
+      "fee": null,
+      "booked_to_portfolio": true,
+      "real_trade": true,
+      "simulation_trade": false,
+      "valuation_status": "pending_quantity_fx_fee",
+      "note": "只确认成交价格与人民币投入成本；不得推算成交股数、汇率、手续费或最新市值。"
+    }
+  ],
+  "trade_type": "债券转权益（用户确认已执行）",
+  "today_amount_yuan": 9000,
+  "targets": "VOO",
+  "funding_source": "2026-07-15到期债券资金；不占用固定现金安全储备",
   "no_trade_reasons": [
-    "DQS=64，只允许方向性建议",
-    "现金低于或接近安全线",
+    "已完成用户确认的债券转权益实盘交易；剩余专项资金不强制立即投入",
+    "DQS=65，只允许方向性建议",
     "未来7天存在高等级宏观事件，事件前不追涨"
   ],
   "next_triggers": [
-    "下一个基础定投复核日：2026-08-05；若DQS>=75且现金高于安全线，可按计划执行。",
-    "若债券到期或赎回资金到账，本月可在条件性额度内分2-3次转向权益ETF。",
+    "下一个基础定投复核日：2026-08-05；若DQS>=75且市场与风险条件通过，可按计划复核。",
+    "本月债券资金已到账，剩余专项现金21,000元可分批评估，但不代表必须立即或一次性投入。",
     "若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。",
     "若DQS低于60或关键价格缺失，继续禁止新增仓位建议。"
   ],
@@ -4673,14 +5052,15 @@
   "next_review_reason": "等待PPI公布后15分钟重新复核市场、DQS和交易条件。",
   "max_risk": "未来7天存在高等级事件。",
   "max_opportunity": "VOO是长期配置优先方向，但当前只允许方向性建议，短期不追涨，等待资金和数据条件确认。",
-  "one_sentence": "DQS=64，只允许方向性建议；现金低于或接近安全线；未来7天存在高等级宏观事件，事件前不追涨；待资金和数据条件满足后再执行分批计划。",
+  "one_sentence": "2026年7月15日已执行一笔债券转权益交易：以692.5美元/份的价格买入人民币9,000元VOO。该交易资金来源为当日实际到账的债券本金，不占用现金安全储备。",
   "disclaimer": "仅供投资辅助，不构成投资建议；系统不自动交易，不接券商下单权限，不承诺收益。",
   "consistency": {
     "ok": true,
     "status": "WARN",
     "errors": [],
     "warnings": [
-      "存在过期数据：03033.HK, 510300.SS, 002558.SZ, 513060.SS, 513090.SS, GDP。",
+      "存在过期数据：03033.HK, 510300.SS, 002558.SZ, 513060.SS, 513090.SS。",
+      "VOO成交股数、实际汇率和手续费待补充；新增9000元仅按成本暂记，禁止冒充实时市值。",
       "关键行情或宏观数据存在过期项。"
     ],
     "checks": [
@@ -4692,7 +5072,7 @@
       {
         "check_item": "DQS一致性",
         "status": "WARN",
-        "description": "存在过期数据：03033.HK, 510300.SS, 002558.SZ, 513060.SS, 513090.SS, GDP。"
+        "description": "存在过期数据：03033.HK, 510300.SS, 002558.SZ, 513060.SS, 513090.SS。"
       },
       {
         "check_item": "A股与港股数据门槛",
@@ -4703,6 +5083,11 @@
         "check_item": "现金预算一致性",
         "status": "PASS",
         "description": "口径一致。"
+      },
+      {
+        "check_item": "用户确认交易完整性",
+        "status": "WARN",
+        "description": "VOO成交股数、实际汇率和手续费待补充；新增9000元仅按成本暂记，禁止冒充实时市值。"
       },
       {
         "check_item": "行情时点一致性",
@@ -4725,7 +5110,7 @@
         "description": "口径一致。"
       }
     ],
-    "checked_at": "2026-07-15T03:10:55+08:00"
+    "checked_at": "2026-07-15T00:00:00+08:00"
   },
   "grid": {
     "enabled": true,
@@ -4741,7 +5126,7 @@
       "reserved_grid_cash_yuan": 28211,
       "simulated_available_yuan": 84633,
       "live_available_yuan": 0,
-      "confirmed_cash_available_yuan": 0,
+      "confirmed_cash_available_yuan": 21000,
       "overlap_guard": "网格资金独立核算；模拟模式不占用基础定投、机会加仓或真实现金预算。"
     },
     "decision_snapshot": {
@@ -4760,7 +5145,7 @@
           "status": "ok",
           "source": "cache:yfinance",
           "published_at": "2026-07-14T00:00:00-04:00",
-          "retrieved_at": "2026-07-15T03:08:19",
+          "retrieved_at": "2026-07-16T00:09:11",
           "fetched_at": "2026-07-15T02:22:41",
           "freshness_status": "fresh",
           "is_realtime": false,
@@ -4769,7 +5154,7 @@
           "provider_symbol": "VOO",
           "symbol_alias_normalization": false,
           "proxy_used": false,
-          "cache_age_days": 0.03,
+          "cache_age_days": 0.91,
           "warning": "",
           "symbol": "VOO",
           "value": 691.88,
@@ -4784,10 +5169,10 @@
           "timezone": "America/New_York",
           "market_date": "2026-07-14",
           "latest_market_date": "2026-07-14",
-          "business_day_lag": 0,
+          "business_day_lag": 1,
           "freshness": "fresh",
           "data_frequency": "quote",
-          "data_session": "official_close",
+          "data_session": "previous_close",
           "age_hours": 26.4,
           "comparable_date": "2026-07-14",
           "source_level": 3,
@@ -4809,7 +5194,7 @@
           "status": "ok",
           "source": "cache:yfinance",
           "published_at": "2026-07-14T00:00:00-04:00",
-          "retrieved_at": "2026-07-15T03:08:20",
+          "retrieved_at": "2026-07-16T00:09:11",
           "fetched_at": "2026-07-15T02:22:41",
           "freshness_status": "fresh",
           "is_realtime": false,
@@ -4818,7 +5203,7 @@
           "provider_symbol": "QQQ",
           "symbol_alias_normalization": false,
           "proxy_used": false,
-          "cache_age_days": 0.03,
+          "cache_age_days": 0.91,
           "warning": "",
           "symbol": "QQQ",
           "value": 721.53,
@@ -4833,10 +5218,10 @@
           "timezone": "America/New_York",
           "market_date": "2026-07-14",
           "latest_market_date": "2026-07-14",
-          "business_day_lag": 0,
+          "business_day_lag": 1,
           "freshness": "fresh",
           "data_frequency": "quote",
-          "data_session": "official_close",
+          "data_session": "previous_close",
           "age_hours": 26.4,
           "comparable_date": "2026-07-14",
           "source_level": 3,
@@ -4902,7 +5287,7 @@
           "market_regime": "uptrend",
           "last_signal_key": "",
           "processed_trade_ids": [],
-          "updated_at": "2026-07-15T03:10:52"
+          "updated_at": "2026-07-16T00:09:45"
         },
         "regime": {
           "symbol": "VOO",
@@ -4941,7 +5326,7 @@
           "paper_only": true,
           "reasons": [
             "未触发网格条件。距离下一买入价约2.64%",
-            "DQS=64，低于网格金额建议门槛85。",
+            "DQS=65，低于网格金额建议门槛85。",
             "DQS模式不是 exact，禁止精确网格金额建议。",
             "未来48小时内存在高等级宏观事件，进入谨慎模式。",
             "当前为模拟模式，禁止生成真实执行金额建议。"
@@ -4985,7 +5370,7 @@
           "market_regime": "uptrend",
           "last_signal_key": "",
           "processed_trade_ids": [],
-          "updated_at": "2026-07-15T03:10:52"
+          "updated_at": "2026-07-16T00:09:45"
         },
         "regime": {
           "symbol": "QQQ",
@@ -5024,7 +5409,7 @@
           "paper_only": true,
           "reasons": [
             "未触发网格条件。距离下一买入价约5.99%",
-            "DQS=64，低于网格金额建议门槛85。",
+            "DQS=65，低于网格金额建议门槛85。",
             "DQS模式不是 exact，禁止精确网格金额建议。",
             "未来48小时内存在高等级宏观事件，进入谨慎模式。",
             "当前为模拟模式，禁止生成真实执行金额建议。"

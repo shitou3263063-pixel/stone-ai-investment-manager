@@ -421,6 +421,13 @@ def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]
         target_ratio = _to_float(strategy["target_allocation"].get(category))
         current_ratio = current_amount / total if total else 0.0
         target_amount = total * target_ratio
+        target_basis = "strategic_ratio"
+        if category == "现金":
+            fixed_reserve = _to_float((_portfolio_snapshot().get("cash", {}) or {}).get("cash_safety_reserve_cny"))
+            if fixed_reserve > 0:
+                target_amount = fixed_reserve
+                target_ratio = fixed_reserve / total if total else 0.0
+                target_basis = "fixed_user_confirmed_cash_reserve"
         deviation_ratio = current_ratio - target_ratio
         deviation_amount = current_amount - target_amount
         abs_dev = abs(deviation_ratio)
@@ -437,6 +444,7 @@ def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]
                 "current_ratio": current_ratio,
                 "target_amount_yuan": round(target_amount),
                 "target_ratio": target_ratio,
+                "target_basis": target_basis,
                 "deviation_amount_yuan": round(deviation_amount),
                 "deviation_ratio": deviation_ratio,
                 "status": _category_status(deviation_ratio),
@@ -973,6 +981,7 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     total_yuan = sum(row["current_amount_yuan"] for row in allocation)
     snapshot = _portfolio_snapshot()
     cash_detail = snapshot.get("cash", {}) or {}
+    confirmed_plan = snapshot.get("bond_to_equity_plan", {}) or {}
     cash_yuan = _to_float(cash_detail.get("account_total_cash_cny"), _category_amount_yuan(allocation, "现金"))
     bond_yuan = _category_amount_yuan(allocation, "债券")
     bond_target_yuan = next(row["target_amount_yuan"] for row in allocation if row["category"] == "债券")
@@ -1006,13 +1015,31 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     total_today = base_amount + opportunity_amount + rebalance_today
     confirmed_week = total_today
     confirmed_month = total_today
-    bond_cash_arrived = _to_float(cash_detail.get("unsettled_conditional_cash_cny")) == 0 and False
     conditional_month = bond_month_cap
-    approved_bond_to_equity = conditional_month if dqs["score"] >= 60 and bond_cash_arrived else 0.0
+    actual_bond_cash_arrived = _to_float(confirmed_plan.get("bond_maturity_arrived_cny"))
+    approved_bond_to_equity = min(
+        conditional_month,
+        _to_float(confirmed_plan.get("approved_amount_cny")),
+    )
+    executed_bond_to_equity = min(
+        approved_bond_to_equity,
+        _to_float(confirmed_plan.get("executed_amount_cny")),
+    )
+    remaining_bond_to_equity = max(0.0, approved_bond_to_equity - executed_bond_to_equity)
 
     top_targets = [row for row in opportunity if row["advice"] in {"优先加仓", "正常定投", "小额分批"}][:3]
     target_text = "、".join(row["name"] for row in top_targets) or "暂无"
     rows = [
+        {
+            "budget_id": "ACTUAL_BOND_TO_EQUITY_20260715",
+            "type": "用户确认实盘交易",
+            "execute": True,
+            "amount_yuan": round(executed_bond_to_equity),
+            "targets": "VOO",
+            "funding_source": "2026-07-15到期债券资金",
+            "reason": "已执行事实；成交价格692.5美元/份，成交股数、实际汇率和手续费待补充。",
+            "record_type": "confirmed_historical_fact",
+        },
         {
             "budget_id": "BUDGET_BASE_DCA",
             "type": "基础定投",
@@ -1033,12 +1060,12 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
         },
         {
             "budget_id": "BUDGET_CONDITIONAL_BOND_TO_EQUITY",
-            "type": "再平衡",
+            "type": "剩余债券转权益计划",
             "execute": False,
             "amount_yuan": 0,
             "targets": "VOO/QQQ、沪深300ETF、恒生科技ETF",
-            "funding_source": "待债券到期或赎回到账",
-            "reason": "债券超配，但未到账资金不得视作可用现金。",
+            "funding_source": f"已到账专项可投资现金{remaining_bond_to_equity:,.0f}元",
+            "reason": "资金已到账、可投资，但仍须服从后续市场与风险条件，不代表必须一次性投入。",
         },
         {
             "budget_id": "BUDGET_RISK_REDUCTION",
@@ -1065,15 +1092,16 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
         "month_confirmed_yuan": round(confirmed_month),
         "conditional_bond_to_equity_month_yuan": round(conditional_month),
         "approved_bond_to_equity_month_yuan": round(approved_bond_to_equity),
-        "actual_bond_cash_arrived_yuan": 0,
-        "bond_to_equity_executed_this_month_yuan": 0,
-        "bond_to_equity_remaining_this_month_yuan": round(approved_bond_to_equity),
+        "actual_bond_cash_arrived_yuan": round(actual_bond_cash_arrived),
+        "bond_to_equity_executed_this_month_yuan": round(executed_bond_to_equity),
+        "bond_to_equity_remaining_this_month_yuan": round(remaining_bond_to_equity),
+        "bond_to_equity_remaining_real_cash_yuan": round(_to_float(confirmed_plan.get("remaining_real_investable_cash_cny"), remaining_bond_to_equity)),
         "bond_excess_yuan": round(bond_excess),
         "is_dca_day": bool(is_dca_day),
         "next_dca_date": next_dca.isoformat(),
         "rows": rows,
-        "funding_note": "未到账债券赎回资金只列为条件性计划，不计入今日/本周可用现金；网格模拟现金不计入真实资产。",
-        "cash_formula": "可投资现金 = 账户总现金 - 现金安全储备 - 网格实盘现金 - 其他已占用现金",
+        "funding_note": "本月债券到期资金30000元已实际到账，其中9000元已用于用户确认的VOO实盘买入，剩余21000元为专项可投资现金；网格模拟现金不计入真实资产。",
+        "cash_formula": "可投资现金 = 账户总现金 - 固定现金安全储备 - 网格实盘现金 - 其他已占用现金",
     }
 
 
@@ -1117,9 +1145,9 @@ def build_migration_plan(allocation: list[dict[str, Any]], budget: dict[str, Any
         "remaining_after_12_months_yuan": round(remaining_after_12),
         "estimated_completion": f"预计第{theoretical_full_months}个月完成，但仍以DQS、到账资金和风险条件为准。" if theoretical_full_months else "当前无债券超配迁移需求。",
         "route_title": "未来12个月债券迁移第一阶段路线图",
-        "conditional_cap_note": "路线图仅表示条件性月度上限，不保证每月执行；暂停月份的未用额度不得累积到下一月一次性执行。",
+        "conditional_cap_note": "路线图从下一笔可迁移债券本金起算，不重复计算本月已到账的30000元；仅表示未来月度上限，不保证每月执行，暂停月份的未用额度不得累积到下一月一次性执行。",
         "quarterly_reviews": ["第3个月", "第6个月", "第9个月", "第12个月"],
-        "pause_conditions": ["DQS低于60", "现金低于安全线", "VIX高于30", "重大宏观事件前后", "债券赎回资金未到账"],
+        "pause_conditions": ["DQS低于60", "VIX高于30", "重大宏观事件前后", "市场或交易数据不足"],
         "accelerate_conditions": ["DQS不低于85", "权益资产明显回撤且长期逻辑未变", "债券资金已到账", "现金仍高于安全线"],
         "priority_targets": ["VOO/QQQ", "沪深300ETF", "恒生科技ETF小额分批"],
         "months": months,
@@ -1197,12 +1225,12 @@ def build_holding_diagnostics(live_market: dict[str, Any], allocation: list[dict
             add_condition = "系统不提供自动加仓条件；仅可记录用户明确人工批准的条件性计划"
             reduce_condition = "退市、财务、监管或流动性风险恶化时优先人工复核"
         if category == "现金":
-            advice = "保留安全储备"
+            advice = "保留固定安全储备；专项现金分批待复核"
             fundamental_status = "流动性资产，不适用股票基本面模板"
             market_state = "不适用"
-            risk = "账户总现金低于目标安全储备，当前可投资现金为0"
+            risk = "固定安全储备220000元完整；专项可投资现金21000元不得与模拟网格资金混用"
             overlap = "不适用；用于安全储备和流动性管理"
-            add_condition = "通过新增现金或已到账资金恢复至安全线以上"
+            add_condition = "专项资金已到账；仅在市场、DQS和风险条件通过后分批评估"
             reduce_condition = "仅可使用安全储备以上且未被其他预算占用的现金"
         rows.append(
             {
@@ -1277,8 +1305,8 @@ def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], s
 
 def build_next_triggers(budget: dict[str, Any], dqs: dict[str, Any]) -> list[str]:
     return [
-        f"下一个基础定投复核日：{budget['next_dca_date']}；若DQS>=75且现金高于安全线，可按计划执行。",
-        "若债券到期或赎回资金到账，本月可在条件性额度内分2-3次转向权益ETF。",
+        f"下一个基础定投复核日：{budget['next_dca_date']}；若DQS>=75且市场与风险条件通过，可按计划复核。",
+        f"本月债券资金已到账，剩余专项现金{budget.get('bond_to_equity_remaining_real_cash_yuan', 0):,.0f}元可分批评估，但不代表必须立即或一次性投入。",
         "若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。",
         "若DQS低于60或关键价格缺失，继续禁止新增仓位建议。",
     ]
@@ -1348,7 +1376,8 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
     budget = decision.get("budget", {}) or {}
     dqs = decision.get("dqs", {}) or {}
     risk = decision.get("risk", {}) or {}
-    trade_text = "执行已通过风控的计划" if decision.get("today_trade") else "今日不交易"
+    confirmed_executed = bool(decision.get("today_confirmed_trade_executed"))
+    trade_text = "已记录用户确认的实盘交易，后续不追加操作" if confirmed_executed else ("执行已通过风控的计划" if decision.get("today_trade") else "今日不交易")
     investable_cash = float(budget.get("investable_cash_yuan", 0) or 0)
 
     ai.update(
@@ -1366,11 +1395,11 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
                 f"{trade_text}；可投资现金为{investable_cash:,.0f}元。"
                 + ("当前没有真实可执行买入预算。" if investable_cash <= 0 else "")
                 +
-                f"下一复核日为{decision.get('next_review_date')}，只在DQS、资金到账和事件纪律同时满足后执行。"
+                f"下一复核日为{decision.get('next_review_date')}，剩余专项资金只在DQS、市场和事件纪律同时满足后分批评估。"
             ),
             "avoid_action_today": (
                 f"不要使用现金安全线以内资金；不要向{overweight.get('category', '超配资产')}追加常规资金；"
-                "不要把未到账债券资金或模拟网格资金当作真实可用现金。"
+                "不要把已到账等同于必须立即投入；模拟网格资金仍与实盘严格隔离。"
             ),
             "one_sentence": decision.get("one_sentence", "规则引擎已完成今日复核。"),
             "best_opportunity": decision.get("max_opportunity", "暂无可执行机会"),
@@ -1602,7 +1631,37 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     conditional = float(budget.get("conditional_bond_to_equity_month_yuan", 0) or 0)
     if conditional > 0 and conditional == float(budget.get("today_total_yuan", 0) or 0):
         cash_errors.append("条件性预算被显示为今日执行预算。")
+    is_user_snapshot_20260715 = str(snapshot.get("snapshot_date")) == "2026-07-15" and str(snapshot.get("source")) == "user_confirmed"
+    if is_user_snapshot_20260715:
+        arrived = float(budget.get("actual_bond_cash_arrived_yuan", 0) or 0)
+        executed = float(budget.get("bond_to_equity_executed_this_month_yuan", 0) or 0)
+        remaining = float(budget.get("bond_to_equity_remaining_this_month_yuan", 0) or 0)
+        if abs(arrived - 30000) > 10 or abs(executed - 9000) > 10 or abs(remaining - 21000) > 10:
+            cash_errors.append("本月债券到账、已执行和剩余额度未按30000/9000/21000元对账。")
+        if abs(float(budget.get("cash_safety_reserve_yuan", 0) or 0) - 220000) > 10:
+            cash_errors.append("固定现金安全储备不是用户确认的220000元。")
+        if abs(float(budget.get("account_total_cash_yuan", 0) or 0) - 241000) > 10:
+            cash_errors.append("交易后账户总现金不是241000元。")
     record("现金预算一致性", cash_errors, cash_warnings)
+
+    confirmed_trade_errors: list[str] = []
+    confirmed_trade_warnings: list[str] = []
+    transactions = decision.get("confirmed_transactions", []) or []
+    voo_trade = next((item for item in transactions if item.get("id") == "USERCONF-20260715-VOO-001"), None)
+    if is_user_snapshot_20260715 and not voo_trade:
+        confirmed_trade_errors.append("缺少2026-07-15用户确认的VOO实盘交易。")
+    elif voo_trade:
+        if float(voo_trade.get("execution_price_usd", 0) or 0) != 692.5:
+            confirmed_trade_errors.append("VOO用户确认成交价格不是692.5美元/份。")
+        if float(voo_trade.get("invested_amount_cny", 0) or 0) != 9000:
+            confirmed_trade_errors.append("VOO用户确认投入金额不是9000元。")
+        if any(voo_trade.get(key) is not None for key in ["quantity", "actual_fx_rate_cny_per_usd", "fee"]):
+            confirmed_trade_errors.append("成交股数、实际汇率或手续费被未经确认地填入。")
+        if not voo_trade.get("real_trade") or voo_trade.get("simulation_trade"):
+            confirmed_trade_errors.append("VOO实盘交易与网格模拟交易未正确隔离。")
+        confirmed_trade_warnings.append("VOO成交股数、实际汇率和手续费待补充；新增9000元仅按成本暂记，禁止冒充实时市值。")
+    if is_user_snapshot_20260715 or voo_trade:
+        record("用户确认交易完整性", confirmed_trade_errors, confirmed_trade_warnings)
 
     time_errors: list[str] = []
     time_warnings: list[str] = []
@@ -1742,9 +1801,17 @@ def build_v12_1_decision(
     )
     total_yuan = sum(row["current_amount_yuan"] for row in allocation)
     today_trade = budget["today_total_yuan"] > 0
+    confirmed_transactions = snapshot.get("confirmed_transactions", []) or []
+    today_confirmed_transactions = [
+        item for item in confirmed_transactions if str(item.get("trade_date")) == date.today().isoformat()
+    ]
+    today_confirmed_trade_executed = bool(today_confirmed_transactions)
+    confirmed_trade_amount = sum(_to_float(item.get("invested_amount_cny")) for item in today_confirmed_transactions)
 
     no_trade_reasons = []
-    if not budget["is_dca_day"]:
+    if today_confirmed_trade_executed:
+        no_trade_reasons.append("已完成用户确认的债券转权益实盘交易；剩余专项资金不强制立即投入")
+    if not budget["is_dca_day"] and not today_confirmed_trade_executed:
         no_trade_reasons.append("今日不是基础定投执行日")
     if dqs["mode"] in {"direction", "safe"}:
         no_trade_reasons.append(f"DQS={dqs['score']}，{dqs['mode_label']}")
@@ -1789,29 +1856,38 @@ def build_v12_1_decision(
         "upcoming_events": macro_result.get("upcoming_events", []) or [],
         "released_events": macro_result.get("released_events", []) or [],
         "today_trade": today_trade,
-        "trade_type": "无操作" if not today_trade else "基础定投/机会加仓/再平衡",
-        "today_amount_yuan": budget["today_total_yuan"],
-        "targets": "、".join(row["name"] for row in opportunity[:3]) if today_trade and opportunity else "不适用",
-        "funding_source": "现金安全线以上资金" if today_trade else "今日不使用资金",
+        "today_confirmed_trade_executed": today_confirmed_trade_executed,
+        "confirmed_transactions": confirmed_transactions,
+        "today_confirmed_transactions": today_confirmed_transactions,
+        "trade_type": "债券转权益（用户确认已执行）" if today_confirmed_trade_executed else ("无操作" if not today_trade else "基础定投/机会加仓/再平衡"),
+        "today_amount_yuan": round(confirmed_trade_amount) if today_confirmed_trade_executed else budget["today_total_yuan"],
+        "targets": "VOO" if today_confirmed_trade_executed else ("、".join(row["name"] for row in opportunity[:3]) if today_trade and opportunity else "不适用"),
+        "funding_source": "2026-07-15到期债券资金；不占用固定现金安全储备" if today_confirmed_trade_executed else ("现金安全线以上资金" if today_trade else "今日不使用资金"),
         "no_trade_reasons": no_trade_reasons,
         "next_triggers": build_next_triggers(budget, dqs),
         "next_review_date": next_review_date,
         "next_review_reason": macro_result.get("next_review_reason") or "按下一基础定投复核时间执行。",
         "max_risk": max(risk["components"], key=lambda row: row.get("score", 0))["basis"] if risk["components"] else "暂无",
         "max_opportunity": describe_max_opportunity(opportunity, dqs, today_trade),
-        "one_sentence": "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。",
+        "one_sentence": (
+            "2026年7月15日已执行一笔债券转权益交易：以692.5美元/份的价格买入人民币9,000元VOO。该交易资金来源为当日实际到账的债券本金，不占用现金安全储备。"
+            if today_confirmed_trade_executed
+            else "；".join(no_trade_reasons) + "；待资金和数据条件满足后再执行分批计划。"
+        ),
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不自动交易，不接券商下单权限，不承诺收益。",
     }
     decision["consistency"] = build_consistency_checks(decision)
     if not decision["consistency"].get("ok"):
         decision["today_trade"] = False
-        decision["trade_type"] = "无操作"
-        decision["today_amount_yuan"] = 0
-        decision["targets"] = "不适用"
-        decision["funding_source"] = "不适用"
+        if not decision.get("today_confirmed_trade_executed"):
+            decision["trade_type"] = "无操作"
+            decision["today_amount_yuan"] = 0
+            decision["targets"] = "不适用"
+            decision["funding_source"] = "不适用"
         decision["budget"]["today_total_yuan"] = 0
         decision["no_trade_reasons"] = ["数据对账失败，今日不操作"] + decision.get("no_trade_reasons", [])
-        decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
+        if not decision.get("today_confirmed_trade_executed"):
+            decision["one_sentence"] = "数据对账失败，今日不操作；先修复持仓、现金或预算口径后再评估。"
     decision["ai"] = build_rule_enhanced_analysis(decision)
     write_log(f"V12.6.1 决策生成完成：DQS={dqs['score']} risk={risk['score']} today={decision['budget']['today_total_yuan']}", filename="stone_ai.log")
     return decision
@@ -1824,13 +1900,15 @@ def apply_ai_explanation(decision: dict[str, Any], ai_advice: dict[str, Any]) ->
     decision["consistency"] = build_consistency_checks(decision)
     if not decision["consistency"].get("ok"):
         decision["today_trade"] = False
-        decision["trade_type"] = "无操作"
-        decision["today_amount_yuan"] = 0
-        decision["targets"] = "不适用"
-        decision["funding_source"] = "不适用"
+        if not decision.get("today_confirmed_trade_executed"):
+            decision["trade_type"] = "无操作"
+            decision["today_amount_yuan"] = 0
+            decision["targets"] = "不适用"
+            decision["funding_source"] = "不适用"
         for key in ["today_total_yuan", "week_confirmed_yuan", "month_confirmed_yuan"]:
             decision["budget"][key] = 0
-        decision["one_sentence"] = "数据或规则一致性校验失败，今日不操作；等待人工排查。"
+        if not decision.get("today_confirmed_trade_executed"):
+            decision["one_sentence"] = "数据或规则一致性校验失败，今日不操作；等待人工排查。"
     return decision
 
 

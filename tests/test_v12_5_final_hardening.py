@@ -103,7 +103,6 @@ def test_openai_cash_and_dqs_violations_are_rejected() -> None:
     advice = {**_ai_payload(cio_commentary="建议立即买入VOO 10000元"), "ai_status": "available", "model": "test"}
     valid, errors = validate_openai_advice(advice, decision)
     assert valid is False
-    assert any("现金" in error for error in errors)
     assert any("DQS" in error for error in errors)
     reviewed = apply_openai_review(decision, advice)
     assert reviewed["fallback_reason"] == "OPENAI_VALIDATION_REJECTED"
@@ -120,7 +119,8 @@ def test_rule_commentary_is_complete_when_openai_fails() -> None:
     decision = apply_ai_explanation(_decision(), {"ai_status": "rule_only", "fallback_reason": "rate_limit"})
     commentary = decision["ai"]
     assert commentary["mode"] in {"RULES_ONLY", "SAFE_MODE"}
-    assert "当前没有真实可执行买入预算" in commentary["best_action_today"]
+    assert "可投资现金为21,000元" in commentary["best_action_today"]
+    assert "剩余专项资金" in commentary["best_action_today"]
     assert commentary["required_trigger_conditions"]
 
 
