@@ -201,7 +201,7 @@ def build_cio_review_context(
 
 def _build_prompt(context: dict[str, Any]) -> str:
     return (
-        "你是Stone AI Investment Manager Pro V12.6.1 Stable的CIO解释与复核层。"
+        "你是Stone AI Investment Manager Pro V12.7.0 Stable的CIO解释与复核层。"
         "规则引擎已经完成交易裁决；你不得修改金额、标的、资金来源或硬风控。"
         "不自动交易、不承诺收益、不预测具体点位。只返回一个JSON对象，不要Markdown。"
         f"JSON必须且只能包含这些字段：{','.join(AI_FIELDS)}。"

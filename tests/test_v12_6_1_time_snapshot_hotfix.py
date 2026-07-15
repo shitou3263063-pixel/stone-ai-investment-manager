@@ -24,6 +24,11 @@ def _event(name: str) -> dict:
 
 
 def _quote(*, price: float, observed: str, market_date: str, session: str) -> dict:
+    stage = {
+        "official_close": "OFFICIAL_CLOSE",
+        "previous_close": "PREVIOUS_OFFICIAL_CLOSE",
+        "intraday_delayed": "INTRADAY",
+    }[session]
     return {
         "close": price,
         "status": "ok",
@@ -34,6 +39,9 @@ def _quote(*, price: float, observed: str, market_date: str, session: str) -> di
         "market_date": market_date,
         "comparable_date": market_date,
         "data_session": session,
+        "price_stage": stage,
+        "data_stage": stage,
+        "is_finalized": session == "official_close",
         "stale": False,
     }
 
@@ -53,7 +61,7 @@ def _decision() -> dict:
 def test_released_event_is_not_upcoming_or_grid_gate() -> None:
     report_time = datetime(2026, 7, 14, 14, 51, tzinfo=ZoneInfo("America/New_York"))
     cpi = _event("CPI")
-    assert classify_event_status(cpi, report_time) == "RELEASED"
+    assert classify_event_status(cpi, report_time) == "RELEASED_DATA_MISSING"
     selected = get_upcoming_high_risk_events(report_time, hours=48, events=[cpi])
     assert selected == []
     assert _event_within_48h([cpi], report_time) is False
@@ -69,7 +77,7 @@ def test_future_event_is_upcoming_and_enters_48_hour_window() -> None:
 def test_event_at_report_time_is_released() -> None:
     event = _event("PPI")
     report_time = datetime(2026, 7, 15, 8, 30, tzinfo=ZoneInfo("America/New_York"))
-    assert classify_event_status(event, report_time) == "RELEASED"
+    assert classify_event_status(event, report_time) == "RELEASED_DATA_MISSING"
 
 
 def test_cross_timezone_event_times_are_equal() -> None:
@@ -101,7 +109,7 @@ def test_cboe_protocol_timestamp_does_not_gain_eight_hours() -> None:
     )
     assert point["source_timezone"] == "UTC"
     assert point["observed_at_utc"] == "2026-07-14T18:48:40+00:00"
-    assert point["age_hours"] == 0.0
+    assert point["age_hours"] == pytest.approx(0.043, abs=0.001)
 
 
 def test_mixed_market_phases_block_grid_signal_and_amount() -> None:
@@ -163,7 +171,7 @@ def test_same_market_snapshot_is_comparable() -> None:
 def test_next_review_is_fifteen_minutes_after_next_upcoming_event() -> None:
     report_time = datetime(2026, 7, 14, 14, 51, tzinfo=ZoneInfo("America/New_York"))
     result = analyze_macro_calendar(as_of=report_time)
-    assert next(item for item in result["events"] if item["event_name"] == "CPI")["status"] == "RELEASED"
+    assert next(item for item in result["events"] if item["event_name"] == "CPI")["status"] == "RELEASED_DATA_MISSING"
     assert next(item for item in result["events"] if item["event_name"] == "PPI")["status"] == "UPCOMING"
     assert result["next_review_date"] == "2026-07-15T20:45:00+08:00"
     assert "PPI公布后15分钟" in result["next_review_reason"]

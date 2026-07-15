@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-07-16T01:24:28+08:00",
+  "generated_at": "2026-07-16T02:08:10+08:00",
   "canonical_symbol": "03033.HK",
   "yfinance_provider_symbol": "3033.HK",
   "forbidden_substitute": "3067.HK",
   "mapping_passed": true,
   "independent_symbol_3067": true,
-  "quote_provider_symbol": "3033.HK",
-  "quote_data_status": "VALID"
+  "quote_provider_symbol": null,
+  "quote_data_status": "DATA_INSUFFICIENT"
 }

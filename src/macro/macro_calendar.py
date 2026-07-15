@@ -80,7 +80,9 @@ def classify_event_status(event: dict[str, Any], report_time: date | datetime, r
         # A calendar confirmation verifies timing, not the released economic
         # value.  Keep post-release data in a safe pending-review state until
         # a source explicitly confirms the result.
-        return "POST_RELEASE_REVIEW_PENDING" if event.get("release_result_confirmed") is False else "RELEASED"
+        if event.get("release_result_confirmed") is False and event.get("actual_value") is None:
+            return "RELEASED_DATA_MISSING"
+        return "RELEASED"
     restriction_hours = int(event.get("restriction_window_hours", 0) or 0)
     if current >= release_utc - timedelta(hours=restriction_hours):
         return "IN_RESTRICTION_WINDOW"
@@ -118,6 +120,12 @@ def _normalise_official_event(raw: dict[str, Any], report_timezone: str) -> dict
         "level": str(raw.get("risk_level") or "medium").lower(),
         "confirmed": verified,
         "status": "UPCOMING" if verified else "INVALID_TIME",
+        "actual_value": raw.get("actual_value"),
+        "previous_value": raw.get("previous_value"),
+        "revised_value": raw.get("revised_value"),
+        "consensus_value": raw.get("consensus_value"),
+        "release_result_confirmed": bool(raw.get("actual_value") is not None),
+        "event_data_status": "AVAILABLE" if raw.get("actual_value") is not None else "PENDING_RELEASE",
     }
     return event
 
@@ -238,9 +246,20 @@ def analyze_macro_calendar(
         < datetime.fromisoformat(str(event["release_at_utc"])).astimezone(timezone.utc)
         <= end_7d
     ]
-    released = [event for event in events if event.get("status") in {"RELEASED", "POST_RELEASE_REVIEW_PENDING", "REVIEWED"}]
-    pending_review = next((event for event in events if event.get("status") == "POST_RELEASE_REVIEW_PENDING" and event.get("risk_level") == "high"), None)
-    next_review = pending_review or (high_48h[0] if high_48h else high_7d[0] if high_7d else None)
+    released = [
+        {
+            **event,
+            "event_data_status": "RELEASED_DATA_MISSING" if event.get("status") == "RELEASED_DATA_MISSING" else "AVAILABLE",
+            "rule_interpretation": (
+                "实际值缺失，不能判断相对预期；利率、股票、债券和美元影响保持待复核。"
+                if event.get("status") == "RELEASED_DATA_MISSING"
+                else "依据实际值、前值和预期差异复核利率、股票、债券与美元方向。"
+            ),
+        }
+        for event in events if event.get("status") in {"RELEASED", "RELEASED_DATA_MISSING", "REVIEWED"}
+    ]
+    pending_review = next((event for event in events if event.get("status") == "RELEASED_DATA_MISSING" and event.get("risk_level") == "high"), None)
+    next_review = (high_48h[0] if high_48h else high_7d[0] if high_7d else pending_review)
     if high_7d:
         reminder = "未来7天存在已核验高等级宏观事件；事件前暂停机会加仓，基础定投只复核，不自动转为大额交易。"
     elif any(item.get("verification_status") == "unverified" for item in upcoming):
@@ -269,8 +288,8 @@ def analyze_macro_calendar(
             if next_review else None
         ),
         "next_review_reason": (
-            (f"{next_review.get('event_name')}已到公布时间，但结果来源尚未确认；在公布后{EVENT_REVIEW_DELAY_MINUTES}分钟复核市场、DQS和交易条件。"
-             if next_review.get("status") == "POST_RELEASE_REVIEW_PENDING"
+            (f"{next_review.get('event_name')}已到公布时间但实际值缺失；标记RELEASED_DATA_MISSING并持续复核官方结果。"
+             if next_review.get("status") == "RELEASED_DATA_MISSING"
              else f"等待{next_review.get('event_name')}公布后{EVENT_REVIEW_DELAY_MINUTES}分钟重新复核市场、DQS和交易条件。")
             if next_review else "未来7天无已核验高等级待发布事件，使用下一基础定投复核时间。"
         ),

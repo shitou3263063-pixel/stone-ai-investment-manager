@@ -382,8 +382,8 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
 
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 评分组 | 标的 | 最终分 | 配置优先级 | 估值吸引力 | 战术入场质量 | 可信度 | 最终动作 | 组合约束 | 当前持仓 | 主要原因 |",
-        "| -- | -- | ---: | -- | --: | --: | -- | -- | ---: | ---: | -- |",
+        "| 评分组 | 标的 | 最终分 | 长期配置优先级 | 今日交易权限 | 当前持仓动作 | 观察动作 | 可信度 | 最终动作 | 当前持仓 | 主要原因 |",
+        "| -- | -- | ---: | -- | -- | -- | -- | -- | -- | ---: | -- |",
     ]
     for item in decision.get("opportunity", []) or []:
         completeness_value = item.get("market_data_completeness")
@@ -392,10 +392,10 @@ def _opportunity_table(decision: dict[str, Any]) -> list[str]:
         analysis_display = "不适用" if analysis_value is None else f"{float(analysis_value):.1f}%"
         rows.append(
             "| "
-            f"{item.get('opportunity_group', '未分组')} | {item['name']} | {item['score']} | {item.get('allocation_priority', '暂无')} | "
-            f"{item.get('valuation_attractiveness', '不适用')} | {item.get('tactical_entry_quality', '不适用')} | "
-            f"{item.get('confidence', item.get('scoring_confidence', '可用'))} | {item.get('final_action', item['advice'])} | "
-            f"{item.get('portfolio_constraint_adjustment', 0):+d} | {_yuan(item['current_holding_yuan'])} | {item.get('reason', '暂无')} |"
+            f"{item.get('opportunity_group', '未分组')} | {item['name']} | {item['score']} | {item.get('long_term_allocation_priority', item.get('allocation_priority', '暂无'))} | "
+            f"{_yes_no(item.get('today_trade_permission'))} | {item.get('current_holding_action', '不适用')} | "
+            f"{item.get('observation_action', '继续观察')} | {item.get('confidence', item.get('scoring_confidence', '可用'))} | "
+            f"{item.get('final_action', item['advice'])} | {_yuan(item['current_holding_yuan'])} | {item.get('reason', '暂无')} |"
         )
     return rows
 
@@ -533,8 +533,8 @@ def _market_table(decision: dict[str, Any]) -> list[str]:
     }
     pair_comparable = bool((decision.get("risk", {}).get("market_time_consistency", {}) or {}).get("comparable"))
     rows = [
-        "| 指标 | 当前值 | 前值 | 涨跌幅 | 源时间 / UTC时间 | 数据口径 | 数据年龄 | 是否可横向比较 | 来源 | 来源等级 | 状态 |",
-        "| -- | --: | --: | --: | -- | -- | -- | -- | -- | --: | -- |",
+        "| 指标 | 当前值 | 前值 | 涨跌幅 | market_date | price_stage | quote_timestamp | retrieved_at | data_age_hours | 数据依据 | 可比较 | 来源 | 状态 |",
+        "| -- | --: | --: | --: | -- | -- | -- | -- | --: | -- | -- | -- | -- |",
     ]
     for item in decision.get("market_table", []) or []:
         change = "暂无数据" if item.get("change_pct") is None else f"{float(item['change_pct']):.2f}%"
@@ -544,10 +544,10 @@ def _market_table(decision: dict[str, Any]) -> list[str]:
         comparable = "是" if item.get("name") in {"VOO", "QQQ"} and pair_comparable else "否"
         rows.append(
             "| "
-            f"{item['name']} | {item['display_value']} | {previous} | {change} | "
-            f"{item['timestamp']}（{item.get('source_timezone', 'unknown')}） / {item.get('observed_at_utc') or item.get('time_status', 'TIMEZONE_UNKNOWN')} | "
-            f"{session_labels.get(item.get('data_session'), item.get('data_session', '未知'))} | "
-            f"{age} | {comparable} | {item['source']} | {item['source_tier']} | {status} |"
+            f"{item['name']} | {item['display_value']} | {previous} | {change} | {item.get('market_date') or '未知'} | "
+            f"{item.get('price_stage') or item.get('data_stage', 'UNKNOWN')} | {item.get('quote_timestamp') or 'None'} | "
+            f"{item.get('retrieved_at') or 'None'} | {age} | {item.get('data_basis') or session_labels.get(item.get('data_session'), '未知')} | "
+            f"{comparable} | {item['source']} | {status} |"
         )
     return rows
 
@@ -583,6 +583,9 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
     ]
     for item in decision.get("dqs", {}).get("components", []) or []:
         rows.append(f"| {item['item']} | {item['score']} | {item['max']} | {item['reason']} |")
+    rows.extend(["", "| 使用场景 | 得分 | 门槛 | 是否允许 |", "| -- | -: | -: | -- |"])
+    for item in (decision.get("dqs", {}).get("use_cases", {}) or {}).values():
+        rows.append(f"| {item.get('label')} | {item.get('score')} | {item.get('threshold')} | {_yes_no(item.get('allowed'))} |")
     return rows
 
 
@@ -609,13 +612,18 @@ def _events(decision: dict[str, Any]) -> list[str]:
 
 def _released_events(decision: dict[str, Any]) -> list[str]:
     events = decision.get("released_events", []) or [
-        event for event in (decision.get("events", []) or []) if event.get("status") == "RELEASED"
+        event for event in (decision.get("events", []) or []) if event.get("status") in {"RELEASED", "RELEASED_DATA_MISSING"}
     ]
     if not events:
         return ["- 本次日历中暂无已发布事件。"]
     return [
         f"- {event.get('event_name', event.get('name', '暂无名称'))}："
-        f"已于{event.get('release_at_report_timezone') or '时间无效'}到达发布时间，状态{event.get('status', 'RELEASED')}；不再作为未来UPCOMING事件。"
+        f"已于{event.get('release_at_report_timezone') or '时间无效'}到达发布时间，状态{event.get('status', 'RELEASED')}；"
+        f"实际值：{event.get('actual_value') if event.get('actual_value') is not None else '缺失'}，"
+        f"前值：{event.get('previous_value') if event.get('previous_value') is not None else '缺失'}，"
+        f"修正值：{event.get('revised_value') if event.get('revised_value') is not None else '缺失'}，"
+        f"预期：{event.get('consensus_value') if event.get('consensus_value') is not None else '无可靠预期'}；"
+        f"数据状态：{event.get('event_data_status', 'RELEASED_DATA_MISSING')}；{event.get('rule_interpretation', '')}"
         for event in events
     ]
 
@@ -713,7 +721,7 @@ def generate_daily_report(
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 15. Stone Smart Grid", 1)
     lines = [
-        "# Stone AI Investment Manager Pro V12.6.2 Stable 日报",
+        "# Stone AI Investment Manager Pro V12.7.0 Stable 日报",
         "",
         "## 0. 报告状态",
         "",
@@ -754,7 +762,9 @@ def generate_daily_report(
         f"- 建议标的：{(decision.get('decision_card', {}).get('current_recommendation', {}) or {}).get('targets', '不适用')}",
         f"- 资金来源：{(decision.get('decision_card', {}).get('current_recommendation', {}) or {}).get('funding_source', '不使用资金')}",
         f"- 主要原因：{(decision.get('decision_card', {}).get('current_recommendation', {}) or {}).get('reason', '等待复核')}",
-        f"- 下一复核时间：{decision.get('next_review_date')}",
+        f"- 下一日常复核：{decision.get('next_daily_review')}（下一个交易日或下一次日报运行）",
+        f"- 下一计划定投复核：{decision.get('next_scheduled_dca_review')}",
+        f"- 事件触发复核：{(decision.get('next_event_trigger_review', {}) or {}).get('description')}",
         "",
         "### C. 条件性计划",
         "",
@@ -767,7 +777,9 @@ def generate_daily_report(
         "",
         f"- 当前最大风险：{decision.get('max_risk')}",
         f"- 当前最大机会：{decision.get('max_opportunity')}",
-        f"- 下一次复核日期：{decision.get('next_review_date')}",
+        f"- 下一日常复核：{decision.get('next_daily_review')}",
+        f"- 下一计划定投复核：{decision.get('next_scheduled_dca_review')}",
+        f"- 事件触发复核：{(decision.get('next_event_trigger_review', {}) or {}).get('description')}",
         f"- 下一次复核依据：{decision.get('next_review_reason')}",
         "",
         "## 2. Stone CIO Commentary",
@@ -808,7 +820,7 @@ def generate_daily_report(
         "",
         *_allocation_table(decision),
         "",
-        "- 现金偏离按用户确认的固定安全储备220,000元计算，不再按总资产比例动态上调现金安全线。",
+        "- 资产配置现金目标严格按总资产×8%计算；固定安全底线220,000元是独立风控口径，只参与真实可投资现金计算。",
         "- 美股权益当前金额339,000元；TLT 55,000元已从美股权益移入债券配置。VOO新增9,000元仍是待估值成本，VOO最新市值未机械更新为139,000元。",
         "",
         "## 7. 未来12个月债券迁移第一阶段路线图",
@@ -1007,7 +1019,7 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
     week_end = week_start + timedelta(days=6)
     return "\n".join(
         [
-            "# Stone AI V12.6.2 Stable 周报",
+            "# Stone AI V12.7.0 Stable 周报",
             "",
             f"- 报告所属周：{iso_year}-W{iso_week:02d}",
             f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
@@ -1029,7 +1041,7 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.6.2 Stable 月报",
+            "# Stone AI V12.7.0 Stable 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
             f"- 本月债券到期到账：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",

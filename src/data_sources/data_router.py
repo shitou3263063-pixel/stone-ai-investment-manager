@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from src.data_sources import alpha_vantage_client, finnhub_client, fred_client, yfinance_client
 from src.data_sources.cn_hk_p1a import build_cn_hk_p1a_snapshot
 from src.data_sources.data_cache import read_cache, write_cache
+from src.data_sources.normalized_market import normalize_market_quote, select_best_normalized_quote
 from src.data_sources.time_normalization import TIMEZONE_UNKNOWN, calculate_age_hours, normalize_to_utc
 from utils.data_loader import project_root
 from utils.logger import write_log
@@ -159,7 +160,7 @@ def _business_day_lag(market_date: str | None, timezone_name: str) -> int | None
     return sum(1 for offset in range(1, (end - start).days + 1) if (start + timedelta(days=offset)).weekday() < 5)
 
 
-def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
+def _legacy_normalize_point(item: dict[str, Any]) -> dict[str, Any]:
     """为行情和宏观点补齐统一审计时间口径，不用0替代缺失值。"""
     source = str(item.get("source") or "unavailable")
     source_key = source.split(":", 1)[1] if source.startswith("cache:") else source
@@ -250,6 +251,85 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
         "fallback_used": bool(item.get("cache_used")) or source.startswith("cache:"),
         "verified_by_second_source": bool(item.get("verified_by_second_source", False)),
     }
+
+
+def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
+    """Route every provider payload through the sole canonical quote model."""
+    symbol = str(item.get("symbol") or "")
+    metadata = INSTRUMENT_METADATA.get(symbol, {})
+    cutoff = item.get("decision_cutoff_time")
+    if cutoff:
+        try:
+            decision_cutoff = datetime.fromisoformat(str(cutoff).replace("Z", "+00:00"))
+        except ValueError:
+            decision_cutoff = datetime.now(tz=timezone.utc)
+    else:
+        retrieved_raw = item.get("retrieved_at") or item.get("fetched_at") or item.get("received_at_utc")
+        try:
+            decision_cutoff = normalize_to_utc(
+                retrieved_raw,
+                source_timezone=str(item.get("received_timezone") or "Asia/Shanghai"),
+            ) if retrieved_raw else datetime.now(tz=timezone.utc)
+        except (TypeError, ValueError, KeyError):
+            decision_cutoff = datetime.now(tz=timezone.utc)
+    enriched = {
+        **item,
+        **metadata,
+        "symbol": symbol,
+        "source_level": int(item.get("source_level") or SOURCE_LEVELS.get(str(item.get("source") or "unavailable").replace("cache:", ""), 99)),
+        "source_timezone": item.get("source_timezone") or SOURCE_TIMEZONES.get(str(item.get("source") or "").replace("cache:", "")) or metadata.get("timezone"),
+    }
+    return normalize_market_quote(enriched, decision_cutoff=decision_cutoff, metadata=metadata)
+
+
+def merge_newer_validated_cn_hk_quotes(
+    items: dict[str, dict[str, Any]],
+    cn_hk_p1a: dict[str, Any],
+    *,
+    decision_cutoff: datetime | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Promote a newer validated AKShare close without mixing identities.
+
+    AKShare remains a monitored fallback.  It may win only when its market
+    reference is fresh, scoring-eligible and newer than the selected quote.
+    """
+    merged = {symbol: dict(item) for symbol, item in items.items()}
+    references = (((cn_hk_p1a.get("akshare") or {}).get("market_references")) or {})
+    cutoff = decision_cutoff or datetime.now(tz=timezone.utc)
+    for symbol, record in references.items():
+        if symbol not in merged or symbol not in INSTRUMENT_METADATA:
+            continue
+        if record.get("status") not in {"ok", "cached"} or not record.get("scoring_eligible"):
+            continue
+        if record.get("error_code") == "SOURCE_CONFLICT" or record.get("freshness") != "fresh":
+            continue
+        close = ((record.get("metrics") or {}).get("close"))
+        if close is None or not record.get("market_date"):
+            continue
+        metadata = INSTRUMENT_METADATA[symbol]
+        candidate = normalize_market_quote(
+            {
+                "symbol": symbol,
+                "close": close,
+                "status": "ok",
+                "source": f"akshare:{record.get('underlying_provider') or 'unknown'}",
+                "source_level": int(record.get("source_level") or 3),
+                "market_date": record.get("market_date"),
+                "retrieved_at": record.get("fetched_at"),
+                "source_timezone": metadata["timezone"],
+                "currency": record.get("currency") or metadata["currency"],
+                "daily_bar_finalized": True,
+                "data_frequency": "daily",
+            },
+            decision_cutoff=cutoff,
+            metadata=metadata,
+        )
+        selected = select_best_normalized_quote([merged[symbol], candidate])
+        if selected and selected.get("source") == candidate.get("source"):
+            selected["promoted_from_p1a"] = True
+            selected["underlying_provider"] = record.get("underlying_provider")
+            merged[symbol] = selected
+    return merged
 
 
 def _dual_source_verified(candidates: list[dict[str, Any]], tolerance_pct: float = 1.0) -> bool:
@@ -546,13 +626,14 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
 
     if candidates:
         normalized_candidates = [_normalize_point(item) for item in candidates]
-        selected = normalized_candidates[0]
+        selected = select_best_normalized_quote(normalized_candidates) or normalized_candidates[0]
         verified = _dual_source_verified(normalized_candidates)
         return validate_market_item(symbol, {
             **selected,
             "candidates": normalized_candidates,
             "source_count": len({item.get("source") for item in normalized_candidates}),
             "verified_by_second_source": verified,
+            "cross_validation_status": selected.get("cross_validation_status") or ("VERIFIED" if verified else "SINGLE_SOURCE"),
             "fallback_used": bool(selected.get("fallback_used")) or bool(errors),
             "provider_errors": errors,
         })
@@ -838,6 +919,12 @@ def fetch_layered_market_data() -> dict[str, Any]:
                 "hk_analysis_completeness": {"score_pct": 0, "decision_restricted": True, "missing_fields": ["P1A增强层失败"]},
             },
         }
+    items = merge_newer_validated_cn_hk_quotes(items, cn_hk_p1a)
+    market_completeness = build_market_completeness(items)
+    try:
+        write_cn_hk_p0_validation(items, market_completeness)
+    except Exception as exc:  # noqa: BLE001
+        write_log(f"A股与港股合并行情验证文件写入失败：{exc}", filename="stone_ai.log")
     macro = get_macro_snapshot()
     news = get_news_and_earnings()
     quality = _build_quality_report(items, macro, news)

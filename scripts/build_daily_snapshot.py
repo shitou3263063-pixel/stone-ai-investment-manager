@@ -119,10 +119,12 @@ def _task_gates(day: date, dqs: dict[str, Any], execution_state: dict[str, Any])
 
 def build_snapshot(snapshot_date: date | None = None, *, decision_cutoff_time: datetime | None = None) -> dict[str, Any]:
     snapshot_date = snapshot_date or date.today()
-    cutoff = decision_cutoff_time or now_report_time()
     master = load_yaml(MASTER_PATH)
     execution_state = load_json(EXECUTION_STATE_PATH)
     market = _market_snapshot()
+    # The default cutoff is captured after all retrievals so retrieved_at can
+    # never be later than the decision boundary. Tests may inject a fixed clock.
+    cutoff = decision_cutoff_time or now_report_time()
     market, source_audit = build_and_write_source_audit(market)
     market = filter_market_for_cutoff(market, cutoff)
     quality = market.get("data_quality", {}) or {}

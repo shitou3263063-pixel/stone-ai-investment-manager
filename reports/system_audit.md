@@ -1,7 +1,7 @@
-# Stone AI V12.6.2 Stable System Audit
+# Stone AI V12.7.0 Stable System Audit
 
-- 审计时间：2026-07-16T01:27:01
-- 当前实际运行入口：根目录 `main.py`（V12.6.2 Stable唯一正式入口）。
+- 审计时间：2026-07-16T02:08:27
+- 当前实际运行入口：根目录 `main.py`（V12.7.0 Stable唯一正式入口）。
 - GitHub Actions 应调用：`python main.py`。
 - 报告生成模块：`src/reports/report_center.py`。
 - 决策核心模块：`src/decision/v12_1_decision.py`。
@@ -25,5 +25,5 @@
 
 - 旧数据质量分：69
 - 旧执行计划：today=0.0万 week=0.0万 month=0.0万
-- 新DQS：56 / 禁止新增仓位建议
+- 新DQS：51 / 禁止新增仓位建议
 - 新风险评分：45 / 中低风险

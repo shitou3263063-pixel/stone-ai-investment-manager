@@ -166,7 +166,7 @@ def run(*, send_email: bool = True) -> str:
     reports_dir.mkdir(exist_ok=True)
     today = date.today()
 
-    write_log("V12.6.2 Stable 正式运行开始", filename="stone_ai.log")
+    write_log("V12.7.0 Stable 正式运行开始", filename="stone_ai.log")
     write_log("阶段：数据获取与每日统一快照开始", filename="stone_ai.log")
     snapshot = write_snapshot()
     context = _build_context(snapshot)
@@ -252,11 +252,12 @@ def run(*, send_email: bool = True) -> str:
         [
             f"{VERSION_NAME} 运行完成",
             f"总资产：{decision.get('portfolio_value_wan', 0):.2f} 万元",
-            f"今日是否交易：{'是' if decision.get('today_trade') else '否'}",
-            f"今日建议金额：{budget.get('today_total_yuan', 0):.0f} 元",
+            f"今日已确认执行交易：{'是' if budget.get('base_dca_executed_yuan', 0) else '否'}",
+            f"今日新增交易建议：{'是' if decision.get('today_trade') else '否'}",
+            f"今日新增建议金额：{budget.get('today_total_yuan', 0):.0f} 元",
             f"本周确认买入：{budget.get('week_confirmed_yuan', 0):.0f} 元",
             f"本月确认买入：{budget.get('month_confirmed_yuan', 0):.0f} 元",
-            f"条件性债券转权益：{budget.get('conditional_bond_to_equity_month_yuan', 0):.0f} 元",
+            f"债券转权益剩余专项现金：{budget.get('bond_to_equity_remaining_real_cash_yuan', 0):.0f} 元",
             f"DQS：{decision['dqs']['score']}；模式：{decision['dqs']['mode_label']}",
             f"风险评分：{decision['risk']['score']}；等级：{decision['risk']['level']}",
             f"一致性校验：{validation.get('status', 'PASS' if validation.get('ok') else 'FAIL')}",

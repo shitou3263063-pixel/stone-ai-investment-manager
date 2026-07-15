@@ -1,9 +1,9 @@
 {
-  "run_time": "2026-07-16T01:24:20+08:00",
-  "data_cutoff_time": "2026-07-16T01:24:20+08:00",
+  "run_time": "2026-07-16T02:08:23+08:00",
+  "data_cutoff_time": "2026-07-16T02:08:23+08:00",
   "report_date": "2026-07-15",
   "status": "warning",
-  "dqs": 56,
+  "dqs": 51,
   "risk_score": 45,
   "total_assets": 2821100,
   "total_cash": 241000,
@@ -18,7 +18,7 @@
     "funding_source": "2026-07-15到期债券资金；不占用固定现金安全储备",
     "manual_confirmation_required": true
   },
-  "next_review_date": "2026-08-05T08:30:00+08:00",
+  "next_review_date": "2026-07-17T08:30:00+08:00",
   "fund_classification": {
     "confirmed_fact_total_cash": 241000,
     "rule_engine_investable_cash": 21000,
@@ -58,7 +58,7 @@
     "akshare_002558_fundamental_status": "ok",
     "akshare_csi300_valuation_status": "ok",
     "akshare_source_conflicts": [],
-    "akshare_last_success_at": "2026-07-16T01:26:31+08:00",
+    "akshare_last_success_at": "2026-07-16T02:07:56+08:00",
     "akshare_03033_history_status": "ok",
     "akshare_03033_history_date": "2026-07-15",
     "akshare_03033_underlying_provider": "sina_finance",
@@ -82,11 +82,7 @@
     "high_confidence_buy_restricted": true
   },
   "warnings": [
-    "存在过期数据：03033.HK, 510300.SS, 002558.SZ, 513060.SS, 513090.SS, GDP。",
     "VOO成交股数、实际汇率和手续费待补充；新增9000元仅按成本暂记，禁止冒充实时市值。",
-    "关键行情或宏观数据存在过期项。",
-    "03033.HK：使用过期数据",
-    "510300.SS：使用过期数据",
     "Tushare PERMISSION_DENIED：Tushare 接口权限不足：抱歉，您没有接口(trade_cal)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
     "邮件发送失败：TLS_HANDSHAKE_ERROR [tls_handshake]：TLS安全连接握手失败。"
   ],

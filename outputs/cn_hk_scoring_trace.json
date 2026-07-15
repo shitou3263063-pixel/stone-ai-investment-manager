@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-16T01:26:59+08:00",
-  "p1a_snapshot_generated_at": "2026-07-16T01:24:28+08:00",
+  "generated_at": "2026-07-16T02:08:24+08:00",
+  "p1a_snapshot_generated_at": "2026-07-16T02:06:05+08:00",
   "rows": [
     {
       "symbol": "510300.SS",
@@ -17,14 +17,15 @@
         "宏观环境适配": 58,
         "资金流或成交结构": 34.411,
         "组合适配度": 60,
-        "数据置信度": 30
+        "数据置信度": 52
       },
-      "data_quality_adjustment": -6,
+      "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "final_score": 55,
-      "advice": "暂停新增",
+      "final_score": 65,
+      "advice": "等待条件，今日不交易",
       "limitations": [
-        "ETF不适用个股财务评分"
+        "ETF不适用个股财务评分",
+        "Opportunity Add DQS=51，当前不允许新增仓位建议"
       ]
     },
     {
@@ -37,19 +38,20 @@
       ],
       "components": {
         "估值吸引力": 58,
-        "趋势与市场宽度": 63.1,
+        "趋势与市场宽度": 62.0,
         "基本面或盈利质量": 74,
         "宏观环境适配": 58,
-        "资金流或成交结构": 44.785,
+        "资金流或成交结构": 24,
         "组合适配度": 60,
-        "数据置信度": 30
+        "数据置信度": 52
       },
-      "data_quality_adjustment": -6,
+      "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "final_score": 46,
+      "final_score": 47,
       "advice": "暂停新增",
       "limitations": [
-        "ETF不适用个股财务评分"
+        "ETF不适用个股财务评分",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
       ]
     },
     {
@@ -67,11 +69,11 @@
         "宏观环境适配": 58,
         "资金流或成交结构": 67.51050000000001,
         "组合适配度": 60,
-        "数据置信度": 30
+        "数据置信度": 52
       },
-      "data_quality_adjustment": -6,
+      "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": -5,
-      "final_score": 49,
+      "final_score": 55,
       "advice": "暂停新增",
       "limitations": [
         "ETF不适用个股财务评分"
@@ -92,12 +94,12 @@
         "宏观环境适配": 58,
         "资金流或成交结构": 57.742000000000004,
         "组合适配度": 45,
-        "数据置信度": 30
+        "数据置信度": 52
       },
-      "data_quality_adjustment": -6,
+      "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": -5,
-      "final_score": 40,
-      "advice": "观察",
+      "final_score": 50,
+      "advice": "继续持有",
       "limitations": [
         "个股不得仅因资产类别低配而加仓"
       ]
@@ -117,12 +119,12 @@
         "宏观环境适配": 58,
         "资金流或成交结构": 24.9155,
         "组合适配度": 60,
-        "数据置信度": 30
+        "数据置信度": 52
       },
-      "data_quality_adjustment": -6,
+      "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": -5,
-      "final_score": 34,
-      "advice": "风险复核或回避",
+      "final_score": 45,
+      "advice": "暂停新增",
       "limitations": [
         "ETF不适用个股财务评分"
       ]

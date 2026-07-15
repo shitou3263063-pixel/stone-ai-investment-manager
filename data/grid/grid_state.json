@@ -1,5 +1,5 @@
 {
-  "version": "Stone AI Investment Manager Pro V12.6.2 Stable",
+  "version": "Stone AI Investment Manager Pro V12.7.0 Stable",
   "symbols": {
     "VOO": {
       "symbol": "VOO",
@@ -24,7 +24,7 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-16T01:26:59"
+      "updated_at": "2026-07-16T02:08:24"
     },
     "QQQ": {
       "symbol": "QQQ",
@@ -49,8 +49,8 @@
       "market_regime": "uptrend",
       "last_signal_key": "",
       "processed_trade_ids": [],
-      "updated_at": "2026-07-16T01:26:59"
+      "updated_at": "2026-07-16T02:08:24"
     }
   },
-  "updated_at": "2026-07-16T01:26:59"
+  "updated_at": "2026-07-16T02:08:24"
 }

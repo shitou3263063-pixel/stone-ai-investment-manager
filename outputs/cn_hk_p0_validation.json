@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-16T01:24:28+08:00",
+  "generated_at": "2026-07-16T02:08:10+08:00",
   "mapping_validation_passed": true,
-  "cn_data_completeness": 85.7,
-  "hk_data_completeness": 85.7,
+  "cn_data_completeness": 100.0,
+  "hk_data_completeness": 100.0,
   "all_target_symbols": {
     "510300.SS": {
       "official_name": "沪深300ETF",
@@ -22,9 +22,9 @@
     },
     "03033.HK": {
       "official_name": "南方东英恒生科技指数ETF",
-      "status": "VALID",
-      "source": "yfinance",
-      "market_date": "2026-07-14",
+      "status": "DATA_INSUFFICIENT",
+      "source": "akshare:sina_finance",
+      "market_date": "2026-07-15",
       "currency": "HKD",
       "timezone": "Asia/Hong_Kong"
     },

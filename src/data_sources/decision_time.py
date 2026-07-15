@@ -13,8 +13,10 @@ REPORT_TIMEZONE = "Asia/Shanghai"
 STAGE_MAP = {
     "pre_market": "PRE_MARKET", "realtime": "INTRADAY", "intraday": "INTRADAY",
     "intraday_delayed": "INTRADAY", "delayed_intraday": "INTRADAY",
-    "official_close": "OFFICIAL_CLOSE", "previous_close": "DELAYED_CLOSE",
-    "delayed_close": "DELAYED_CLOSE", "official_lagged_macro": "OFFICIAL_LAGGED_MACRO",
+    "official_close": "OFFICIAL_CLOSE", "previous_close": "PREVIOUS_OFFICIAL_CLOSE",
+    "previous_official_close": "PREVIOUS_OFFICIAL_CLOSE",
+    "after_hours_unfinalized": "AFTER_HOURS_UNFINALIZED",
+    "delayed_close": "PREVIOUS_OFFICIAL_CLOSE", "official_lagged_macro": "OFFICIAL_LAGGED_MACRO",
     "stale": "STALE",
 }
 
@@ -29,7 +31,7 @@ def to_report_iso(value: datetime) -> str:
 
 def item_time_metadata(item: dict[str, Any], *, market_session_date: str | None = None) -> dict[str, Any]:
     source_timezone = item.get("source_timezone") or item.get("market_timezone") or item.get("timezone")
-    source_value = item.get("source_observation_time") or item.get("observed_at_utc") or item.get("observed_at") or item.get("published_at") or item.get("date")
+    source_value = item.get("quote_timestamp") or item.get("source_observation_time") or item.get("observed_at_utc")
     retrieved_value = item.get("data_retrieval_time") or item.get("received_at_utc") or item.get("retrieved_at") or item.get("fetched_at")
     try:
         observed_iso = normalize_to_utc(source_value, source_timezone=str(source_timezone) if source_timezone else None).isoformat()
@@ -39,15 +41,19 @@ def item_time_metadata(item: dict[str, Any], *, market_session_date: str | None 
         retrieved_iso = normalize_to_utc(retrieved_value, source_timezone=str(source_timezone) if source_timezone else None).isoformat()
     except (TypeError, ValueError, KeyError):
         retrieved_iso = None
-    raw_session = str(item.get("data_session") or item.get("data_stage") or "").lower()
-    stage = STAGE_MAP.get(raw_session, "UNKNOWN")
+    explicit_stage = str(item.get("price_stage") or item.get("data_stage") or "").upper()
+    raw_session = str(item.get("data_session") or "").lower()
+    stage = explicit_stage if explicit_stage in set(STAGE_MAP.values()) else STAGE_MAP.get(raw_session, "UNKNOWN")
     if item.get("cache_stale") or str(item.get("freshness_status") or "").lower() == "stale":
         stage = "STALE"
     return {
         "source_observation_time": observed_iso,
         "data_retrieval_time": retrieved_iso,
-        "market_session_date": str(item.get("market_session_date") or item.get("comparable_date") or item.get("market_date") or market_session_date or "") or None,
+        "market_session_date": str(item.get("market_date") or item.get("market_session_date") or item.get("comparable_date") or market_session_date or "") or None,
         "data_stage": stage,
+        "data_age_hours": item.get("data_age_hours", item.get("age_hours")),
+        "data_basis": item.get("data_basis"),
+        "is_finalized": bool(item.get("is_finalized")),
     }
 
 

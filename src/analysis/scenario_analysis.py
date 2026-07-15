@@ -10,6 +10,11 @@ SCENARIO_LABELS = {
     "equity_bond_drawdown": "情景D：股债双杀",
     "inflation_reacceleration": "情景E：通胀重新上行",
     "liquidity_shock": "情景F：流动性冲击",
+    "financial_crisis_2008": "情景G：2008式金融危机",
+    "equity_bond_selloff_2022": "情景H：2022式股债双杀",
+    "rates_up_200bp": "情景I：利率再上升200个基点",
+    "hk_tech_crash_40": "情景J：港股科技再下跌40%",
+    "global_liquidity_crisis": "情景K：全球流动性危机",
 }
 
 
@@ -25,8 +30,7 @@ def calculate_portfolio_stress_scenarios(
     tolerance_high = float(scenario_config.get("max_drawdown_tolerance_high", 0.35) or 0.35)
     results: list[dict[str, Any]] = []
 
-    keys = ["equity_bull", "range_market", "risk_shock"]
-    keys.extend(key for key in ["equity_bond_drawdown", "inflation_reacceleration", "liquidity_shock"] if key in scenario_config)
+    keys = [key for key in SCENARIO_LABELS if key in scenario_config]
     for key in keys:
         assumptions = scenario_config.get(key, {}) or {}
         contributions: list[dict[str, Any]] = []

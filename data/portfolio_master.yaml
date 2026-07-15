@@ -1,4 +1,4 @@
-config_version: V12.6.2_STABLE
+config_version: V12.7.0_STABLE
 data_role: production_portfolio_authority
 schema_version: 2
 as_of: 2026-07-15
