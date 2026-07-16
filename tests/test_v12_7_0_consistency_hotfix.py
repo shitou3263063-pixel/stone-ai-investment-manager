@@ -48,6 +48,7 @@ def test_manual_reconciliation_uses_run_date_not_trade_date() -> None:
         decision_cutoff_at="2026-07-16T21:05:00+08:00",
         transactions=[_trade()],
         run_label="手动运行",
+        explicit_run_mode="MANUAL_RECONCILIATION",
     )
     assert metadata["report_business_date"] == "2026-07-16"
     assert metadata["report_generated_at"] == "2026-07-16T21:06:00+08:00"
