@@ -59,7 +59,7 @@ jobs:
       - name: Run tests
         run: pytest
 
-      - name: Run Stone AI Investment Manager Pro V12.7.0 Stable
+      - name: Run Stone AI Investment Manager Pro V12.7.1 Final Freeze
         env:
           REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
         run: python main.py

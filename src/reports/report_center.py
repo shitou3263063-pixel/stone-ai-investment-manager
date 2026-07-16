@@ -387,8 +387,8 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
 
 def _opportunity_table(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 评分组 | 标的 | 最终分 | 长期配置优先级 | 今日交易权限 | 当前持仓动作 | 观察动作 | 可信度 | 最终动作 | 当前持仓 | 主要原因 |",
-        "| -- | -- | ---: | -- | -- | -- | -- | -- | -- | ---: | -- |",
+        "| 市场内分组 | 标的 | Market Attractiveness Score | Portfolio Repair Priority | 今日交易权限 | 当前持仓动作 | 可信度 | 最终动作 | 当前持仓 | 主要原因 |",
+        "| -- | -- | ---: | ---: | -- | -- | -- | -- | ---: | -- |",
     ]
     for item in decision.get("opportunity", []) or []:
         completeness_value = item.get("market_data_completeness")
@@ -397,10 +397,42 @@ def _opportunity_table(decision: dict[str, Any]) -> list[str]:
         analysis_display = "不适用" if analysis_value is None else f"{float(analysis_value):.1f}%"
         rows.append(
             "| "
-            f"{item.get('opportunity_group', '未分组')} | {item['name']} | {item['score']} | {item.get('long_term_allocation_priority', item.get('allocation_priority', '暂无'))} | "
+            f"{item.get('market_internal_rank_scope', item.get('category', '未分组'))} | {item['name']} | {item.get('market_attractiveness_score', item['score'])} | {item.get('portfolio_repair_priority_score', 0)} | "
             f"{_yes_no(item.get('today_trade_permission'))} | {item.get('current_holding_action', '不适用')} | "
-            f"{item.get('observation_action', '继续观察')} | {item.get('confidence', item.get('scoring_confidence', '可用'))} | "
+            f"{item.get('confidence', item.get('scoring_confidence', '可用'))} | "
             f"{item.get('final_action', item['advice'])} | {_yuan(item['current_holding_yuan'])} | {item.get('reason', '暂无')} |"
+        )
+    return rows
+
+
+def _portfolio_repair_table(decision: dict[str, Any]) -> list[str]:
+    rows = [
+        "| 资产类别 | 当前占比 | 目标占比 | 偏离 | 偏离金额 | 修复方向 | Portfolio Repair Priority | 优先宽基 | 今日权限 |",
+        "| -- | --: | --: | --: | --: | -- | --: | -- | -- |",
+    ]
+    for item in decision.get("portfolio_repair_priority", []) or []:
+        rows.append(
+            f"| {item.get('category')} | {_pct(item.get('current_ratio'))} | {_pct(item.get('target_ratio'))} | "
+            f"{float(item.get('deviation_ratio', 0) or 0):+.1%} | {_yuan(item.get('deviation_amount_yuan'))} | "
+            f"{item.get('repair_direction')} | {item.get('portfolio_repair_priority')} | "
+            f"{item.get('preferred_broad_market_instrument')} | {_yes_no(item.get('today_trade_permission'))} |"
+        )
+    return rows
+
+
+def _scenario_permission_table(decision: dict[str, Any]) -> list[str]:
+    gates = decision.get("trade_permission_gates", {}) or {}
+    rows = [
+        "| 操作类型 | 当前DQS | 要求DQS | DQS | 计划 | 现金 | 风险 | 事件 | 最终权限 | 主要拒绝原因 |",
+        "| -- | --: | --: | -- | -- | -- | -- | -- | -- | -- |",
+    ]
+    for item in gates.get("scenarios", []) or []:
+        reasons = "；".join(item.get("exact_denial_reasons", []) or []) or "无"
+        rows.append(
+            f"| {item.get('scenario_name')} | {item.get('scenario_dqs')} | {item.get('required_dqs')} | "
+            f"{_yes_no(item.get('dqs_gate_passed'))} | {_yes_no(item.get('schedule_gate_passed'))} | "
+            f"{_yes_no(item.get('cash_gate_passed'))} | {_yes_no(item.get('risk_gate_passed'))} | "
+            f"{_yes_no(item.get('event_gate_passed'))} | {item.get('final_permission')} | {reasons} |"
         )
     return rows
 
@@ -408,7 +440,7 @@ def _opportunity_table(decision: dict[str, Any]) -> list[str]:
 def _cn_hk_completeness_table(decision: dict[str, Any]) -> list[str]:
     completeness = decision.get("market_completeness", {}) or {}
     rows = [
-        "| 市场 | 数据完整度 | 评分可信度 | 是否限制决策 | 缺失字段 |",
+        "| 市场 | 行情字段覆盖率 | 评分可信度 | 是否限制决策 | 缺失字段 |",
         "| -- | --: | -- | -- | -- |",
     ]
     for key, label in [("cn_data_completeness", "A股"), ("hk_data_completeness", "港股及港股主题基金")]:
@@ -593,8 +625,8 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
         rows.append(f"| {item['item']} | {item['score']} | {item['max']} | {item['reason']} |")
     rows.extend([
         "",
-        "| 使用场景 | 得分 | 门槛 | DQS门槛通过 | 计划门槛通过 | 现金门槛通过 | 风险门槛通过 | 最终交易权限 | 拒绝原因 |",
-        "| -- | -: | -: | -- | -- | -- | -- | -- | -- |",
+        "| 使用场景 | 得分 | 门槛 | DQS门槛通过 | 计划门槛通过 | 现金门槛通过 | 风险门槛通过 | 事件门槛通过 | 最终权限 | 拒绝原因 |",
+        "| -- | -: | -: | -- | -- | -- | -- | -- | -- | -- |",
     ])
     for item in (decision.get("dqs", {}).get("use_cases", {}) or {}).values():
         rows.append(
@@ -603,7 +635,8 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
             f"{_yes_no(item.get('schedule_gate_passed')) if 'schedule_gate_passed' in item else '不适用'} | "
             f"{_yes_no(item.get('cash_gate_passed')) if 'cash_gate_passed' in item else '不适用'} | "
             f"{_yes_no(item.get('risk_gate_passed')) if 'risk_gate_passed' in item else '不适用'} | "
-            f"{_yes_no(item.get('final_trade_permission', item.get('allowed')))} | "
+            f"{_yes_no(item.get('event_gate_passed')) if 'event_gate_passed' in item else '不适用'} | "
+            f"{item.get('final_permission', '是' if item.get('allowed') else '否')} | "
             f"{item.get('denial_reason', '无')} |"
         )
     return rows
@@ -674,7 +707,7 @@ def _scenarios(decision: dict[str, Any]) -> list[str]:
 
 def _stress_scenarios(decision: dict[str, Any]) -> list[str]:
     rows = [
-        "| 情景 | 组合损失比例 | 损失金额 | 最大贡献资产 | 超过25% | 超过35% | 是否需调整长期配置 |",
+        "| 情景 | 组合收益/损失率 | 组合收益/损失金额 | 最大正贡献/负贡献资产 | 超过25% | 超过35% | 是否需调整长期配置 |",
         "| -- | --: | --: | -- | -- | -- | -- |",
     ]
     for item in decision.get("stress_scenarios", []) or []:
@@ -720,6 +753,193 @@ def _source_lines(decision: dict[str, Any]) -> list[str]:
     return rows or ["- 本次没有可靠在线数据源成功返回，报告进入降级模式。"]
 
 
+def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
+    dqs = decision.get("dqs", {}) or {}
+    risk = decision.get("risk", {}) or {}
+    budget = decision.get("budget", {}) or {}
+    consistency = decision.get("consistency", {}) or {}
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    reconciliation = decision.get("trade_reconciliation", {}) or {}
+    comparability = decision.get("comparability", {}) or {}
+    gates = decision.get("trade_permission_gates", {}) or {}
+    ai = decision.get("ai", {}) or {}
+    transactions = decision.get("confirmed_transactions", []) or []
+    provisional = bool(snapshot.get("has_provisional_values") or reconciliation.get("status") == "WARN")
+
+    trade_rows = [
+        "| 交易日期 | 成交时间 | 标的 | 方向 | 数量 | 成交价/币种 | 人民币投入 | 资金来源 | 来源类型 | 对账状态 |",
+        "| -- | -- | -- | -- | --: | -- | --: | -- | -- | -- |",
+    ]
+    for trade in transactions:
+        trade_rows.append(
+            f"| {trade.get('trade_date')} | {trade.get('trade_datetime') or '待补'} | {trade.get('symbol')} | "
+            f"{trade.get('side') or trade.get('action')} | {trade.get('quantity') if trade.get('quantity') is not None else '待补'} | "
+            f"{trade.get('execution_price') or trade.get('execution_price_usd')} {trade.get('trade_currency') or 'USD'} | "
+            f"{_yuan(trade.get('invested_amount_cny'))} | {trade.get('funding_source')} | {trade.get('trade_origin')} | "
+            f"{trade.get('reconciliation_status')} |"
+        )
+    if len(trade_rows) == 2:
+        trade_rows.append("| 无 | 无 | 无 | 无 | 无 | 无 | 0元 | 无 | 无 | NOT_APPLICABLE |")
+
+    anomalies: list[str] = []
+    if reconciliation.get("status") == "WARN":
+        anomalies.append("VOO成交字段待补：" + "、".join(reconciliation.get("missing_fields", []) or []))
+    if snapshot.get("unconfirmed_holdings"):
+        anomalies.append(
+            "UNCONFIRMED_HOLDING："
+            + "、".join(str(row.get("security_name") or row.get("asset_id")) for row in snapshot["unconfirmed_holdings"])
+            + "（已排除正式计算）"
+        )
+    if comparability.get("non_comparable_items_count", 0):
+        anomalies.append(
+            f"不可比较项目{comparability.get('non_comparable_items_count')}项："
+            + "、".join(comparability.get("non_comparable_items", []) or [])
+        )
+    anomalies.extend(str(item) for item in consistency.get("warnings", []) or [])
+    anomalies.extend("错误：" + str(item) for item in consistency.get("errors", []) or [])
+    anomalies = list(dict.fromkeys(anomalies)) or ["无阻断级异常。"]
+
+    risk_gate_lines: list[str] = []
+    for item in gates.get("scenarios", []) or []:
+        contributors = "、".join(item.get("risk_top_contributors", []) or []) or "无"
+        risk_blocks = "；".join(item.get("risk_blocking_factors", []) or []) or "无"
+        event_blocks = "；".join(item.get("event_blocking_factors", []) or []) or "无"
+        risk_gate_lines.append(
+            f"- {item.get('scenario_name')}：risk_threshold={item.get('risk_threshold')}，"
+            f"current_risk_score={item.get('current_risk_score')}，主要贡献={contributors}，"
+            f"risk_blocking_factors={risk_blocks}，event_blocking_factors={event_blocks}，"
+            f"阻断依据={item.get('risk_blocking_basis')}。"
+        )
+
+    grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
+    grid_section = grid_section.replace("# Stone Smart Grid", "## 附录 E. Stone Smart Grid（SIMULATION_ONLY）", 1)
+    lines = [
+        f"# Stone AI Investment Manager Pro V12.7.1 Final Freeze 日报（{decision.get('report_run_mode_label', '正常运行')}）",
+        "",
+        "## 0. 报告状态",
+        "",
+        f"- 业务日期：{decision.get('report_business_date', decision.get('date'))}",
+        f"- 运行模式：{decision.get('report_run_mode')}（{decision.get('report_run_mode_label')}）",
+        f"- 生成时间：{decision.get('report_generated_at', decision.get('generated_at'))}",
+        f"- 数据截止时间：{decision.get('decision_cutoff_at', decision.get('data_cutoff'))}",
+        f"- 数据质量：DQS={dqs.get('score')}（{dqs.get('mode_label')}）",
+        f"- 是否存在暂估数据：{_yes_no(provisional)}",
+        f"- 全局最终交易权限：{gates.get('global_final_permission', 'DENY')}（来源场景：{gates.get('final_trade_permission_source', 'Scheduled DCA')}）",
+        f"- 历史实盘交易日期：{decision.get('actual_trade_date') or '无'}",
+        "- 所有真实交易均须用户人工确认；系统不自动交易。",
+        "",
+        *( ["> **存在未完成对账的实盘交易。总资产、美股市值和资产占比包含暂估口径，不作为精确再平衡依据。**", ""] if provisional else [] ),
+        *_scenario_permission_table(decision),
+        "",
+        "## 1. 今日决策卡",
+        "",
+        f"- 今日是否操作：{_yes_no(decision.get('today_trade'))}",
+        f"- 操作类型：{decision.get('trade_type')}",
+        f"- 标的：{decision.get('targets', '不适用')}",
+        f"- 建议金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
+        f"- 资金来源：{decision.get('funding_source', '今日不使用资金')}",
+        f"- 可投资现金：{_yuan(budget.get('investable_cash_yuan'))}",
+        f"- DQS：{dqs.get('score')}；Market Risk Score：{risk.get('score')}",
+        f"- 最大风险：{decision.get('max_risk')}",
+        f"- 下一复核时间：{decision.get('next_daily_review')}",
+        f"- 警告：{'；'.join(consistency.get('warnings', []) or []) or '无'}",
+        f"- 错误：{'；'.join(consistency.get('errors', []) or []) or '无'}",
+        "",
+        "## 2. 已执行交易事实",
+        "",
+        *trade_rows,
+        "",
+        "- 历史已执行交易：以上记录仅按真实交易日期归档，不冒充今日建议。",
+        "- 今日建议：由第1节和场景权限表单独给出。",
+        "- 条件性计划：仅为未来触发条件，不是当前交易指令。",
+        "- Smart Grid：保持SIMULATION_ONLY，模拟信号不进入实盘资产、现金或建议。",
+        "",
+        "## 3. 资产配置偏离",
+        "",
+        *_allocation_table(decision),
+        "",
+        f"- 精确再平衡资产基数：{_yuan(snapshot.get('decision_total_assets', decision.get('portfolio_value_yuan')))}；待估值成本{_yuan(snapshot.get('provisional_value_cny'))}已排除。",
+        "",
+        "## 4. 下一触发条件",
+        "",
+        _items((decision.get("next_triggers", []) or [])[:5]),
+        "",
+        "## 5. 异常与待补数据",
+        "",
+        _items(anomalies),
+        "",
+        "# 附录",
+        "",
+        "## 附录 A. 市场吸引力与组合修复优先级",
+        "",
+        "- Market Attractiveness Score只评价标的自身；Portfolio Repair Priority单独评价组合偏离与长期资金方向。",
+        f"- cross_asset_comparability={comparability.get('cross_asset_comparability', 'NOT_EVALUATED')}；不可比时不生成跨资产统一第一名。",
+        "- 当前组合修复结论：美股宽基是长期第一优先方向；A股标的仅在A股市场内部排名。",
+        "",
+        *_portfolio_repair_table(decision),
+        "",
+        *_opportunity_table(decision),
+        "",
+        "## 附录 B. 正式持仓与白名单",
+        "",
+        f"- 白名单状态：{snapshot.get('holding_validation_status')}；未经确认持仓数量：{len(snapshot.get('unconfirmed_holdings', []) or [])}",
+        "- *ST闻泰来源：data/portfolio_master.yaml（user_confirmed_category_reconciled）；仅允许人工风险复核，永久禁止自动新增。",
+        "",
+        *_holding_table(decision),
+        "",
+        "## 附录 C. 市场、宏观与研究数据",
+        "",
+        *_market_table(decision),
+        "",
+        "### A股/港股行情字段覆盖率",
+        "",
+        *_cn_hk_completeness_table(decision),
+        "",
+        "### A股研究数据完整度 / 港股研究数据完整度",
+        "",
+        *_cn_hk_p1a_table(decision),
+        "",
+        "### 市场宽度、资金流与情绪数据状态",
+        "",
+        *_market_context_status(decision),
+        "",
+        "## 附录 D. DQS、风险门槛与可比较性",
+        "",
+        f"- core_decision_comparability={comparability.get('core_decision_comparability')}",
+        f"- cross_asset_comparability={comparability.get('cross_asset_comparability')}",
+        f"- grid_snapshot_comparability={comparability.get('grid_snapshot_comparability')}",
+        f"- non_comparable_items_count={comparability.get('non_comparable_items_count', 0)}",
+        "",
+        *_risk_table(decision),
+        "",
+        *risk_gate_lines,
+        "",
+        *_dqs_table(decision),
+        "",
+        "## 附录 E. 事件、压力测试与模拟网格",
+        "",
+        *_events(decision),
+        "",
+        "### 组合情景压力测试",
+        "",
+        *_stress_scenarios(decision),
+        "",
+        grid_section,
+        "",
+        "## 附录 F. 系统状态、来源与一致性",
+        "",
+        f"- OpenAI状态：{ai.get('openai_status', 'rules_only')}；分析来源：{ai.get('provider')}；仅作解释，不覆盖规则。",
+        "",
+        *_source_lines(decision),
+        "",
+        f"- 一致性结果：{consistency.get('status')}；错误{len(consistency.get('errors', []) or [])}项；警告{len(consistency.get('warnings', []) or [])}项。",
+        *_consistency_table(decision),
+        "",
+        decision.get("disclaimer", "仅供投资辅助，不构成投资建议；系统不自动交易，不承诺收益。"),
+    ]
+    return "\n".join(lines)
+
+
 def generate_daily_report(
     *,
     decision: dict[str, Any],
@@ -731,6 +951,8 @@ def generate_daily_report(
     ai_advice_result: dict[str, Any] | None = None,
     validation: dict[str, Any] | None = None,
 ) -> str:
+    return _generate_final_freeze_daily_report(decision)
+
     dqs = decision.get("dqs", {})
     risk = decision.get("risk", {})
     budget = decision.get("budget", {})
@@ -743,7 +965,7 @@ def generate_daily_report(
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 15. Stone Smart Grid", 1)
     lines = [
-        f"# Stone AI Investment Manager Pro V12.7.0 Stable 日报（{decision.get('report_run_mode_label', '正常运行')}）",
+        f"# Stone AI Investment Manager Pro V12.7.1 Final Freeze 日报（{decision.get('report_run_mode_label', '正常运行')}）",
         "",
         "## 0. 报告状态",
         "",
@@ -1057,7 +1279,7 @@ def generate_weekly_report(decision: dict[str, Any]) -> str:
     week_end = week_start + timedelta(days=6)
     return "\n".join(
         [
-            "# Stone AI V12.7.0 Stable 周报",
+            "# Stone AI V12.7.1 Final Freeze 周报",
             "",
             f"- 报告所属周：{iso_year}-W{iso_week:02d}",
             f"- 周期：{week_start.isoformat()} 至 {week_end.isoformat()}",
@@ -1079,7 +1301,7 @@ def generate_monthly_report(decision: dict[str, Any]) -> str:
     budget = decision.get("budget", {})
     return "\n".join(
         [
-            "# Stone AI V12.7.0 Stable 月报",
+            "# Stone AI V12.7.1 Final Freeze 月报",
             "",
             f"- 本月确认买入额度：{_yuan(budget.get('month_confirmed_yuan'))}",
             f"- 本月债券到期到账：{_yuan(budget.get('actual_bond_cash_arrived_yuan'))}",

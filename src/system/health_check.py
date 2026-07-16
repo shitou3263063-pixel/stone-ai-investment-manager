@@ -336,7 +336,7 @@ def run_health_check(auto_fix: bool = True) -> dict[str, object]:
 def format_health_report(result: dict[str, object]) -> str:
     items = result.get("items", [])
     lines = [
-        "Stone AI Investment Manager Pro V12.7.0 Stable 系统自检",
+        "Stone AI Investment Manager Pro V12.7.1 Final Freeze 系统自检",
         f"总体状态：{result.get('status', 'UNKNOWN')}",
         "",
     ]

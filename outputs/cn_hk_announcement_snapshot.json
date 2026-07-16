@@ -1,12 +1,12 @@
 {
-  "fetched_at": "2026-07-16T02:08:10+08:00",
+  "fetched_at": "2026-07-16T23:44:28+08:00",
   "status": "partial",
   "cn": {
     "status": "failed",
     "source": "cninfo_official",
     "source_level": 1,
     "source_type": "official_disclosure_platform",
-    "fetched_at": "2026-07-16T02:08:10+08:00",
+    "fetched_at": "2026-07-16T23:44:28+08:00",
     "market_date": null,
     "timezone": "Asia/Shanghai",
     "records": [],
@@ -19,7 +19,7 @@
     "source": "hkex_official",
     "source_level": 1,
     "source_type": "official_exchange_disclosure",
-    "fetched_at": "2026-07-16T02:08:10+08:00",
+    "fetched_at": "2026-07-16T23:44:28+08:00",
     "market_date": null,
     "timezone": "Asia/Hong_Kong",
     "symbols": [

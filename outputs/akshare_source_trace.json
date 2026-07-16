@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T02:07:56+08:00",
+  "generated_at": "2026-07-16T23:44:14+08:00",
   "provider": "akshare",
   "version": "1.18.64",
   "records": [
@@ -91,8 +91,8 @@
       "fallback_used": false,
       "scoring_eligible": false,
       "display_only": false,
-      "error_code": "NETWORK_ERROR",
-      "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513060 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))"
+      "error_code": "SSL_ERROR",
+      "error_message": "AKShare底层连接SSL失败：SSLError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513060 (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)')))"
     },
     {
       "interface": "513090_history",

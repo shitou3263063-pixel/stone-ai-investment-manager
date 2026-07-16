@@ -142,11 +142,10 @@ def test_daily_report_has_single_trigger_section_and_fixed_order() -> None:
     report = generate_daily_report(decision=_decision())
     assert report.count("下一触发条件") == 1
     headings = [
-        "## 1. Stone CIO 今日决策卡",
-        "## 2. Stone CIO Commentary",
-        "## 3. 今日资金计划",
-        "## 18. 一致性验证",
-        "## 19. 免责声明",
+        "## 1. 今日决策卡",
+        "## 2. 已执行交易事实",
+        "## 3. 资产配置偏离",
+        "## 附录 F. 系统状态、来源与一致性",
     ]
     positions = [report.index(heading) for heading in headings]
     assert positions == sorted(positions)

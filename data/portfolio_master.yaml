@@ -1,9 +1,33 @@
-config_version: V12.7.0_STABLE
+config_version: V12.7.1_FINAL_FREEZE
 data_role: production_portfolio_authority
 schema_version: 2
 as_of: 2026-07-15
 currency: CNY
 source: user_confirmed
+
+# Only these user-confirmed asset IDs may enter the production portfolio.
+# A newly observed holding stays in UNCONFIRMED_HOLDING until this list is
+# explicitly updated from a user-confirmed portfolio or transaction record.
+confirmed_holding_whitelist:
+  - us_voo
+  - us_voo_20260715_pending_valuation
+  - us_nvda
+  - us_goog
+  - us_tlt
+  - us_ibkr
+  - us_xlf
+  - us_baba
+  - hk_03033
+  - hk_513060
+  - hk_513090
+  - cn_510300
+  - cn_002558
+  - cn_st_wentai
+  - bond_cn_core
+  - bond_cn_10y_local
+  - gold_bar_565g
+  - gold_518880
+  - cash_total
 
 notes:
   - "portfolio_master.yaml 是最高优先级资产事实来源。"

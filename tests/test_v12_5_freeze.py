@@ -55,7 +55,7 @@ def test_asset_total_consistency() -> None:
 
 def test_target_weight_sum() -> None:
     strategy = yaml.safe_load((PROJECT_ROOT / "config" / "strategy.yaml").read_text(encoding="utf-8"))
-    assert strategy["config_version"] == "V12.7.0_STABLE"
+    assert strategy["config_version"] == "V12.7.1_FINAL_FREEZE"
     assert abs(sum(strategy["target_allocation"].values()) - 1.0) < 1e-9
 
 
@@ -133,25 +133,17 @@ def test_report_required_sections() -> None:
     report = generate_daily_report(decision=_decision())
     required = [
         "## 0. 报告状态",
-        "## 1. Stone CIO 今日决策卡",
-        "## 2. Stone CIO Commentary",
-        "## 3. 今日资金计划",
-        "## 4. 现金与预算口径",
-        "## 5. 下一触发条件",
-        "## 6. 资产配置与偏离",
-        "## 7. 未来12个月债券迁移第一阶段路线图",
-        "## 8. Opportunity Score",
-        "## 9. 持仓健康检查",
-        "## 10. 市场与宏观",
-        "## 11. 市场风险评分",
-        "## 12. DQS数据质量",
-        "## 13. 未来7天事件",
-        "## 14. 三种市场情景",
-        "## 15. Stone Smart Grid",
-        "## 16. OpenAI状态与回退说明",
-        "## 17. 数据来源",
-        "## 18. 一致性验证",
-        "## 19. 免责声明",
+        "## 1. 今日决策卡",
+        "## 2. 已执行交易事实",
+        "## 3. 资产配置偏离",
+        "## 4. 下一触发条件",
+        "## 5. 异常与待补数据",
+        "## 附录 A. 市场吸引力与组合修复优先级",
+        "## 附录 B. 正式持仓与白名单",
+        "## 附录 C. 市场、宏观与研究数据",
+        "## 附录 D. DQS、风险门槛与可比较性",
+        "## 附录 E. 事件、压力测试与模拟网格",
+        "## 附录 F. 系统状态、来源与一致性",
     ]
     for heading in required:
         assert heading in report

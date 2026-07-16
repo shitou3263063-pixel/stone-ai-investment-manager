@@ -1,6 +1,6 @@
-config_version: V12.7.0_STABLE
+config_version: V12.7.1_FINAL_FREEZE
 config_role: production_strategy_authority
-version: V12.7.0 Stable
+version: V12.7.1 Final Freeze
 
 target_allocation:
   美股: 0.30
