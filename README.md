@@ -1,8 +1,8 @@
-# Stone AI Investment Manager Pro V12.6 Stable
+# Stone AI Investment Manager Pro V12.7.0 Stable
 
 Stone AI Investment Manager 是个人投资管理和投资日报系统。它负责读取资产、获取市场和宏观数据、计算资产偏离、执行风控规则、生成候选建议、调用 AI 做解释复核，并通过 Gmail 发送日报。
 
-V12.6 Stable 在 V12.5 稳定架构上做小范围增强：OpenAI仅作为可选复核层并具备分类回退，Opportunity Score采用集中配置的七维评分与横截面校正，日报增加公开数据状态和静态组合压力测试。预算、DQS、现金安全线、资产配置、再平衡和模拟网格规则保持不变。
+V12.7.0 Stable 在 V12.6 Stable 基础上统一生产配置、正式运行入口、报告和模拟网格版本标识，并完善报告日期、DQS门槛、市场风险权重、数据可比较性和实盘交易对账口径。预算、现金安全线、资产配置、投资策略、交易规则和模拟网格隔离逻辑保持不变。
 
 系统不自动交易，不接券商下单权限，不使用杠杆，不做空，不使用期权，不承诺收益。所有内容仅供投资辅助，不构成投资建议，最终操作必须由用户人工确认。
 
@@ -20,7 +20,7 @@ python main.py
 
 ## 生产配置权威来源
 
-生产策略配置统一标记为 `config_version: V12.6_STABLE`。每类数据只有一个权威来源：
+生产策略配置统一标记为 `config_version: V12.7.0_STABLE`。每类数据只有一个权威来源：
 
 | 数据 | 权威来源 | 说明 |
 | -- | -- | -- |
@@ -321,7 +321,7 @@ OpenAI是规则裁决后的可选解释层。系统先完成资产、预算、DQ
 ## 分支与版本冻结
 
 - `main`：GitHub Actions当前生产部署分支，与冻结版本保持一致。
-- `stable/v12.5`：历史稳定基线，仅用于回退追溯；当前生产版本为V12.6 Stable。
+- `stable/v12.5`：历史稳定基线，仅用于回退追溯；当前生产版本为V12.7.0 Stable。
 - `develop/v13`：未来功能的隔离开发起点，本次不实现任何V13功能。
 - `feature/*`：单项功能分支，必须经过测试、日报生成、一致性验证、当前稳定版结果对比和人工确认后才能合并。
 
@@ -342,7 +342,7 @@ OpenAI是规则裁决后的可选解释层。系统先完成资产、预算、DQ
 ```bash
 git init
 git add .
-git commit -m "Stone AI Investment Manager Pro V12.6 Stable"
+git commit -m "Stone AI Investment Manager Pro V12.7.0 Stable"
 git branch -M main
 git remote add origin 你的GitHub仓库地址
 git push -u origin main
@@ -352,7 +352,7 @@ git push -u origin main
 
 ```bash
 git add .
-git commit -m "Update Stone AI Investment Manager Pro V12.6 Stable"
+git commit -m "Update Stone AI Investment Manager Pro V12.7.0 Stable"
 git push origin main
 ```
 

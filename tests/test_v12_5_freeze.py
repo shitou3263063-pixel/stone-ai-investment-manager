@@ -33,6 +33,11 @@ def _decision(*, weekend: bool = False) -> dict:
     if not weekend:
         return build_v12_1_decision(**kwargs)
 
+    kwargs["live_market_result"]["decision_timing"] = {
+        "report_generation_time": "2026-07-12T08:30:00+08:00",
+        "decision_cutoff_time": "2026-07-12T08:30:00+08:00",
+    }
+
     class WeekendDate(date):
         @classmethod
         def today(cls) -> "WeekendDate":
@@ -88,8 +93,11 @@ def test_grid_simulation_cash_exclusion() -> None:
 def test_no_trade_amount_zero() -> None:
     decision = _decision()
     assert decision["today_trade"] is False
-    assert decision["today_confirmed_trade_executed"] is True
-    assert decision["today_amount_yuan"] == 9000
+    assert decision["today_confirmed_trade_executed"] is False
+    assert decision["today_amount_yuan"] == 0
+    assert decision["actual_trade_recorded"] is True
+    assert decision["actual_trade_amount_yuan"] == 9000
+    assert decision["actual_trade_date"] == "2026-07-15"
     assert any(item["id"] == "USERCONF-20260715-VOO-001" for item in decision["confirmed_transactions"])
     assert decision["budget"]["today_total_yuan"] == 0
 

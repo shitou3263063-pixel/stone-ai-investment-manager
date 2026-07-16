@@ -24,6 +24,7 @@ from src.decision.v12_1_decision import (
     build_consistency_checks,
     build_system_audit_text,
     build_v12_1_decision,
+    update_comparability_summary,
 )
 from src.journal.investment_journal import build_log_row, upsert_investment_log
 from src.journal.review_engine import build_history_review
@@ -103,6 +104,7 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
             "summary": "智能网格模块异常，主日报继续生成。",
         }
     decision["grid"] = grid_result
+    update_comparability_summary(decision)
     # 先完成规则与网格一致性校验，再允许OpenAI对已裁决结果做解释复核。
     decision["consistency"] = build_consistency_checks(decision)
     write_log(f"阶段：规则前置一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
@@ -252,7 +254,8 @@ def run(*, send_email: bool = True) -> str:
         [
             f"{VERSION_NAME} 运行完成",
             f"总资产：{decision.get('portfolio_value_wan', 0):.2f} 万元",
-            f"今日已确认执行交易：{'是' if budget.get('base_dca_executed_yuan', 0) else '否'}",
+            f"今日已确认执行交易：{'是' if decision.get('today_confirmed_trade_executed') else '否'}",
+            f"历史实盘交易记录：{'是' if decision.get('actual_trade_recorded') else '否'}；交易日期：{decision.get('actual_trade_date') or '无'}",
             f"今日新增交易建议：{'是' if decision.get('today_trade') else '否'}",
             f"今日新增建议金额：{budget.get('today_total_yuan', 0):.0f} 元",
             f"本周确认买入：{budget.get('week_confirmed_yuan', 0):.0f} 元",

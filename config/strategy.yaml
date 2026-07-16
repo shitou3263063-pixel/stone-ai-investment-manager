@@ -41,6 +41,15 @@ risk_weights:
   policy_geo: 10
   data_quality: 5
 
+market_risk_weights:
+  valuation: 20
+  volatility: 15
+  interest_rate: 15
+  macro_event: 15
+  trend: 10
+  policy_geo: 10
+  market_breadth_flow: 15
+
 opportunity_weights:
   valuation: 0.20
   trend_breadth: 0.15

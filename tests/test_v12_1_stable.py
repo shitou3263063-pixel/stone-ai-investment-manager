@@ -170,8 +170,11 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         self.assertFalse(decision["today_trade"])
-        self.assertEqual(decision["targets"], "VOO")
-        self.assertTrue(decision["today_confirmed_trade_executed"])
+        self.assertEqual(decision["targets"], "不适用")
+        self.assertFalse(decision["today_confirmed_trade_executed"])
+        self.assertTrue(decision["actual_trade_recorded"])
+        self.assertEqual(decision["actual_trade_symbol"], "VOO")
+        self.assertEqual(decision["actual_trade_date"], "2026-07-15")
         self.assertFalse(decision["decision_card"]["current_recommendation"]["continue_operation"])
 
     def test_decision_can_be_serialized_to_json(self) -> None:
