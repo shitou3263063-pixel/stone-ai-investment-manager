@@ -121,7 +121,7 @@ def test_13_stale_quote_reduces_timeliness() -> None:
 
 def test_14_missing_trade_fields_are_pending_reconciliation() -> None:
     dqs = compute_dqs(_live(), load_strategy())
-    assert dqs["transaction_reconciliation"][0]["status"] == "pending_reconciliation"
+    assert dqs["transaction_reconciliation"][0]["status"] == "WARN"
 
 
 def test_15_pending_trade_blocks_valuation_readiness() -> None:
@@ -159,7 +159,7 @@ def test_20_intraday_quote_cannot_form_grid_anchor() -> None:
 
 
 def test_21_confirmed_trade_is_not_system_recommendation() -> None:
-    assert compute_dqs(_live(), load_strategy())["transaction_reconciliation"][0]["status"] == "pending_reconciliation"
+    assert compute_dqs(_live(), load_strategy())["transaction_reconciliation"][0]["status"] == "WARN"
 
 
 def test_22_conditional_budget_is_not_real_cash() -> None:

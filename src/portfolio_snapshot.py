@@ -78,7 +78,14 @@ def _security_for(holding: dict[str, Any], lookup: dict[str, dict[str, Any]]) ->
     return {}
 
 
-def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _snapshot_holding(
+    holding: dict[str, Any],
+    labels: dict[str, str],
+    lookup: dict[str, dict[str, Any]],
+    *,
+    source_file: Path,
+    user_confirmed: bool,
+) -> dict[str, Any]:
     security = _security_for(holding, lookup)
     instrument_asset_class = str(holding.get("asset_class", "")).strip()
     allocation_bucket = str(holding.get("allocation_bucket") or security.get("allocation_bucket") or "").strip()
@@ -89,6 +96,8 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
     raw_exchange_rate = holding.get("exchange_rate")
     exchange_rate = None if raw_exchange_rate in {None, ""} else _to_float(raw_exchange_rate)
     confirmed_at = str(holding.get("last_confirmed_at") or holding.get("valuation_time") or date.today().isoformat())
+    first_seen_at = str(holding.get("first_seen_at") or holding.get("valuation_time") or confirmed_at)
+    holding_source = str(holding.get("holding_source") or holding.get("data_source") or "unknown")
     valuation_method = str(
         holding.get("valuation_method")
         or ("manual_override" if holding.get("manual_override") else "user_confirmed_market_value")
@@ -117,6 +126,10 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
         "market_value_cny": value_cny,
         "data_source": holding.get("data_source") or "user_confirmed",
         "source": holding.get("data_source") or "user_confirmed",
+        "holding_source": holding_source,
+        "holding_source_file": str(source_file),
+        "user_confirmed": bool(user_confirmed),
+        "first_seen_at": first_seen_at,
         "last_confirmed_at": confirmed_at,
         "valuation_method": valuation_method,
         "valuation_status": holding.get("valuation_status") or "confirmed_market_value",
@@ -138,9 +151,13 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
 
 def _normalized_confirmed_transaction(item: dict[str, Any]) -> dict[str, Any]:
     row = dict(item)
+    row["side"] = row.get("side") or row.get("action")
+    row["execution_price"] = row.get("execution_price") or row.get("execution_price_usd")
+    row["trade_currency"] = row.get("trade_currency") or ("USD" if row.get("execution_price_usd") else row.get("currency"))
+    row["user_confirmed"] = bool(row.get("user_confirmed", row.get("data_source") == "user_confirmed"))
     missing = [field for field in TRADE_RECONCILIATION_FIELDS if row.get(field) in {None, ""}]
     row["missing_reconciliation_fields"] = missing
-    row["reconciliation_status"] = "pending_reconciliation" if missing else "reconciled"
+    row["reconciliation_status"] = "WARN" if missing else "RECONCILED"
     row["valuation_status"] = (
         "pending_quantity_fx_fee" if missing else "trade_fields_complete_awaiting_latest_market_price"
     )
@@ -159,21 +176,54 @@ def build_portfolio_snapshot() -> dict[str, Any]:
     labels = master.get("asset_class_labels", {}) or {}
     totals = master.get("totals", {}) or {}
     lookup = _security_lookup()
-    holdings = [
-        _snapshot_holding(item, labels, lookup)
+    whitelist = {str(item).strip() for item in master.get("confirmed_holding_whitelist", []) or [] if str(item).strip()}
+    all_holdings = [
+        _snapshot_holding(
+            item,
+            labels,
+            lookup,
+            source_file=master_path,
+            user_confirmed=(
+                str(item.get("asset_id") or "").strip() in whitelist
+                and str(item.get("data_source") or "").startswith("user_confirmed")
+            ),
+        )
         for item in master.get("holdings", []) or []
         if _to_float(item.get("market_value_cny")) >= 0
     ]
-    total_assets = round(_to_float(totals.get("total_assets")))
+    holdings = [item for item in all_holdings if item["user_confirmed"]]
+    unconfirmed_holdings = [
+        {**item, "validation_status": "UNCONFIRMED_HOLDING"}
+        for item in all_holdings
+        if not item["user_confirmed"]
+    ]
     class_totals: dict[str, int] = {}
     for holding in holdings:
         category = holding["asset_class"]
         class_totals[category] = class_totals.get(category, 0) + int(holding["market_value_cny"])
 
-    configured_totals = {
+    configured_totals_authority = {
         labels.get(key) or CANONICAL_CATEGORY[key]: round(_to_float(totals.get(key)))
         for key in ASSET_CLASS_KEYS
     }
+    configured_totals = {category: class_totals.get(category, 0) for category in configured_totals_authority}
+    total_assets = round(sum(configured_totals.values()))
+    decision_holdings = [
+        item for item in holdings
+        if str(item.get("valuation_status")) not in {
+            "pending_actual_quantity_fx_fee",
+            "pending_quantity_fx_fee",
+        }
+    ]
+    decision_class_totals: dict[str, int] = {}
+    for holding in decision_holdings:
+        category = str(holding.get("asset_class"))
+        decision_class_totals[category] = decision_class_totals.get(category, 0) + int(holding.get("market_value_cny", 0) or 0)
+    decision_class_totals = {
+        category: decision_class_totals.get(category, 0)
+        for category in configured_totals
+    }
+    decision_total_assets = round(sum(decision_class_totals.values()))
 
     cash_policy = master.get("cash_policy", {}) or {}
     account_cash = round(_to_float(cash_policy.get("account_total_cash_cny"), configured_totals.get("现金", 0)))
@@ -228,9 +278,16 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         "holdings_stale": holdings_stale,
         "freshness_warning": freshness_warning,
         "total_assets": total_assets,
+        "decision_total_assets": decision_total_assets,
         "asset_class_totals": configured_totals,
+        "decision_asset_class_totals": decision_class_totals,
+        "has_provisional_values": decision_total_assets != total_assets,
+        "provisional_value_cny": total_assets - decision_total_assets,
         "holding_class_totals": class_totals,
         "holdings": holdings,
+        "unconfirmed_holdings": unconfirmed_holdings,
+        "holding_whitelist": sorted(whitelist),
+        "holding_validation_status": "PASS" if not unconfirmed_holdings else "WARN",
         "cash": {
             "account_total_cash_cny": account_cash,
             "cash_safety_reserve_cny": safety_reserve,
@@ -254,7 +311,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
             "reconciled": abs(gold_detail_total - configured_totals.get("黄金", 0)) < 10,
         },
         "validation_inputs": {
-            "configured_totals": configured_totals,
+            "configured_totals": configured_totals_authority,
             "class_totals_from_holdings": class_totals,
         },
     }

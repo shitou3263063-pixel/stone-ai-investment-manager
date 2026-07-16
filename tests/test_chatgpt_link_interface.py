@@ -147,10 +147,10 @@ def test_github_daily_workflow_has_beijing_and_new_york_0830() -> None:
     assert 'timezone: "Asia/Shanghai"' in workflow
     assert 'cron: "30 8 * * 0-6"' in workflow
     assert 'timezone: "America/New_York"' in workflow
-    assert "Run Stone AI Investment Manager Pro V12.7.0 Stable" in workflow
+    assert "Run Stone AI Investment Manager Pro V12.7.1 Final Freeze" in workflow
 
 
-def test_user_facing_repository_version_is_v12_7_0() -> None:
+def test_user_facing_repository_version_is_v12_7_1_final_freeze() -> None:
     root = Path(__file__).resolve().parents[1]
     readme = (root / "README.md").read_text(encoding="utf-8")
     stable_readme = (root / "README_STABLE.md").read_text(encoding="utf-8")
@@ -158,13 +158,13 @@ def test_user_facing_repository_version_is_v12_7_0() -> None:
     final_check = (root / "scripts" / "final_check.py").read_text(encoding="utf-8")
     project_audit = (root / "scripts" / "project_audit.py").read_text(encoding="utf-8")
 
-    assert readme.startswith("# Stone AI Investment Manager Pro V12.7.0 Stable")
-    assert "config_version: V12.7.0_STABLE" in readme
-    assert "当前生产版本为V12.7.0 Stable" in readme
-    assert stable_readme.startswith("# Stone AI Investment Manager Pro V12.7.0 Stable")
-    assert "Stone AI Investment Manager Pro V12.7.0 Stable 部署前检查报告" in deploy_check
-    assert "Stone AI Investment Manager Pro V12.7.0 Stable 系统检查报告" in final_check
-    assert "Stone AI Investment Manager Pro V12.7.0 Stable" in project_audit
+    assert readme.startswith("# Stone AI Investment Manager Pro V12.7.1 Final Freeze")
+    assert "config_version: V12.7.1_FINAL_FREEZE" in readme
+    assert "当前生产版本为V12.7.1 Final Freeze" in readme
+    assert stable_readme.startswith("# Stone AI Investment Manager Pro V12.7.1 Final Freeze")
+    assert "Stone AI Investment Manager Pro V12.7.1 Final Freeze 部署前检查报告" in deploy_check
+    assert "Stone AI Investment Manager Pro V12.7.1 Final Freeze 系统检查报告" in final_check
+    assert "Stone AI Investment Manager Pro V12.7.1 Final Freeze" in project_audit
 
 
 def test_four_attachments_have_readable_mime_payloads() -> None:

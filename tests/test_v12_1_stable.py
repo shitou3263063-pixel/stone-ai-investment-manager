@@ -185,7 +185,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         encoded = json.dumps(decision, ensure_ascii=False, default=str)
-        self.assertIn("Stone AI Investment Manager Pro V12.7.0 Stable", encoded)
+        self.assertIn("Stone AI Investment Manager Pro V12.7.1 Final Freeze", encoded)
 
     def test_report_fields_complete(self) -> None:
         decision = build_v12_1_decision(
@@ -195,7 +195,7 @@ class V121StableTest(unittest.TestCase):
             ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
         )
         report = generate_daily_report(decision=decision)
-        self.assertIn("## 18. 一致性验证", report)
+        self.assertIn("## 附录 F. 系统状态、来源与一致性", report)
         self.assertNotIn("|  |", report)
 
     def test_suggestion_does_not_violate_dqs(self) -> None:

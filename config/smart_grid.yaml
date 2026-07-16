@@ -1,4 +1,4 @@
-config_version: V12.7.0_STABLE
+config_version: V12.7.1_FINAL_FREEZE
 config_role: production_smart_grid_authority
 
 smart_grid:

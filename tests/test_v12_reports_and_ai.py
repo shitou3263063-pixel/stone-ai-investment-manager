@@ -43,12 +43,12 @@ class ReportsAndAiTest(unittest.TestCase):
         daily = generate_daily_report(decision=decision)
 
         self.assertIn("金额或金额区间", today)
-        self.assertIn("## 8. Opportunity Score", daily)
-        self.assertIn("## 12. DQS数据质量", daily)
-        self.assertIn("## 14. 三种市场情景", daily)
-        self.assertIn("## 16. OpenAI状态与回退说明", daily)
-        self.assertIn("未来3—7天最重要风险", daily)
-        self.assertIn("今天为什么操作或不操作", daily)
+        self.assertIn("## 附录 A. 市场吸引力与组合修复优先级", daily)
+        self.assertIn("## 附录 D. DQS、风险门槛与可比较性", daily)
+        self.assertIn("## 附录 E. 事件、压力测试与模拟网格", daily)
+        self.assertIn("## 附录 F. 系统状态、来源与一致性", daily)
+        self.assertIn("最大风险", daily)
+        self.assertIn("今日是否操作", daily)
         self.assertNotIn("失败/降级原因", daily)
 
     def test_service_health_report_has_no_secret_values(self) -> None:

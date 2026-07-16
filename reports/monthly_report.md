@@ -1,4 +1,4 @@
-# Stone AI V12.7.0 Stable 月报
+# Stone AI V12.7.1 Final Freeze 月报
 
 - 本月确认买入额度：9,000元
 - 本月债券到期到账：30,000元

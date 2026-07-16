@@ -1,4 +1,4 @@
-Stone AI Investment Manager Pro V12.7.0 Stable 系统自检
+Stone AI Investment Manager Pro V12.7.1 Final Freeze 系统自检
 总体状态：OK
 
 [OK] Python版本：当前 Python 3.12.13。

@@ -24,7 +24,7 @@ README_REQUIRED_SNIPPETS = [
     "python scripts/final_check.py",
     "python scripts/deploy_check.py",
     "git init",
-    'git commit -m "Stone AI Investment Manager Pro V12.7.0 Stable"',
+    'git commit -m "Stone AI Investment Manager Pro V12.7.1 Final Freeze"',
     "git remote add origin",
     "Run workflow",
     "SMTP_HOST",
@@ -180,7 +180,7 @@ def _overall(items: list[CheckItem]) -> str:
 
 def _build_report(items: list[CheckItem]) -> str:
     lines = [
-        "# Stone AI Investment Manager Pro V12.7.0 Stable 部署前检查报告",
+        "# Stone AI Investment Manager Pro V12.7.1 Final Freeze 部署前检查报告",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 总体状态：{_overall(items)}",
