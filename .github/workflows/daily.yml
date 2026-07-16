@@ -22,7 +22,6 @@ jobs:
 
     env:
       PYTHONIOENCODING: utf-8
-      REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -61,6 +60,8 @@ jobs:
         run: pytest
 
       - name: Run Stone AI Investment Manager Pro V12.7.0 Stable
+        env:
+          REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
         run: python main.py
 
       - name: Upload reports and logs artifact

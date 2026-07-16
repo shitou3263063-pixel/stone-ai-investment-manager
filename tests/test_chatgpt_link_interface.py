@@ -112,8 +112,9 @@ def test_email_subject_body_and_attachments_are_fixed() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         reports = _write_email_fixture(root)
-        with patch("src.notifier.email_notifier._send_email") as sender:
-            result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
+        with patch.dict("os.environ", {"REPORT_RUN_LABEL": ""}, clear=False):
+            with patch("src.notifier.email_notifier._send_email") as sender:
+                result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
         assert result["sent"] is True
         args = sender.call_args.args
         assert args[1] == "Stone AI CIO Daily - 10%-15% Target"
