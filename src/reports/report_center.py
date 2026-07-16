@@ -207,6 +207,11 @@ def build_run_status(
         "run_time": decision.get("generated_at"),
         "data_cutoff_time": decision.get("data_cutoff"),
         "report_date": decision.get("date"),
+        "report_business_date": decision.get("report_business_date", decision.get("date")),
+        "report_generated_at": decision.get("report_generated_at", decision.get("generated_at")),
+        "decision_cutoff_at": decision.get("decision_cutoff_at", decision.get("data_cutoff")),
+        "actual_trade_date": decision.get("actual_trade_date"),
+        "report_run_mode": decision.get("report_run_mode"),
         "status": status,
         "dqs": decision.get("dqs", {}).get("score"),
         "risk_score": decision.get("risk", {}).get("score"),
@@ -356,7 +361,7 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
     before_cash = float(cash.get("opening_cash_before_bond_maturity_cny", 0) or 0)
     arrival = float(cash.get("bond_maturity_arrival_cny", 0) or 0)
     purchase = float(cash.get("voo_purchase_outflow_cny", 0) or 0)
-    transactions = decision.get("today_confirmed_transactions", []) or []
+    transactions = decision.get("confirmed_transactions", []) or []
     trade = transactions[0] if transactions else {}
     quantity = trade.get("quantity")
     fx_rate = trade.get("actual_fx_rate_cny_per_usd")
@@ -568,6 +573,9 @@ def _risk_table(decision: dict[str, Any]) -> list[str]:
         rows.append(f"| {label} | {item.get('score', '暂无')} | {item.get('level', '暂无')}；{meaning} |")
     rows.extend([
         "",
+        f"- 市场风险权重合计：{(risk.get('market_risk', {}) or {}).get('market_risk_weights_sum', '暂无')}%",
+        f"- 市场风险置信度：{(risk.get('market_risk', {}) or {}).get('confidence', '暂无')}",
+        "",
         "| 市场风险项目 | 分数 | 权重 | 主要依据 |",
         "| ----- | -: | -: | ---- |",
     ])
@@ -583,9 +591,21 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
     ]
     for item in decision.get("dqs", {}).get("components", []) or []:
         rows.append(f"| {item['item']} | {item['score']} | {item['max']} | {item['reason']} |")
-    rows.extend(["", "| 使用场景 | 得分 | 门槛 | 是否允许 |", "| -- | -: | -: | -- |"])
+    rows.extend([
+        "",
+        "| 使用场景 | 得分 | 门槛 | DQS门槛通过 | 计划门槛通过 | 现金门槛通过 | 风险门槛通过 | 最终交易权限 | 拒绝原因 |",
+        "| -- | -: | -: | -- | -- | -- | -- | -- | -- |",
+    ])
     for item in (decision.get("dqs", {}).get("use_cases", {}) or {}).values():
-        rows.append(f"| {item.get('label')} | {item.get('score')} | {item.get('threshold')} | {_yes_no(item.get('allowed'))} |")
+        rows.append(
+            f"| {item.get('label')} | {item.get('score')} | {item.get('threshold')} | "
+            f"{_yes_no(item.get('dqs_gate_passed', item.get('allowed')))} | "
+            f"{_yes_no(item.get('schedule_gate_passed')) if 'schedule_gate_passed' in item else '不适用'} | "
+            f"{_yes_no(item.get('cash_gate_passed')) if 'cash_gate_passed' in item else '不适用'} | "
+            f"{_yes_no(item.get('risk_gate_passed')) if 'risk_gate_passed' in item else '不适用'} | "
+            f"{_yes_no(item.get('final_trade_permission', item.get('allowed')))} | "
+            f"{item.get('denial_reason', '无')} |"
+        )
     return rows
 
 
@@ -718,17 +738,21 @@ def generate_daily_report(
     consistency = decision.get("consistency", {})
     ai = decision.get("ai", {})
     snapshot = decision.get("portfolio_snapshot", {}) or {}
+    reconciliation = decision.get("trade_reconciliation", {}) or {}
+    comparability = decision.get("comparability", {}) or {}
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 15. Stone Smart Grid", 1)
     lines = [
-        "# Stone AI Investment Manager Pro V12.7.0 Stable 日报",
+        f"# Stone AI Investment Manager Pro V12.7.0 Stable 日报（{decision.get('report_run_mode_label', '正常运行')}）",
         "",
         "## 0. 报告状态",
         "",
-        f"- 报告日期：{decision.get('date')}",
+        f"- 报告业务日期（report_business_date）：{decision.get('report_business_date', decision.get('date'))}",
+        f"- 运行模式（report_run_mode）：{decision.get('report_run_mode', 'SCHEDULED')}（{decision.get('report_run_mode_label', '自动定时运行')}）",
         f"- 报告时区：{decision.get('report_timezone', 'Asia/Shanghai')}",
-        f"- 报告生成时间（含时区）：{decision.get('generated_at')}",
-        f"- 决策数据统一截止时间：{(decision.get('data_time_summary', {}) or {}).get('decision_data_cutoff', decision.get('data_cutoff'))}",
+        f"- 报告生成时间（report_generated_at）：{decision.get('report_generated_at', decision.get('generated_at'))}",
+        f"- 决策数据截止时间（decision_cutoff_at）：{decision.get('decision_cutoff_at', decision.get('data_cutoff'))}",
+        f"- 实盘交易发生日期（actual_trade_date）：{_text(decision.get('actual_trade_date'), '无')}",
         f"- 数据阶段：{'、'.join((decision.get('data_time_summary', {}) or {}).get('data_stages', []) or ['UNKNOWN'])}",
         f"- 截止时间后获取的数据：{len(decision.get('post_cutoff_data', []) or [])}项（仅附录，不参与DQS、风险、评分、网格或今日建议）",
         f"- 是否存在不同步数据：{_yes_no((decision.get('data_time_summary', {}) or {}).get('has_unsynchronized_data'))}",
@@ -737,23 +761,33 @@ def generate_daily_report(
         f"- 当前交易日状态：{decision.get('trading_day_status')}",
         f"- 分析模式：{ai.get('mode')}（{ai.get('provider')}）",
         f"- DQS：{dqs.get('score')} / {dqs.get('mode_label')}",
+        f"- dqs_gate_passed：{_yes_no((decision.get('trade_permission_gates', {}) or {}).get('dqs_gate_passed'))}",
+        f"- schedule_gate_passed：{_yes_no((decision.get('trade_permission_gates', {}) or {}).get('schedule_gate_passed'))}",
+        f"- cash_gate_passed：{_yes_no((decision.get('trade_permission_gates', {}) or {}).get('cash_gate_passed'))}",
+        f"- risk_gate_passed：{_yes_no((decision.get('trade_permission_gates', {}) or {}).get('risk_gate_passed'))}",
+        f"- final_trade_permission：{_yes_no((decision.get('trade_permission_gates', {}) or {}).get('final_trade_permission'))}",
+        f"- denial_reason：{(decision.get('trade_permission_gates', {}) or {}).get('denial_reason', '无')}",
         f"- 数据完整性结论：{dqs.get('conclusion')}",
         f"- 持仓快照：{snapshot.get('snapshot_date')}；来源：{snapshot.get('source')}；{snapshot.get('freshness_warning')}",
         "",
         "## 1. Stone CIO 今日决策卡",
         "",
-        "### A. 今日已发生实盘事实",
+        "### A. 实盘交易事实（独立于报告业务日期）",
         "",
-        f"- USER_CONFIRMED_ACTUAL_TRADE：{_yes_no(decision.get('today_confirmed_trade_executed'))}",
-        f"- 交易：{decision.get('trade_type')}；金额：{_amount_mode_text(decision, decision.get('today_amount_yuan', 0))}；标的：{decision.get('targets')}",
+        f"- USER_CONFIRMED_ACTUAL_TRADE：{_yes_no(decision.get('actual_trade_recorded'))}",
+        f"- 交易发生日期：{_text(decision.get('actual_trade_date'), '无')}；报告业务日期：{decision.get('report_business_date', decision.get('date'))}",
+        f"- 交易：{decision.get('trade_type')}；实际金额：{_yuan(decision.get('actual_trade_amount_yuan'))}；标的：{_text(decision.get('actual_trade_symbol'), '无')}",
         f"- trade_origin：{decision.get('trade_origin', 'UNKNOWN')}",
         f"- execution_status：{_text(decision.get('execution_status'))}",
         f"- 是否由系统事前批准：{'是，属于此前既定周三基础定投计划' if decision.get('system_pre_authorized') else '否'}",
         f"- 是否机会加仓：{_yes_no(decision.get('opportunity_add'))}；是否自主临时交易：{_yes_no(decision.get('discretionary_trade'))}；是否事件追涨：{_yes_no(decision.get('event_chasing'))}",
         f"- 交易目的：{'基础定投' if decision.get('trade_origin') == 'SCHEDULED_BASE_DCA' else '待确认'}；资金来源：{decision.get('funding_source')}；资产迁移属性：{_text(decision.get('asset_migration_attribute'))}",
-        "- 本次9,000元VOO买入为此前既定周三基础定投计划的执行结果，资金来源为当日到账债券资金，不属于机会加仓、临时追涨或网格交易。",
-        f"- 是否完成对账：{'否，待对账' if any(item.get('status') == 'pending_reconciliation' for item in dqs.get('transaction_reconciliation', [])) else '是'}",
-        f"- 待补字段：{'、'.join((dqs.get('transaction_reconciliation') or [{}])[0].get('missing_fields', []) or ['无'])}",
+        "- 2026-07-15的9,000元VOO买入是独立历史交易事实；手动补运行不会把它改写成报告业务日期的新交易。",
+        f"- 交易对账状态：{reconciliation.get('status', 'NOT_APPLICABLE')}",
+        f"- 待补字段：{'、'.join(reconciliation.get('missing_fields', []) or ['无'])}",
+        f"- 自动重算：{_yes_no(reconciliation.get('auto_recalculated'))}；交易对账质量：{reconciliation.get('transaction_reconciliation_quality', '不适用')}",
+        f"- VOO总股数：{_text(reconciliation.get('voo_total_quantity'))}；VOO最新市值：{_yuan(reconciliation.get('voo_latest_market_value_cny')) if reconciliation.get('voo_latest_market_value_cny') is not None else '待字段和最新行情齐备后重算'}",
+        f"- 美股总市值：{_yuan(reconciliation.get('us_stock_total_market_value_cny')) if reconciliation.get('us_stock_total_market_value_cny') is not None else '待字段和最新行情齐备后重算'}",
         "",
         "### B. Stone CIO当前建议",
         "",
@@ -893,7 +927,11 @@ def generate_daily_report(
         f"- 可选解释数据缺失：{dqs.get('optional_explanation_missing_count', 0)}项",
         f"- 数据冲突：{len(dqs.get('conflicts', []))}项",
         f"- 过期数据：{len(dqs.get('stale_metrics', []))}项",
-        f"- 不可横向比较数据：{len(dqs.get('non_comparable_metrics', []))}项（{'、'.join(dqs.get('non_comparable_metrics', [])) or '无'}）",
+        f"- core_decision_comparability：{comparability.get('core_decision_comparability', 'NOT_EVALUATED')}",
+        f"- cross_asset_comparability：{comparability.get('cross_asset_comparability', 'NOT_EVALUATED')}",
+        f"- grid_snapshot_comparability：{comparability.get('grid_snapshot_comparability', 'NOT_EVALUATED')}",
+        f"- non_comparable_items_count：{comparability.get('non_comparable_items_count', 0)}",
+        f"- 不可比较项目明细：{'、'.join(comparability.get('non_comparable_items', []) or []) or '无'}",
         f"- 异常0值：{', '.join(dqs.get('suspicious_zero', [])) or '无'}",
         "",
         *_dqs_table(decision),

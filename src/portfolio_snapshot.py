@@ -29,6 +29,13 @@ ALLOCATION_BUCKET_CATEGORY = {
     "cash": "现金",
 }
 
+TRADE_RECONCILIATION_FIELDS = [
+    "trade_datetime",
+    "quantity",
+    "actual_fx_rate_cny_per_usd",
+    "fee",
+]
+
 
 def _to_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -129,6 +136,17 @@ def _snapshot_holding(holding: dict[str, Any], labels: dict[str, str], lookup: d
     }
 
 
+def _normalized_confirmed_transaction(item: dict[str, Any]) -> dict[str, Any]:
+    row = dict(item)
+    missing = [field for field in TRADE_RECONCILIATION_FIELDS if row.get(field) in {None, ""}]
+    row["missing_reconciliation_fields"] = missing
+    row["reconciliation_status"] = "pending_reconciliation" if missing else "reconciled"
+    row["valuation_status"] = (
+        "pending_quantity_fx_fee" if missing else "trade_fields_complete_awaiting_latest_market_price"
+    )
+    return row
+
+
 def build_portfolio_snapshot() -> dict[str, Any]:
     root = project_root()
     master_path = root / "data" / "portfolio_master.yaml"
@@ -173,10 +191,23 @@ def build_portfolio_snapshot() -> dict[str, Any]:
     bond_to_equity_cash = round(_to_float(cash_policy.get("bond_to_equity_investable_cash_cny"), investable_cash))
     plan = execution_state.get("bond_to_equity_plan", {}) or {}
     transactions = [
-        item
+        _normalized_confirmed_transaction(item)
         for item in execution_state.get("records", []) or []
         if item.get("status") == "executed" and item.get("data_source") == "user_confirmed"
     ]
+
+    voo_trade = next((item for item in transactions if str(item.get("symbol")) == "VOO"), None)
+    if voo_trade:
+        pending_voo = next((item for item in holdings if str(item.get("reference_symbol")) == "VOO"), None)
+        if pending_voo is not None:
+            pending_voo["actual_quantity"] = voo_trade.get("quantity")
+            pending_voo["actual_fx_rate"] = voo_trade.get("actual_fx_rate_cny_per_usd")
+            pending_voo["fee"] = voo_trade.get("fee")
+            if not voo_trade.get("missing_reconciliation_fields"):
+                pending_voo["quantity"] = voo_trade.get("quantity")
+                pending_voo["unit"] = "share"
+                pending_voo["valuation_status"] = "trade_fields_complete_awaiting_latest_market_price"
+                pending_voo["confidence"] = "medium"
 
     gold_detail_total = sum(int(item["market_value_cny"]) for item in holdings if item["asset_class"] == "黄金")
     snapshot_date = str(master.get("as_of") or date.today().isoformat())
