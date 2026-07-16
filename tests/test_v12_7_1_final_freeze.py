@@ -175,7 +175,7 @@ def test_10_confirmed_st_holding_has_provenance_and_permanent_no_auto_add() -> N
     st = next(row for row in snapshot["holdings"] if row["security_name"] == "*ST闻泰")
     assert st["user_confirmed"] is True
     assert st["holding_source"] == "user_confirmed_category_reconciled"
-    assert st["holding_source_file"].endswith("data\\portfolio_master.yaml")
+    assert Path(st["holding_source_file"]).parts[-2:] == ("data", "portfolio_master.yaml")
     decision = _decision()
     opportunity = next(row for row in decision["opportunity"] if row["name"] == "*ST闻泰")
     assert opportunity["today_trade_permission"] is False
