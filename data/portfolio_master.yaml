@@ -94,7 +94,7 @@ holdings:
     allocation_bucket: us_equity
     economic_exposure: us_large_cap_equity
     listing_market: US
-    security_name: VOO 2026-07-15新增投入成本（待估值）
+    security_name: VOO 2026-07-15新增投入成本（待实际汇率估值）
     security_code: VOO_PENDING_20260715
     market: US
     currency: CNY
@@ -105,16 +105,16 @@ holdings:
     valuation_time: 2026-07-15
     confidence: pending
     account: IBKR
-    liquidity_status: pending_trade_details
+    liquidity_status: pending_actual_fx_rate
     strategy_bucket: pending_valuation
-    valuation_method: confirmed_cost_pending_quantity_fx_fee
-    valuation_status: pending_actual_quantity_fx_fee
+    valuation_method: confirmed_cost_pending_actual_fx_rate
+    valuation_status: pending_actual_fx_rate
     reference_symbol: VOO
     execution_price_usd: 692.5
     additional_cost_cny: 9000
-    actual_quantity: null
+    actual_quantity: 2.166
     actual_fx_rate: null
-    fee: null
+    fee: 0
 
   - asset_id: us_nvda
     asset_class: us_stock

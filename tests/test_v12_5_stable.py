@@ -146,7 +146,7 @@ def test_conditional_bond_plan_is_not_cash() -> None:
     assert budget["investable_cash_yuan"] == 21000
 
 
-def test_voo_trade_keeps_unknown_execution_fields_and_does_not_fake_market_value() -> None:
+def test_voo_trade_keeps_ignored_fx_unknown_and_does_not_fake_market_value() -> None:
     snapshot = build_portfolio_snapshot()
     original = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo")
     pending = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo_20260715_pending_valuation")
@@ -154,9 +154,10 @@ def test_voo_trade_keeps_unknown_execution_fields_and_does_not_fake_market_value
     assert original["market_value_cny"] == 130000
     assert original["quantity"] == 28
     assert pending["market_value_cny"] == 9000
-    assert pending["valuation_status"] == "pending_actual_quantity_fx_fee"
-    assert trade["quantity"] is None
+    assert pending["valuation_status"] == "pending_actual_fx_rate"
+    assert trade["trade_datetime"] == "2026-07-15T10:24:00-04:00"
+    assert trade["quantity"] == 2.166
     assert trade["actual_fx_rate_cny_per_usd"] is None
-    assert trade["fee"] is None
+    assert trade["fee"] == 0
     assert trade["real_trade"] is True
     assert trade["simulation_trade"] is False
