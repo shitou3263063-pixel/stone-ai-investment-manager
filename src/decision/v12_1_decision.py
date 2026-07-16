@@ -425,7 +425,7 @@ def build_trade_reconciliation_summary(
         return {
             **base,
             "status": "WARN",
-            "warning": "实盘交易字段缺失，保持WARN；未估算成交时间、股数、实际汇率或手续费。",
+            "warning": "实盘交易字段待补：" + "、".join(missing) + "；保持WARN且未估算。",
         }
 
     holdings = snapshot.get("holdings", []) or []

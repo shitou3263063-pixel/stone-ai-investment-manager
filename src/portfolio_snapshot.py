@@ -212,6 +212,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         item for item in holdings
         if str(item.get("valuation_status")) not in {
             "pending_actual_quantity_fx_fee",
+            "pending_actual_fx_rate",
             "pending_quantity_fx_fee",
         }
     ]

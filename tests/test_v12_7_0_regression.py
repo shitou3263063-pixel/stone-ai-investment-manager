@@ -159,8 +159,10 @@ def test_13_pending_reconciliation_does_not_increase_voo_value() -> None:
     original = next(row for row in holdings if row["security_code"] == "VOO")
     pending = next(row for row in holdings if row["security_code"] == "VOO_PENDING_20260715")
     assert original["market_value_cny"] == 130000
-    assert pending["valuation_status"] == "pending_actual_quantity_fx_fee"
-    assert pending["actual_quantity"] is pending["actual_fx_rate"] is pending["fee"] is None
+    assert pending["valuation_status"] == "pending_actual_fx_rate"
+    assert pending["actual_quantity"] == pytest.approx(2.166)
+    assert pending["actual_fx_rate"] is None
+    assert pending["fee"] == 0
 
 
 def test_14_released_event_has_value_or_missing_marker() -> None:

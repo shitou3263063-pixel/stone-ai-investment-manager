@@ -8,6 +8,7 @@ import pytest
 from src.decision.v12_1_decision import (
     build_opportunity_scores,
     build_portfolio_repair_priority,
+    build_trade_reconciliation_summary,
     build_trade_permission_gates,
     compute_dqs,
     describe_max_opportunity,
@@ -222,7 +223,12 @@ def test_14_existing_cash_trade_and_grid_isolation_contract() -> None:
     trade = snapshot["confirmed_transactions"][0]
     assert trade["invested_amount_cny"] == 9000
     assert trade["reconciliation_status"] == "WARN"
-    assert trade["quantity"] is None
+    assert trade["trade_datetime"] == "2026-07-15T10:24:00-04:00"
+    assert trade["quantity"] == pytest.approx(2.166)
+    assert trade["execution_price"] == pytest.approx(692.5)
+    assert trade["fee"] == 0
+    assert trade["actual_fx_rate_cny_per_usd"] is None
+    assert trade["missing_reconciliation_fields"] == ["actual_fx_rate_cny_per_usd"]
 
 
 def test_15_provisional_cost_is_not_exact_rebalance_value() -> None:
@@ -238,3 +244,17 @@ def test_16_market_risk_weights_are_exactly_100() -> None:
     strategy = load_strategy()
     assert sum(strategy["market_risk_weights"].values()) == 100
 
+
+def test_17_user_ignored_fx_is_not_estimated() -> None:
+    snapshot = build_portfolio_snapshot()
+    summary = build_trade_reconciliation_summary(
+        snapshot,
+        {"items": {"VOO": {"current_price": 700}}},
+    )
+    assert summary["status"] == "WARN"
+    assert summary["missing_fields"] == ["actual_fx_rate_cny_per_usd"]
+    assert "actual_fx_rate_cny_per_usd" in summary["warning"]
+    assert "trade_datetime" not in summary["warning"]
+    assert summary["auto_recalculated"] is False
+    assert summary["voo_total_quantity"] is None
+    assert summary["voo_latest_market_value_cny"] is None
