@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -269,9 +270,10 @@ def test_17_usd_cash_trade_does_not_require_actual_fx() -> None:
 
 
 def test_18_cpi_and_gdp_use_release_frequency_freshness(monkeypatch: pytest.MonkeyPatch) -> None:
+    business_today = datetime.now(tz=ZoneInfo("Asia/Shanghai")).date()
     observed_dates = {
-        "CPIAUCSL": date.today() - timedelta(days=50),
-        "GDP": date.today() - timedelta(days=130),
+        "CPIAUCSL": business_today - timedelta(days=50),
+        "GDP": business_today - timedelta(days=130),
     }
 
     def fake_get(_: str, params: dict[str, str]) -> dict:
@@ -286,8 +288,8 @@ def test_18_cpi_and_gdp_use_release_frequency_freshness(monkeypatch: pytest.Monk
     assert cpi["data_status"] == "VALID_LAGGED_BY_DESIGN"
     assert gdp["data_status"] == "VALID_LAGGED_BY_DESIGN"
 
-    observed_dates["CPIAUCSL"] = date.today() - timedelta(days=51)
-    observed_dates["GDP"] = date.today() - timedelta(days=131)
+    observed_dates["CPIAUCSL"] = business_today - timedelta(days=51)
+    observed_dates["GDP"] = business_today - timedelta(days=131)
     assert fred_client.get_series_latest("CPIAUCSL")["data_status"] == "DATA_INSUFFICIENT"
     assert fred_client.get_series_latest("GDP")["data_status"] == "DATA_INSUFFICIENT"
 
