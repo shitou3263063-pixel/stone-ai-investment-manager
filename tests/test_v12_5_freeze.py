@@ -125,7 +125,7 @@ def test_single_production_entrypoint() -> None:
     assert production_main_files == [PROJECT_ROOT / "main.py"]
     assert "from src.app import main" in (PROJECT_ROOT / "main.py").read_text(encoding="utf-8")
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
-    assert "run: python main.py" in workflow
+    assert "python main.py 2>&1 | tee logs/main.log" in workflow
     assert "python src/main.py" not in workflow
 
 
