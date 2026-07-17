@@ -136,7 +136,7 @@ def test_scenario_analysis_calculation() -> None:
 def test_report_internal_consistency() -> None:
     decision = _decision()
     report = generate_daily_report(decision=decision)
-    assert decision["consistency"]["status"] == "WARN"
+    assert decision["consistency"]["status"] == "PASS"
     assert "### 组合情景压力测试" in report
     assert "### 市场宽度、资金流与情绪数据状态" in report
     assert "模拟资金" not in decision.get("funding_source", "")

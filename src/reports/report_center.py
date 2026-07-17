@@ -38,6 +38,36 @@ def _text(value: Any, fallback: str = "暂无数据") -> str:
     return text if text else fallback
 
 
+DATA_STATUS_VALUES = {
+    "VALID",
+    "VALID_LAGGED_BY_DESIGN",
+    "ESTIMATED",
+    "DATA_INSUFFICIENT",
+    "NOT_CONNECTED",
+    "SOURCE_FAILED",
+    "NOT_APPLICABLE",
+}
+
+
+def _normalized_data_status(item: dict[str, Any]) -> str:
+    raw = str(item.get("data_status") or "").upper()
+    if raw in DATA_STATUS_VALUES:
+        return raw
+    if item.get("estimated") or str(item.get("valuation_status") or "").lower().startswith("estimated"):
+        return "ESTIMATED"
+    status = str(item.get("status") or "").lower()
+    source = str(item.get("source") or "unavailable").lower()
+    if status in {"failed", "error", "source_failed"}:
+        return "SOURCE_FAILED"
+    if source == "unavailable" and status in {"", "missing", "unavailable", "not_connected"}:
+        return "NOT_CONNECTED"
+    if item.get("success") or status in {"ok", "success", "cached"}:
+        if str(item.get("data_frequency") or "").lower() in {"monthly", "quarterly"} and not item.get("stale"):
+            return "VALID_LAGGED_BY_DESIGN"
+        return "VALID" if not item.get("stale") else "DATA_INSUFFICIENT"
+    return "DATA_INSUFFICIENT"
+
+
 def _items(values: list[Any] | None) -> str:
     values = values or []
     if not values:
@@ -124,6 +154,9 @@ def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
         "cash_safety_reserve_yuan": float(budget.get("cash_safety_reserve_yuan", 0) or 0),
         "dqs": dqs.get("score"),
         "dqs_mode": dqs.get("mode_label"),
+        "core_dqs": dqs.get("core_dqs"),
+        "opportunity_dqs": dqs.get("opportunity_dqs"),
+        "execution_dqs": dqs.get("execution_dqs"),
         "risk_score": risk.get("score"),
         "risk_level": risk.get("level"),
         "opportunity_score": (
@@ -156,7 +189,7 @@ def generate_today_action(decision: dict[str, Any]) -> str:
             f"- 交易前账户现金：{_yuan(action['pre_transaction_cash_yuan'])}" if action["confirmed_executed"] else "- 交易前账户现金：不适用",
             f"- 执行后账户现金余额：{_yuan(action['post_execution_cash_yuan'])}",
             f"- 固定现金安全储备：{_yuan(action['cash_safety_reserve_yuan'])}",
-            f"- DQS：{action['dqs']}（{action['dqs_mode']}）",
+            f"- DQS用途拆分：core_dqs={action['core_dqs']}（Scheduled DCA/持仓/风险）；opportunity_dqs={action['opportunity_dqs']}（Opportunity Add/跨资产）；execution_dqs={action['execution_dqs']}（成交/现金/汇率/持仓对账）",
             f"- Risk Score：{action['risk_score']}（{action['risk_level']}）",
             f"- Opportunity Score：{action['opportunity_score']}",
             f"- 下一复核日期：{action['next_review_date']}",
@@ -214,6 +247,9 @@ def build_run_status(
         "report_run_mode": decision.get("report_run_mode"),
         "status": status,
         "dqs": decision.get("dqs", {}).get("score"),
+        "core_dqs": decision.get("dqs", {}).get("core_dqs"),
+        "opportunity_dqs": decision.get("dqs", {}).get("opportunity_dqs"),
+        "execution_dqs": decision.get("dqs", {}).get("execution_dqs"),
         "risk_score": decision.get("risk", {}).get("score"),
         "total_assets": decision.get("portfolio_value_yuan"),
         "total_cash": budget.get("account_total_cash_yuan"),
@@ -364,7 +400,8 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
     transactions = decision.get("confirmed_transactions", []) or []
     trade = transactions[0] if transactions else {}
     quantity = trade.get("quantity")
-    fx_rate = trade.get("actual_fx_rate_cny_per_usd")
+    actual_fx_rate = trade.get("actual_fx_rate_cny_per_usd")
+    valuation_fx_rate = trade.get("valuation_fx_rate_cny_per_usd")
     fee = trade.get("fee")
     return [
         "| 项目 | 交易前 | 变动 | 交易后 / 当前口径 |",
@@ -373,15 +410,19 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
         f"| 固定现金安全储备 | {_yuan(budget.get('cash_safety_reserve_yuan'))} | 0元 | {_yuan(budget.get('cash_safety_reserve_yuan'))}，未占用 |",
         "| 到期债券本金（不含TLT） | 1,130,000元 | -30,000元 | 1,100,000元 |",
         f"| 债券资产配置（含TLT） | 原报告漏计TLT 55,000元 | TLT重分类为债券 | {_yuan((allocation.get('债券') or {}).get('current_amount_yuan'))} |",
-        "| VOO原确认市值 | 130,000元 | 不机械增加9,000元 | 仍为130,000元（原确认口径）；最新市值待实际股数、最新价格和实际汇率补齐后重算 |",
+        "| VOO原确认市值 | 130,000元 | 不机械增加9,000元 | 仍为130,000元（原确认口径）；最新市值待最新价格和独立估值汇率补齐后重算 |",
         f"| VOO本次新增投入成本 | 0元 | +{purchase:,.0f}元 | {purchase:,.0f}元，单列待估值，不等同于新增市值 |",
         f"| 当前真实可投资现金 | 0元 | 债券到账后净增加{budget.get('investable_cash_yuan', 0):,.0f}元 | {_yuan(budget.get('investable_cash_yuan'))} |",
         "",
         f"- 成交价格：{trade.get('execution_price_usd', '待补充')}美元/份",
         f"- 成交股数：{quantity if quantity is not None else '待补充'}",
-        f"- 实际换汇汇率：{fx_rate if fx_rate is not None else '待补充'}",
+        f"- 交易币种 / 资金币种：{trade.get('trade_currency') or '待补充'} / {trade.get('funding_currency') or '待补充'}",
+        f"- 美元成交金额：{trade.get('trade_amount_usd') if trade.get('trade_amount_usd') is not None else '待补充'}",
+        f"- 实际成交换汇汇率：{actual_fx_rate if actual_fx_rate is not None else 'NOT_APPLICABLE'}",
+        f"- 估值汇率：{valuation_fx_rate if valuation_fx_rate is not None else '待独立估值数据'}",
+        f"- fx_status：{trade.get('fx_status') or 'DATA_INSUFFICIENT'}",
         f"- 手续费：{fee if fee is not None else '待补充'}",
-        "- VOO最新市值：待实际成交股数、最新市场价格和实际汇率补齐后重新计算。",
+        "- VOO最新市值：待最新市场价格和独立估值汇率齐备后重新计算；9,000元成本不作为实时市值。",
     ]
 
 
@@ -456,7 +497,7 @@ def _cn_hk_completeness_table(decision: dict[str, Any]) -> list[str]:
             rows.append(
                 f"| {item.get('symbol')} | {item.get('official_name')} | {item.get('symbol')} | "
                 f"{item.get('exchange')} | {item.get('market')} | {item.get('currency')} | {item.get('timezone')} | "
-                f"{item.get('market_date') or '暂无可靠数据'} | {item.get('source')} | {item.get('data_status')} |"
+                f"{item.get('market_date') or '暂无可靠数据'} | {item.get('source')} | {_normalized_data_status(item)} |"
             )
     return rows
 
@@ -576,7 +617,7 @@ def _market_table(decision: dict[str, Any]) -> list[str]:
     for item in decision.get("market_table", []) or []:
         change = "暂无数据" if item.get("change_pct") is None else f"{float(item['change_pct']):.2f}%"
         previous = "暂无数据" if item.get("previous") is None else f"{float(item['previous']):.2f}"
-        status = "成功" if item.get("success") else _text(item.get("error"), "请求失败")
+        status = _normalized_data_status(item)
         age = "暂无" if item.get("age_hours") is None else f"{float(item['age_hours']):.1f}小时"
         comparable = "是" if item.get("name") in {"VOO", "QQQ"} and pair_comparable else "否"
         rows.append(
@@ -617,11 +658,18 @@ def _risk_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _dqs_table(decision: dict[str, Any]) -> list[str]:
+    dqs = decision.get("dqs", {}) or {}
     rows = [
+        "| 明确用途 | 得分 | 对应场景 |",
+        "| -- | -: | -- |",
+        f"| core_dqs | {dqs.get('core_dqs')} | Scheduled DCA、持仓判断和风险监控 |",
+        f"| opportunity_dqs | {dqs.get('opportunity_dqs')} | Opportunity Add、跨资产比较和机会加仓 |",
+        f"| execution_dqs | {dqs.get('execution_dqs')} | 成交、现金、汇率和持仓对账 |",
+        "",
         "| DQS项目 | 得分 | 满分 | 原因 |",
         "| ----- | -: | -: | -- |",
     ]
-    for item in decision.get("dqs", {}).get("components", []) or []:
+    for item in dqs.get("components", []) or []:
         rows.append(f"| {item['item']} | {item['score']} | {item['max']} | {item['reason']} |")
     rows.extend([
         "",
@@ -640,6 +688,29 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
             f"{item.get('denial_reason', '无')} |"
         )
     return rows
+
+
+def _data_issue_sections(decision: dict[str, Any]) -> list[str]:
+    groups = (decision.get("dqs", {}) or {}).get("data_issues_by_scope", {}) or {}
+    labels = [
+        ("scheduled_dca", "影响Scheduled DCA的数据缺失"),
+        ("opportunity_add", "仅影响Opportunity Add的数据缺失"),
+        ("cross_asset_ranking", "仅影响跨资产排名的数据缺失"),
+        ("execution_reconciliation", "仅影响成交对账的数据缺失"),
+    ]
+    lines: list[str] = []
+    for index, (key, label) in enumerate(labels, start=1):
+        lines.extend([f"### 5.{index} {label}", ""])
+        issues = groups.get(key, []) or []
+        if not issues:
+            lines.append("- 无（VALID 或 NOT_APPLICABLE）")
+        else:
+            for issue in issues:
+                lines.append(
+                    f"- {issue.get('item')}：{_normalized_data_status(issue)}；{issue.get('note') or '仅按所属场景处理。'}"
+                )
+        lines.append("")
+    return lines
 
 
 def _events(decision: dict[str, Any]) -> list[str]:
@@ -737,7 +808,7 @@ def _market_context_status(decision: dict[str, Any]) -> list[str]:
         rows.append(
             f"| {item.get('name')} | {value} | {previous} | {item.get('timestamp') or '暂无'} | "
             f"{item.get('source') or 'unavailable'} | {item.get('source_level', 99)} | "
-            f"{item.get('status', 'missing')} | {'是' if item.get('verified_by_second_source') else '否'} | "
+            f"{_normalized_data_status(item)} | {'是' if item.get('verified_by_second_source') else '否'} | "
             f"{item.get('note') or '暂无'} |"
         )
     if len(rows) == 2:
@@ -767,19 +838,24 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
     provisional = bool(snapshot.get("has_provisional_values") or reconciliation.get("status") == "WARN")
 
     trade_rows = [
-        "| 交易日期 | 成交时间 | 标的 | 方向 | 数量 | 成交价/币种 | 人民币投入 | 资金来源 | 来源类型 | 对账状态 |",
-        "| -- | -- | -- | -- | --: | -- | --: | -- | -- | -- |",
+        "| 交易日期 | 成交时间 | 标的 | 数量 | 成交价 | 交易/资金币种 | 美元成交额 | 人民币等值记录 | 成交汇率 | 估值汇率 | fx_status | 对账状态 |",
+        "| -- | -- | -- | --: | -- | -- | --: | --: | -- | -- | -- | -- |",
     ]
     for trade in transactions:
         trade_rows.append(
             f"| {trade.get('trade_date')} | {trade.get('trade_datetime') or '待补'} | {trade.get('symbol')} | "
-            f"{trade.get('side') or trade.get('action')} | {trade.get('quantity') if trade.get('quantity') is not None else '待补'} | "
+            f"{trade.get('quantity') if trade.get('quantity') is not None else '待补'} | "
             f"{trade.get('execution_price') or trade.get('execution_price_usd')} {trade.get('trade_currency') or 'USD'} | "
-            f"{_yuan(trade.get('invested_amount_cny'))} | {trade.get('funding_source')} | {trade.get('trade_origin')} | "
-            f"{trade.get('reconciliation_status')} |"
+            f"{trade.get('trade_currency') or 'USD'} / {trade.get('funding_currency') or 'DATA_INSUFFICIENT'} | "
+            f"{trade.get('trade_amount_usd') if trade.get('trade_amount_usd') is not None else 'DATA_INSUFFICIENT'} | "
+            f"{_yuan(trade.get('invested_amount_cny'))} | "
+            f"{trade.get('actual_fx_rate_cny_per_usd') if trade.get('actual_fx_rate_cny_per_usd') is not None else 'NOT_APPLICABLE'} | "
+            f"{trade.get('valuation_fx_rate_cny_per_usd') if trade.get('valuation_fx_rate_cny_per_usd') is not None else 'DATA_INSUFFICIENT'} | "
+            f"{trade.get('fx_status') or 'DATA_INSUFFICIENT'} | "
+            f"{'PASS' if trade.get('reconciliation_status') == 'RECONCILED' else trade.get('reconciliation_status')} |"
         )
     if len(trade_rows) == 2:
-        trade_rows.append("| 无 | 无 | 无 | 无 | 无 | 无 | 0元 | 无 | 无 | NOT_APPLICABLE |")
+        trade_rows.append("| 无 | 无 | 无 | 无 | 无 | 无 | 无 | 0元 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE |")
 
     anomalies: list[str] = []
     if reconciliation.get("status") == "WARN":
@@ -822,13 +898,15 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         f"- 运行模式：{decision.get('report_run_mode')}（{decision.get('report_run_mode_label')}）",
         f"- 生成时间：{decision.get('report_generated_at', decision.get('generated_at'))}",
         f"- 数据截止时间：{decision.get('decision_cutoff_at', decision.get('data_cutoff'))}",
-        f"- 数据质量：DQS={dqs.get('score')}（{dqs.get('mode_label')}）",
+        f"- core_dqs={dqs.get('core_dqs')}：用于Scheduled DCA、持仓判断和风险监控",
+        f"- opportunity_dqs={dqs.get('opportunity_dqs')}：用于Opportunity Add、跨资产比较和机会加仓",
+        f"- execution_dqs={dqs.get('execution_dqs')}：用于成交、现金、汇率和持仓对账",
         f"- 是否存在暂估数据：{_yes_no(provisional)}",
         f"- 全局最终交易权限：{gates.get('global_final_permission', 'DENY')}（来源场景：{gates.get('final_trade_permission_source', 'Scheduled DCA')}）",
         f"- 历史实盘交易日期：{decision.get('actual_trade_date') or '无'}",
         "- 所有真实交易均须用户人工确认；系统不自动交易。",
         "",
-        *( ["> **存在未完成对账的实盘交易。总资产、美股市值和资产占比包含暂估口径，不作为精确再平衡依据。**", ""] if provisional else [] ),
+        *( ["> **成交事实对账已独立判断；仍存在待估值成本时，总资产、美股市值和资产占比不作为精确再平衡依据。9,000元成本不冒充实时市值。**", ""] if provisional else [] ),
         *_scenario_permission_table(decision),
         "",
         "## 1. 今日决策卡",
@@ -839,7 +917,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         f"- 建议金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
         f"- 资金来源：{decision.get('funding_source', '今日不使用资金')}",
         f"- 可投资现金：{_yuan(budget.get('investable_cash_yuan'))}",
-        f"- DQS：{dqs.get('score')}；Market Risk Score：{risk.get('score')}",
+        f"- core_dqs / opportunity_dqs / execution_dqs：{dqs.get('core_dqs')} / {dqs.get('opportunity_dqs')} / {dqs.get('execution_dqs')}；Market Risk Score：{risk.get('score')}",
         f"- 最大风险：{decision.get('max_risk')}",
         f"- 下一复核时间：{decision.get('next_daily_review')}",
         f"- 警告：{'；'.join(consistency.get('warnings', []) or []) or '无'}",
@@ -848,6 +926,10 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         "## 2. 已执行交易事实",
         "",
         *trade_rows,
+        "",
+        f"- VOO交易事实对账：{reconciliation.get('status', 'NOT_APPLICABLE')}；execution_dqs={dqs.get('execution_dqs')}；待补成交字段：{'、'.join(reconciliation.get('missing_fields', []) or ['无'])}",
+        f"- VOO总股数：{_text(reconciliation.get('voo_total_quantity'))}；VOO最新人民币市值：{_yuan(reconciliation.get('voo_latest_market_value_cny')) if reconciliation.get('voo_latest_market_value_cny') is not None else '待最新价格和独立估值汇率齐备'}",
+        "- 人民币9,000元仅为资金等值/成本记录，不作为实时市值。",
         "",
         "- 历史已执行交易：以上记录仅按真实交易日期归档，不冒充今日建议。",
         "- 今日建议：由第1节和场景权限表单独给出。",
@@ -865,6 +947,9 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         _items((decision.get("next_triggers", []) or [])[:5]),
         "",
         "## 5. 异常与待补数据",
+        "",
+        *_data_issue_sections(decision),
+        "### 5.5 其他一致性警告（非数据缺失分类）",
         "",
         _items(anomalies),
         "",

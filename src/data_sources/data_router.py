@@ -731,7 +731,22 @@ def _status_point(
     freshness_status: str = "unavailable",
     age_hours: Any = None,
     comparable_date: Any = None,
+    data_status: str | None = None,
 ) -> dict[str, Any]:
+    normalized_status = str(data_status or "").upper()
+    if normalized_status not in {
+        "VALID", "VALID_LAGGED_BY_DESIGN", "ESTIMATED", "DATA_INSUFFICIENT",
+        "NOT_CONNECTED", "SOURCE_FAILED", "NOT_APPLICABLE",
+    }:
+        status_text = str(status or "").lower()
+        if status_text in {"ok", "success", "cached"} and not stale:
+            normalized_status = "VALID_LAGGED_BY_DESIGN" if data_frequency in {"monthly", "quarterly"} else "VALID"
+        elif status_text in {"not_connected", "unavailable", "missing"} and source == "unavailable":
+            normalized_status = "NOT_CONNECTED"
+        elif status_text in {"failed", "error"}:
+            normalized_status = "SOURCE_FAILED"
+        else:
+            normalized_status = "DATA_INSUFFICIENT"
     return {
         "name": name,
         "value": value,
@@ -740,6 +755,7 @@ def _status_point(
         "source": source,
         "source_level": source_level,
         "status": status,
+        "data_status": normalized_status,
         "stale": stale,
         "verified_by_second_source": verified,
         "note": note,
@@ -769,7 +785,8 @@ def _build_market_context_status(items: dict[str, Any], macro: dict[str, Any]) -
                       data_frequency=str(vix.get("data_frequency") or "quote"),
                       data_session=str(vix.get("data_session") or "unavailable"),
                       freshness_status=str(vix.get("freshness_status") or "unavailable"),
-                      age_hours=vix.get("age_hours"), comparable_date=vix.get("comparable_date")),
+                      age_hours=vix.get("age_hours"), comparable_date=vix.get("comparable_date"),
+                      data_status=vix.get("data_status")),
         _status_point("Put/Call Ratio", note="未找到当前流程可稳定复用的官方接口，本版不接入。"),
         _status_point("市场宽度", note="上涨/下跌家数与新高/新低未接入；不得以指数涨跌替代。"),
         _status_point("ETF资金流", note="未接入可靠许可数据；不得以价格或成交量替代净申赎。"),
@@ -790,6 +807,7 @@ def _build_market_context_status(items: dict[str, Any], macro: dict[str, Any]) -
                 data_session=str(point.get("data_session") or "official_lagged_macro"),
                 freshness_status=str(point.get("freshness_status") or "official_lagged"),
                 age_hours=point.get("age_hours"), comparable_date=point.get("comparable_date"),
+                data_status=point.get("data_status"),
             )
         )
     return {

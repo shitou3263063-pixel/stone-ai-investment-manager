@@ -154,12 +154,12 @@ def test_12_voo_trade_amount_counted_once() -> None:
     assert sum(row["invested_amount_cny"] for row in snapshot["confirmed_transactions"] if row["id"] == trade["id"]) == 9000
 
 
-def test_13_pending_reconciliation_does_not_increase_voo_value() -> None:
+def test_13_pending_valuation_does_not_increase_voo_value() -> None:
     holdings = build_portfolio_snapshot()["holdings"]
     original = next(row for row in holdings if row["security_code"] == "VOO")
     pending = next(row for row in holdings if row["security_code"] == "VOO_PENDING_20260715")
     assert original["market_value_cny"] == 130000
-    assert pending["valuation_status"] == "pending_actual_fx_rate"
+    assert pending["valuation_status"] == "trade_reconciled_valuation_fx_pending"
     assert pending["actual_quantity"] == pytest.approx(2.166)
     assert pending["actual_fx_rate"] is None
     assert pending["fee"] == 0

@@ -13,15 +13,15 @@ from zoneinfo import ZoneInfo
 
 BASE_URL = "https://api.stlouisfed.org/fred"
 FRESHNESS_DAYS = {
-    "DGS10": 10,
-    "DGS2": 10,
+    "DGS10": 3,
+    "DGS2": 3,
     "T10Y2Y": 10,
-    "BAMLH0A0HYM2": 10,
-    "CPIAUCSL": 60,
+    "BAMLH0A0HYM2": 3,
+    "CPIAUCSL": 50,
     "PPIACO": 60,
     "PCEPI": 60,
-    "UNRATE": 60,
-    "GDP": 150,
+    "UNRATE": 45,
+    "GDP": 130,
 }
 MONTHLY_SERIES = {"CPIAUCSL", "PPIACO", "PCEPI", "UNRATE"}
 QUARTERLY_SERIES = {"GDP"}
@@ -87,6 +87,14 @@ def get_series_latest(series_id: str) -> dict[str, Any]:
         age_hours = None
         observed_at = None
     stale = age_days > FRESHNESS_DAYS.get(series_id, 60)
+    frequency = _frequency(series_id)
+    data_status = (
+        "DATA_INSUFFICIENT"
+        if stale
+        else "VALID_LAGGED_BY_DESIGN"
+        if frequency in {"monthly", "quarterly"}
+        else "VALID"
+    )
     previous = observations[1].get("value") if len(observations) > 1 else None
     previous_value = None if previous in (None, "", ".") else float(previous)
     return {
@@ -99,9 +107,10 @@ def get_series_latest(series_id: str) -> dict[str, Any]:
         "quote_timestamp": None,
         "fetched_at": fetched.isoformat(),
         "market_timezone": "America/New_York",
-        "data_frequency": _frequency(series_id),
+        "data_frequency": frequency,
         "data_session": "official_lagged_macro",
         "freshness_status": "stale" if stale else "official_lagged",
+        "data_status": data_status,
         "age_hours": age_hours,
         "source_level": 1,
         "comparable_date": observed_date or None,

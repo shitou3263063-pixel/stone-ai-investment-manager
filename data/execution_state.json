@@ -55,11 +55,16 @@
       "action": "BUY",
       "execution_price_usd": 692.5,
       "invested_amount_cny": 9000,
+      "trade_currency": "USD",
+      "funding_currency": "USD",
+      "trade_amount_usd": 1499.955,
       "funding_source": "2026-07-15到期债券资金",
       "data_source": "user_confirmed",
       "quantity": 2.166,
       "actual_fx_rate_cny_per_usd": null,
-      "actual_fx_rate_status": "USER_INSTRUCTED_IGNORE_NOT_ESTIMATED",
+      "valuation_fx_rate_cny_per_usd": null,
+      "fx_status": "NOT_APPLICABLE_USD_CASH",
+      "actual_fx_rate_status": "NOT_APPLICABLE_USD_CASH",
       "fee": 0,
       "fee_status": "USER_CONFIRMED_ZERO",
       "fee_currency": "USD",
@@ -67,11 +72,11 @@
       "booked_to_portfolio": true,
       "real_trade": true,
       "simulation_trade": false,
-      "valuation_status": "pending_actual_fx_rate",
-      "reconciliation_status": "WARN",
-      "missing_reconciliation_fields": ["actual_fx_rate_cny_per_usd"],
-      "reconciliation_note": "User confirmed trade time, quantity, and zero fee; actual FX rate intentionally not estimated.",
-      "note": "此前既定周三基础定投计划的执行结果；到期债券资金是资金来源，债券转权益是迁移属性。交易金额只计算一次。成交时间、股数和零手续费已由用户确认；实际汇率按用户要求忽略且不估算，因此人民币最新市值继续待对账。"
+      "valuation_status": "trade_reconciled_valuation_fx_pending",
+      "reconciliation_status": "RECONCILED",
+      "missing_reconciliation_fields": [],
+      "reconciliation_note": "User confirmed USD-account cash funding; actual trade FX is not applicable. Valuation FX remains separate and is not estimated.",
+      "note": "此前既定周三基础定投计划的执行结果；到期债券资金是资金来源，债券转权益是迁移属性。交易金额只计算一次。成交使用美元账户已有美元现金，人民币9000元仅为资金等值记录；成交汇率不适用，估值汇率仍待独立取得且不得估算。"
     }
   ]
 }
