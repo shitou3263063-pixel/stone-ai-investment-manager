@@ -32,8 +32,11 @@ ALLOCATION_BUCKET_CATEGORY = {
 TRADE_RECONCILIATION_FIELDS = [
     "trade_datetime",
     "quantity",
-    "actual_fx_rate_cny_per_usd",
     "fee",
+    "trade_currency",
+    "funding_currency",
+    "trade_amount_usd",
+    "fx_status",
 ]
 
 
@@ -44,6 +47,19 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def trade_reconciliation_missing_fields(trade: dict[str, Any]) -> list[str]:
+    """Return factual execution gaps without treating USD-cash funding as an FX trade."""
+    missing = [field for field in TRADE_RECONCILIATION_FIELDS if trade.get(field) in {None, ""}]
+    funding_currency = str(trade.get("funding_currency") or "").upper()
+    fx_status = str(trade.get("fx_status") or "").upper()
+    actual_fx = trade.get("actual_fx_rate_cny_per_usd")
+    if funding_currency == "CNY" and actual_fx in {None, ""}:
+        missing.append("actual_fx_rate_cny_per_usd")
+    elif funding_currency == "USD" and fx_status != "NOT_APPLICABLE_USD_CASH":
+        missing.append("fx_status")
+    return list(dict.fromkeys(missing))
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -145,6 +161,11 @@ def _snapshot_holding(
         "additional_cost_cny": holding.get("additional_cost_cny"),
         "actual_quantity": holding.get("actual_quantity"),
         "actual_fx_rate": holding.get("actual_fx_rate"),
+        "valuation_fx_rate_cny_per_usd": holding.get("valuation_fx_rate_cny_per_usd"),
+        "trade_currency": holding.get("trade_currency"),
+        "funding_currency": holding.get("funding_currency"),
+        "trade_amount_usd": holding.get("trade_amount_usd"),
+        "trade_fx_status": holding.get("fx_status"),
         "fee": holding.get("fee"),
     }
 
@@ -155,11 +176,11 @@ def _normalized_confirmed_transaction(item: dict[str, Any]) -> dict[str, Any]:
     row["execution_price"] = row.get("execution_price") or row.get("execution_price_usd")
     row["trade_currency"] = row.get("trade_currency") or ("USD" if row.get("execution_price_usd") else row.get("currency"))
     row["user_confirmed"] = bool(row.get("user_confirmed", row.get("data_source") == "user_confirmed"))
-    missing = [field for field in TRADE_RECONCILIATION_FIELDS if row.get(field) in {None, ""}]
+    missing = trade_reconciliation_missing_fields(row)
     row["missing_reconciliation_fields"] = missing
     row["reconciliation_status"] = "WARN" if missing else "RECONCILED"
     row["valuation_status"] = (
-        "pending_quantity_fx_fee" if missing else "trade_fields_complete_awaiting_latest_market_price"
+        "pending_quantity_fx_fee" if missing else row.get("valuation_status") or "trade_reconciled_valuation_fx_pending"
     )
     return row
 
@@ -214,6 +235,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
             "pending_actual_quantity_fx_fee",
             "pending_actual_fx_rate",
             "pending_quantity_fx_fee",
+            "trade_reconciled_valuation_fx_pending",
         }
     ]
     decision_class_totals: dict[str, int] = {}
@@ -253,11 +275,16 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         if pending_voo is not None:
             pending_voo["actual_quantity"] = voo_trade.get("quantity")
             pending_voo["actual_fx_rate"] = voo_trade.get("actual_fx_rate_cny_per_usd")
+            pending_voo["valuation_fx_rate_cny_per_usd"] = voo_trade.get("valuation_fx_rate_cny_per_usd")
+            pending_voo["trade_currency"] = voo_trade.get("trade_currency")
+            pending_voo["funding_currency"] = voo_trade.get("funding_currency")
+            pending_voo["trade_amount_usd"] = voo_trade.get("trade_amount_usd")
+            pending_voo["trade_fx_status"] = voo_trade.get("fx_status")
             pending_voo["fee"] = voo_trade.get("fee")
             if not voo_trade.get("missing_reconciliation_fields"):
                 pending_voo["quantity"] = voo_trade.get("quantity")
                 pending_voo["unit"] = "share"
-                pending_voo["valuation_status"] = "trade_fields_complete_awaiting_latest_market_price"
+                pending_voo["valuation_status"] = "trade_reconciled_valuation_fx_pending"
                 pending_voo["confidence"] = "medium"
 
     gold_detail_total = sum(int(item["market_value_cny"]) for item in holdings if item["asset_class"] == "黄金")

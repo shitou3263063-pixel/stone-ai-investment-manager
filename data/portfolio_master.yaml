@@ -34,8 +34,8 @@ notes:
   - "10年地债约132200元已包含在中国债券中，不得重复计算。"
   - "2026-07-15交易后账户总现金为241000元，其中220000元为固定现金安全储备，21000元为已到账的债券转权益专项可投资现金。"
   - "2026-07-15债券到期到账30000元，债券本金由1130000元降至1100000元；具体到期券种待补充，组合层面先冲减中国债券核心组合。"
-  - "2026-07-15以692.5美元/份买入VOO，人民币投入成本9000元；成交股数、实际换汇汇率和手续费待补充。"
-  - "VOO原确认市值130000元不机械更新为139000元；新增9000元单列为待估值成本，待成交字段补齐后按实际股数、最新价格和实际汇率重估。"
+  - "2026-07-15以692.5美元/份买入VOO 2.166股，使用美元账户已有美元现金；人民币9000元仅为资金等值记录，成交汇率不适用。"
+  - "VOO原确认市值130000元不机械更新为139000元；新增9000元单列为待估值成本，待最新价格和独立估值汇率齐备后重估。"
   - "黄金分类总额547000元，等于实物金条512000元 + 黄金ETF 35000元。"
 
 totals:
@@ -94,7 +94,7 @@ holdings:
     allocation_bucket: us_equity
     economic_exposure: us_large_cap_equity
     listing_market: US
-    security_name: VOO 2026-07-15新增投入成本（待实际汇率估值）
+    security_name: VOO 2026-07-15新增投入成本（待独立估值汇率）
     security_code: VOO_PENDING_20260715
     market: US
     currency: CNY
@@ -105,15 +105,20 @@ holdings:
     valuation_time: 2026-07-15
     confidence: pending
     account: IBKR
-    liquidity_status: pending_actual_fx_rate
+    liquidity_status: pending_valuation_fx_rate
     strategy_bucket: pending_valuation
-    valuation_method: confirmed_cost_pending_actual_fx_rate
-    valuation_status: pending_actual_fx_rate
+    valuation_method: confirmed_cost_pending_valuation_fx_rate
+    valuation_status: trade_reconciled_valuation_fx_pending
     reference_symbol: VOO
     execution_price_usd: 692.5
     additional_cost_cny: 9000
     actual_quantity: 2.166
     actual_fx_rate: null
+    valuation_fx_rate_cny_per_usd: null
+    trade_currency: USD
+    funding_currency: USD
+    trade_amount_usd: 1499.955
+    fx_status: NOT_APPLICABLE_USD_CASH
     fee: 0
 
   - asset_id: us_nvda

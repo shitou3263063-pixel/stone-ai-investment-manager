@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from src.data_sources import fred_client
 from src.decision.v12_1_decision import (
     build_opportunity_scores,
     build_portfolio_repair_priority,
@@ -222,13 +224,18 @@ def test_14_existing_cash_trade_and_grid_isolation_contract() -> None:
     assert snapshot["cash"]["paper_grid_cash_cny"] == 0
     trade = snapshot["confirmed_transactions"][0]
     assert trade["invested_amount_cny"] == 9000
-    assert trade["reconciliation_status"] == "WARN"
+    assert trade["reconciliation_status"] == "RECONCILED"
     assert trade["trade_datetime"] == "2026-07-15T10:24:00-04:00"
     assert trade["quantity"] == pytest.approx(2.166)
     assert trade["execution_price"] == pytest.approx(692.5)
     assert trade["fee"] == 0
     assert trade["actual_fx_rate_cny_per_usd"] is None
-    assert trade["missing_reconciliation_fields"] == ["actual_fx_rate_cny_per_usd"]
+    assert trade["valuation_fx_rate_cny_per_usd"] is None
+    assert trade["trade_currency"] == "USD"
+    assert trade["funding_currency"] == "USD"
+    assert trade["trade_amount_usd"] == pytest.approx(1499.955)
+    assert trade["fx_status"] == "NOT_APPLICABLE_USD_CASH"
+    assert trade["missing_reconciliation_fields"] == []
 
 
 def test_15_provisional_cost_is_not_exact_rebalance_value() -> None:
@@ -245,16 +252,77 @@ def test_16_market_risk_weights_are_exactly_100() -> None:
     assert sum(strategy["market_risk_weights"].values()) == 100
 
 
-def test_17_user_ignored_fx_is_not_estimated() -> None:
+def test_17_usd_cash_trade_does_not_require_actual_fx() -> None:
     snapshot = build_portfolio_snapshot()
     summary = build_trade_reconciliation_summary(
         snapshot,
         {"items": {"VOO": {"current_price": 700}}},
     )
-    assert summary["status"] == "WARN"
-    assert summary["missing_fields"] == ["actual_fx_rate_cny_per_usd"]
-    assert "actual_fx_rate_cny_per_usd" in summary["warning"]
-    assert "trade_datetime" not in summary["warning"]
+    assert summary["status"] == "PASS"
+    assert summary["missing_fields"] == []
+    assert summary["transaction_reconciliation_quality"] == 100
+    assert summary["trade_standard_fields"]["actual_fx_rate_cny_per_usd"] is None
+    assert summary["trade_standard_fields"]["fx_status"] == "NOT_APPLICABLE_USD_CASH"
     assert summary["auto_recalculated"] is False
-    assert summary["voo_total_quantity"] is None
+    assert summary["voo_total_quantity"] == pytest.approx(30.166)
     assert summary["voo_latest_market_value_cny"] is None
+
+
+def test_18_cpi_and_gdp_use_release_frequency_freshness(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed_dates = {
+        "CPIAUCSL": date.today() - timedelta(days=50),
+        "GDP": date.today() - timedelta(days=130),
+    }
+
+    def fake_get(_: str, params: dict[str, str]) -> dict:
+        observed = observed_dates[params["series_id"]].isoformat()
+        return {"observations": [{"date": observed, "value": "100"}]}
+
+    monkeypatch.setattr(fred_client, "_get_json", fake_get)
+    cpi = fred_client.get_series_latest("CPIAUCSL")
+    gdp = fred_client.get_series_latest("GDP")
+    assert cpi["stale"] is False
+    assert gdp["stale"] is False
+    assert cpi["data_status"] == "VALID_LAGGED_BY_DESIGN"
+    assert gdp["data_status"] == "VALID_LAGGED_BY_DESIGN"
+
+    observed_dates["CPIAUCSL"] = date.today() - timedelta(days=51)
+    observed_dates["GDP"] = date.today() - timedelta(days=131)
+    assert fred_client.get_series_latest("CPIAUCSL")["data_status"] == "DATA_INSUFFICIENT"
+    assert fred_client.get_series_latest("GDP")["data_status"] == "DATA_INSUFFICIENT"
+
+
+def test_19_three_dqs_are_independent_and_enhancement_only_limits_opportunity() -> None:
+    live = _live_market()
+    live["items"]["VOO"].update({"price_stage": "OFFICIAL_CLOSE", "is_finalized": True})
+    live["market_context_status"] = {"indicators": []}
+    dqs = compute_dqs(live, load_strategy(), {"calendar_confidence": "high"})
+
+    assert dqs["core_dqs"] == dqs["use_cases"]["scheduled_dca"]["score"]
+    assert dqs["opportunity_dqs"] == dqs["use_cases"]["opportunity_add"]["score"]
+    assert dqs["execution_dqs"] == dqs["use_cases"]["transaction_reconciliation"]["score"]
+    assert dqs["use_cases"]["scheduled_dca"]["allowed"] is True
+    assert dqs["use_cases"]["opportunity_add"]["allowed"] is False
+    opportunity_issues = dqs["data_issues_by_scope"]["opportunity_add"]
+    assert {row["item"] for row in opportunity_issues} >= {"市场宽度", "ETF资金流"}
+    assert all(row["data_status"] == "NOT_CONNECTED" for row in opportunity_issues)
+    assert dqs["data_issues_by_scope"]["scheduled_dca"] == []
+
+
+def test_20_daily_report_explains_three_dqs_and_four_missing_data_scopes() -> None:
+    decision = _decision()
+    live = _live_market()
+    live["items"]["VOO"].update({"price_stage": "OFFICIAL_CLOSE", "is_finalized": True})
+    live["market_context_status"] = {"indicators": []}
+    decision["dqs"] = compute_dqs(live, load_strategy(), {"calendar_confidence": "high"})
+    report = generate_daily_report(decision=decision)
+
+    assert "core_dqs=" in report
+    assert "opportunity_dqs=" in report
+    assert "execution_dqs=" in report
+    assert "数据质量：DQS=" not in report
+    assert "影响Scheduled DCA的数据缺失" in report
+    assert "仅影响Opportunity Add的数据缺失" in report
+    assert "仅影响跨资产排名的数据缺失" in report
+    assert "仅影响成交对账的数据缺失" in report
+    assert "市场宽度：NOT_CONNECTED" in report

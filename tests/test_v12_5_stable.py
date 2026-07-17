@@ -131,7 +131,7 @@ def test_dqs_safe_mode_downgrades_actionable_opportunities() -> None:
 
 def test_consistency_validation_is_real_pass() -> None:
     decision = _decision()
-    assert decision["consistency"]["status"] == "WARN"
+    assert decision["consistency"]["status"] == "PASS"
     assert decision["consistency"]["errors"] == []
 
 
@@ -154,10 +154,12 @@ def test_voo_trade_keeps_ignored_fx_unknown_and_does_not_fake_market_value() -> 
     assert original["market_value_cny"] == 130000
     assert original["quantity"] == 28
     assert pending["market_value_cny"] == 9000
-    assert pending["valuation_status"] == "pending_actual_fx_rate"
+    assert pending["valuation_status"] == "trade_reconciled_valuation_fx_pending"
     assert trade["trade_datetime"] == "2026-07-15T10:24:00-04:00"
     assert trade["quantity"] == 2.166
     assert trade["actual_fx_rate_cny_per_usd"] is None
+    assert trade["funding_currency"] == "USD"
+    assert trade["fx_status"] == "NOT_APPLICABLE_USD_CASH"
     assert trade["fee"] == 0
     assert trade["real_trade"] is True
     assert trade["simulation_trade"] is False

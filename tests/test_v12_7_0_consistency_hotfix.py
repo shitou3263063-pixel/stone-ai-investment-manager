@@ -17,7 +17,13 @@ def _trade(**overrides):
         "trade_date": "2026-07-15",
         "trade_datetime": None,
         "quantity": None,
+        "execution_price_usd": 700,
+        "trade_currency": "USD",
+        "funding_currency": "CNY",
+        "trade_amount_usd": 1400,
         "actual_fx_rate_cny_per_usd": None,
+        "valuation_fx_rate_cny_per_usd": 7.2,
+        "fx_status": "ACTUAL_FX_REQUIRED",
         "fee": None,
     }
     row.update(overrides)
@@ -136,12 +142,12 @@ def test_missing_trade_fields_remain_warn_without_estimation() -> None:
         {"items": {"VOO": {"current_price": 700}}},
     )
     assert summary["status"] == "WARN"
-    assert summary["missing_fields"] == [
+    assert set(summary["missing_fields"]) == {
         "trade_datetime",
         "quantity",
         "actual_fx_rate_cny_per_usd",
         "fee",
-    ]
+    }
     assert summary["auto_recalculated"] is False
     assert summary["voo_total_quantity"] is None
     assert summary["voo_latest_market_value_cny"] is None
@@ -158,7 +164,7 @@ def test_completed_trade_fields_trigger_automatic_recalculation() -> None:
         _snapshot(trade),
         {"items": {"VOO": {"current_price": 700}}},
     )
-    assert summary["status"] == "RECONCILED"
+    assert summary["status"] == "PASS"
     assert summary["transaction_reconciliation_quality"] == 100
     assert summary["auto_recalculated"] is True
     assert summary["voo_total_quantity"] == 30

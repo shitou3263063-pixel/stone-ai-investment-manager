@@ -171,5 +171,5 @@ def test_data_source_fallback() -> None:
 
 def test_consistency_validation() -> None:
     decision = _decision()
-    assert decision["consistency"]["status"] == "WARN"
+    assert decision["consistency"]["status"] == "PASS"
     assert decision["consistency"]["errors"] == []
