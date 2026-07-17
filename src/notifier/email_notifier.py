@@ -448,6 +448,43 @@ def send_test_email(env_path: Path | None = None) -> dict[str, Any]:
         return _failure_result("邮件测试发送失败，已跳过", exc)
 
 
+def send_workflow_failure_notification(
+    *,
+    failed_stage: str,
+    run_url: str = "",
+    env_path: Path | None = None,
+) -> dict[str, Any]:
+    """Send a dedicated alert when report production fails in GitHub Actions."""
+    config = _get_email_config(env_path)
+    if not config:
+        message = "邮件未配置，无法发送日报生产失败通知"
+        write_log(message, filename="email_notifier.log")
+        return {"sent": False, "skipped": True, "message": message, "error": ""}
+
+    subject = "[失败] Stone AI 日报生产未完成"
+    body_lines = [
+        "Stone AI Investment Manager 的日报生产流程执行失败。",
+        f"失败阶段：{failed_stage}",
+        "完整运行日志已由 GitHub Actions 上传为 artifact，请及时检查。",
+    ]
+    if run_url:
+        body_lines.append(f"运行详情：{run_url}")
+    body_lines.extend(
+        [
+            "本次失败不代表系统执行了任何交易。",
+            "系统不自动交易，现有投资策略和交易规则未发生变化。",
+        ]
+    )
+
+    try:
+        _send_email(config, subject, "\n".join(body_lines), [])
+        message = f"日报生产失败通知已发送到 {_mask_email(config['EMAIL_TO'])}"
+        write_log(message, filename="email_notifier.log")
+        return {"sent": True, "skipped": False, "message": message, "error": ""}
+    except Exception as exc:  # noqa: BLE001
+        return _failure_result("日报生产失败通知发送失败，已记录错误", exc)
+
+
 def send_daily_reports(
     reports_dir: Path | None = None,
     subject_date: date | None = None,

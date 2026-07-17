@@ -165,7 +165,7 @@ def test_hard_validation_detects_live_grid_budget_in_simulation() -> None:
 
 def test_workflow_has_single_entry_and_concurrency() -> None:
     workflow = Path(".github/workflows/daily.yml").read_text(encoding="utf-8")
-    assert workflow.count("run: python main.py") == 1
+    assert workflow.count("python main.py 2>&1 | tee logs/main.log") == 1
     assert "concurrency:" in workflow
     assert 'cron: "30 8 * * *"' in workflow
     assert 'timezone: "Asia/Shanghai"' in workflow

@@ -161,13 +161,15 @@ def test_tushare_response_schema_error_is_explicit(monkeypatch: pytest.MonkeyPat
 
 
 def test_hkma_official_data_is_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    sample_date = date.today().isoformat()
+
     def fake_get(url: str, params: dict, timeout: int = 15) -> dict:
         if "daily-figures" in url:
-            row = {"end_of_date": "2026-07-14", "closing_balance": 120000, "opening_balance": 119000, "cu_weakside": 7.85, "cu_strongside": 7.75}
+            row = {"end_of_date": sample_date, "closing_balance": 120000, "opening_balance": 119000, "cu_weakside": 7.85, "cu_strongside": 7.75}
         elif "hk-interbank" in url:
-            row = {"end_of_day": "2026-07-14", "ir_overnight": 1.8, "ir_1m": 2.1, "ir_3m": 2.3}
+            row = {"end_of_day": sample_date, "ir_overnight": 1.8, "ir_1m": 2.1, "ir_3m": 2.3}
         else:
-            row = {"end_of_day": "2026-07-14", "usd": 7.8, "cny": 1.09}
+            row = {"end_of_day": sample_date, "usd": 7.8, "cny": 1.09}
         return {"header": {"success": True}, "result": {"records": [row]}}
     monkeypatch.setattr(hkma_client, "_get_json", fake_get)
     monkeypatch.setattr(hkma_client, "write_cache", lambda *args, **kwargs: None)
