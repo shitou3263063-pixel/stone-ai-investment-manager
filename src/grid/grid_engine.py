@@ -233,7 +233,11 @@ def evaluate_symbol(
     item = _quote(live_market_result, symbol)
     price = _price(item)
     snapshot_comparable = True if decision_snapshot is None else bool(decision_snapshot.get("snapshot_comparable"))
-    total_assets = float(decision.get("portfolio_value_yuan", 0) or 0)
+    total_assets = float(
+        ((decision.get("portfolio_snapshot", {}) or {}).get("total_valued_assets"))
+        or decision.get("portfolio_value_yuan", 0)
+        or 0
+    )
     symbol_budget_yuan = symbol_budget(symbol, total_assets, grid_budget, symbol_cfg)
     total_quantity = float(quantities.get(symbol, 0) or 0)
     split = split_core_grid(total_quantity, float(symbol_cfg.get("core_position_pct", 70) or 70))
@@ -320,7 +324,7 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
     decision_snapshot = build_grid_decision_snapshot(
         live_market_result, max_gap_minutes=max_gap_minutes,
         decision_cutoff_time=(decision.get("data_time_summary", {}) or {}).get("decision_cutoff_time"),
-        dqs_score=int((decision.get("dqs", {}) or {}).get("score", 0) or 0),
+        dqs_score=int((decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}).get("grid_dqs", 0) or 0),
         require_dqs=int((smart.get("risk", {}) or {}).get("require_dqs", 85) or 85),
     )
     symbols = {}

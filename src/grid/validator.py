@@ -30,8 +30,9 @@ def review_grid_signal(
     reasons: list[str] = []
     paper_mode = bool(smart.get("paper_mode", True))
     require_dqs = int(risk_cfg.get("require_dqs", 85) or 85)
-    dqs_score = int(decision.get("dqs", {}).get("score", 0) or 0)
-    dqs_mode = str(decision.get("dqs", {}).get("mode", "safe"))
+    quality = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
+    dqs_score = int(quality.get("grid_dqs", 0) or 0)
+    dqs_mode = str(quality.get("mode", "safe"))
 
     if signal.action == "NONE":
         reasons.append(signal.reason)
@@ -66,7 +67,11 @@ def review_grid_signal(
     if signal.action == "SELL" and state.sell_spacing_pct * 10000 <= float(smart.get("transaction_cost", {}).get("estimated_slippage_bps", 5)) + float(smart.get("transaction_cost", {}).get("min_expected_profit_bps", 20)):
         reasons.append("扣除交易成本和滑点后预期利润不足。")
     if signal.symbol in {"QQQ", "QQQM"} and signal.action == "BUY":
-        total_assets = float(decision.get("portfolio_value_yuan", 0) or 0)
+        total_assets = float(
+            ((decision.get("portfolio_snapshot", {}) or {}).get("total_valued_assets"))
+            or decision.get("portfolio_value_yuan", 0)
+            or 0
+        )
         exposure = estimate_tech_exposure_yuan(portfolio_result)
         limit_pct = float(symbol_cfg.get("tech_concentration_limit_pct", 18) or 18)
         if total_assets and exposure / total_assets * 100 >= limit_pct:

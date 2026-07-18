@@ -6,7 +6,11 @@ from typing import Any
 def build_grid_budget(decision: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     smart = config.get("smart_grid", {})
     portfolio = smart.get("portfolio", {})
-    total_assets = float(decision.get("portfolio_value_yuan", 0) or 0)
+    total_assets = float(
+        ((decision.get("portfolio_snapshot", {}) or {}).get("total_valued_assets"))
+        or decision.get("portfolio_value_yuan", 0)
+        or 0
+    )
     confirmed_cash = float(decision.get("budget", {}).get("confirmed_cash_available_yuan", 0) or 0)
     total_limit_pct = float(portfolio.get("total_grid_capital_pct", 4) or 4)
     max_total_pct = float(portfolio.get("max_total_grid_capital_pct", 8) or 8)

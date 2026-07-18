@@ -1,0 +1,18 @@
+{
+  "total_valued_assets": 2812100,
+  "pending_valuation_total": 9000,
+  "total_asset_including_cost_records": 2821100,
+  "asset_class_values": {
+    "美股": 330000,
+    "港股": 272600,
+    "A股": 266500,
+    "债券": 1155000,
+    "黄金": 547000,
+    "现金": 241000
+  },
+  "core_dqs": 75,
+  "opportunity_dqs": 75,
+  "execution_dqs": 100,
+  "rebalance_dqs": 100,
+  "grid_dqs": 0
+}

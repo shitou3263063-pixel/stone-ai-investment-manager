@@ -22,6 +22,10 @@ dqs_thresholds:
   cap_when_dual_source_below: 0.25
   severe_conflict_cap: 59
 
+scheduled_dca_dqs:
+  hard_min_dqs: 65
+  normal_execution_dqs: 75
+
 dqs_weights:
   field_completeness: 20
   timeliness: 15

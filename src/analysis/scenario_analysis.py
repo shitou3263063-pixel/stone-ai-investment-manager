@@ -22,10 +22,13 @@ def calculate_portfolio_stress_scenarios(
     allocation: list[dict[str, Any]],
     scenario_config: dict[str, Any],
     stress_exposures: list[dict[str, Any]] | None = None,
+    portfolio_snapshot: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """按当前资产金额做静态情景测算；结果用于风险理解，不生成交易指令。"""
     exposure_rows = stress_exposures or allocation
-    total = sum(float(row.get("current_amount_yuan", 0) or 0) for row in exposure_rows)
+    total = float((portfolio_snapshot or {}).get("total_valued_assets", 0) or 0)
+    if not total:  # Compatibility path for isolated legacy callers/tests.
+        total = sum(float(row.get("current_amount_yuan", 0) or 0) for row in exposure_rows)
     tolerance_low = float(scenario_config.get("max_drawdown_tolerance_low", 0.25) or 0.25)
     tolerance_high = float(scenario_config.get("max_drawdown_tolerance_high", 0.35) or 0.35)
     results: list[dict[str, Any]] = []

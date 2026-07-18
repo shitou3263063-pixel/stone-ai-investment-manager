@@ -13,6 +13,7 @@ from src.data_sources.normalized_market import PRICE_STAGES, classify_price_stag
 from src.macro.macro_calendar import get_upcoming_high_risk_events
 from src.portfolio_snapshot import (
     TRADE_RECONCILIATION_FIELDS,
+    apply_verified_market_valuation,
     build_portfolio_snapshot,
     trade_reconciliation_missing_fields,
 )
@@ -24,6 +25,7 @@ VERSION_NAME = "Stone AI Investment Manager Pro V12.7.1 Final Freeze"
 
 DEFAULT_STRATEGY: dict[str, Any] = {
     "cash": {"safety_ratio": 0.08, "hard_floor_ratio": 0.05},
+    "scheduled_dca_dqs": {"hard_min_dqs": 65, "normal_execution_dqs": 75},
     "dqs_thresholds": {
         "exact_amount": 85,
         "range_amount": 75,
@@ -265,11 +267,27 @@ def build_trade_permission_gates(
     budget: dict[str, Any],
     risk: dict[str, Any],
     macro_result: dict[str, Any],
+    comparability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return scenario-specific permissions and a sourced global conclusion."""
     use_cases = dqs.get("use_cases", {}) or {}
     investable_cash = float(budget.get("confirmed_cash_available_yuan", 0) or 0)
     live_grid_cash = float(budget.get("live_grid_cash_yuan", 0) or 0)
+    comparability = comparability or {}
+    dqs_bindings = {
+        "scheduled_dca": "core_dqs",
+        "opportunity_add": "opportunity_dqs",
+        "strategic_rebalance": "rebalance_dqs",
+        "grid": "grid_dqs",
+        "risk_monitoring": "core_dqs",
+        "transaction_reconciliation": "execution_dqs",
+    }
+    comparability_bindings = {
+        "scheduled_dca": "core_decision_comparability",
+        "opportunity_add": "cross_asset_comparability",
+        "strategic_rebalance": "core_decision_comparability",
+        "grid": "grid_snapshot_comparability",
+    }
     specs = [
         ("scheduled_dca", "Scheduled DCA", RISK_GATE_THRESHOLDS["scheduled_dca"], False),
         ("opportunity_add", "Opportunity Add", RISK_GATE_THRESHOLDS["opportunity_add"], True),
@@ -281,7 +299,8 @@ def build_trade_permission_gates(
     scenarios: list[dict[str, Any]] = []
     for key, name, risk_threshold, strict_confidence in specs:
         case = use_cases.get(key, {}) or {}
-        score = int(case.get("score", 0) or 0)
+        used_dqs_name = dqs_bindings[key]
+        score = int(dqs.get(used_dqs_name, case.get("score", 0)) or 0)
         required = int(case.get("threshold", 0) or 0)
         dqs_gate = score >= required
         if key == "scheduled_dca":
@@ -322,7 +341,12 @@ def build_trade_permission_gates(
             reasons.append("专项可投资现金不足" if key != "grid" else "实盘网格专用现金为0")
         reasons.extend(gate["risk_blocking_factors"])
         reasons.extend(gate["event_blocking_factors"])
-        all_gates = bool(dqs_gate and schedule_gate and cash_gate and gate["risk_gate_passed"] and gate["event_gate_passed"])
+        comparability_key = comparability_bindings.get(key)
+        comparability_status = str(comparability.get(comparability_key) or "NOT_APPLICABLE")
+        comparability_gate = comparability_status in {"COMPARABLE", "NOT_APPLICABLE", "NOT_EVALUATED"}
+        if not comparability_gate:
+            reasons.append(f"{comparability_key}={comparability_status}")
+        all_gates = bool(dqs_gate and schedule_gate and cash_gate and gate["risk_gate_passed"] and gate["event_gate_passed"] and comparability_gate)
         if key == "strategic_rebalance":
             final_permission = "ALLOW_EVALUATION_ONLY" if all_gates else "DENY"
             if all_gates:
@@ -331,18 +355,29 @@ def build_trade_permission_gates(
             final_permission = "ALLOW_MONITORING" if dqs_gate else "DENY"
         elif key == "transaction_reconciliation":
             final_permission = "ALLOW_RECONCILIATION" if dqs_gate else "DENY"
+        elif key == "scheduled_dca" and all_gates and score < int(case.get("normal_execution_dqs", 75) or 75):
+            final_permission = "ALLOW_REDUCED_REVIEW_ONLY"
+            reasons.append("仅允许减额复核，不自动生成正常金额；仍须人工确认")
         else:
             final_permission = "ALLOW_TRADE_SUBJECT_TO_MANUAL_CONFIRMATION" if all_gates else "DENY"
         scenario = {
             "scenario_key": key,
             "scenario_name": name,
+            "used_dqs_name": used_dqs_name,
+            "used_dqs_value": score,
             "scenario_dqs": score,
             "required_dqs": required,
             "dqs_gate_passed": dqs_gate,
+            "plan_gate": schedule_gate,
             "schedule_gate_passed": schedule_gate,
+            "cash_gate": cash_gate,
             "cash_gate_passed": cash_gate,
+            "risk_gate": gate["risk_gate_passed"],
+            "event_gate": gate["event_gate_passed"],
+            "comparability_gate": comparability_gate,
             **gate,
             "final_permission": final_permission,
+            "blocking_reasons": reasons,
             "exact_denial_reasons": reasons,
         }
         scenarios.append(scenario)
@@ -359,6 +394,7 @@ def build_trade_permission_gates(
     global_allowed = selected["final_permission"] == "ALLOW_TRADE_SUBJECT_TO_MANUAL_CONFIRMATION"
     return {
         "scenarios": scenarios,
+        "contexts": {row["scenario_key"]: row for row in scenarios},
         "final_trade_permission": global_allowed,
         "final_trade_permission_source": selected["scenario_name"],
         "global_final_permission": selected["final_permission"],
@@ -453,17 +489,18 @@ def build_trade_reconciliation_summary(
             "voo_total_quantity": round(total_quantity, 8),
         }
 
-    voo_market_value = round(total_quantity * latest_price * valuation_fx, 2)
-    class_totals = dict(snapshot.get("asset_class_totals", {}) or {})
-    original_value = _to_float(original.get("market_value_cny"))
-    pending_value = _to_float(pending.get("market_value_cny"))
-    us_stock_total = round(_to_float(class_totals.get("美股")) - original_value - pending_value + voo_market_value, 2)
-    class_totals["美股"] = us_stock_total
-    total_assets = round(sum(_to_float(value) for value in class_totals.values()), 2)
-    ratios = {
-        category: round(_to_float(value) / total_assets, 6) if total_assets else 0.0
-        for category, value in class_totals.items()
-    }
+    updated_snapshot = apply_verified_market_valuation(
+        snapshot,
+        security_code="VOO",
+        pending_reference_symbol="VOO",
+        total_quantity=total_quantity,
+        latest_price=latest_price,
+        valuation_fx_rate=valuation_fx,
+    )
+    voo_market_value = _to_float(((updated_snapshot.get("verified_valuations", {}) or {}).get("VOO", {}) or {}).get("market_value_cny"))
+    us_stock_total = _to_float((updated_snapshot.get("asset_class_values", {}) or {}).get("美股"))
+    total_assets = _to_float(updated_snapshot.get("total_valued_assets"))
+    ratios = updated_snapshot.get("asset_class_weights", {}) or {}
     return {
         **base,
         "status": "PASS",
@@ -475,6 +512,7 @@ def build_trade_reconciliation_summary(
         "us_stock_total_market_value_cny": us_stock_total,
         "recalculated_total_assets_cny": total_assets,
         "asset_allocation_ratios": ratios,
+        "updated_portfolio_snapshot": updated_snapshot,
     }
 
 
@@ -646,6 +684,7 @@ def compute_dqs(
     live_market: dict[str, Any],
     strategy: dict[str, Any],
     macro_result: dict[str, Any] | None = None,
+    portfolio_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     weights = strategy["dqs_weights"]
     items, macro = _market_items(live_market), _macro_items(live_market)
@@ -666,7 +705,7 @@ def compute_dqs(
     stale_metrics = [row["name"] for row in build_market_table(live_market) if row.get("stale")]
     market_time = aggregate_comparable_market_changes(live_market)
     non_comparable = [] if market_time["comparable"] else market_time["symbols"]
-    snapshot = _portfolio_snapshot()
+    snapshot = portfolio_snapshot or _portfolio_snapshot()
     transactions = snapshot.get("confirmed_transactions", []) or []
     transaction_standard_fields = [
         "symbol", "action", "trade_date", "invested_amount_cny",
@@ -686,7 +725,10 @@ def compute_dqs(
             "missing_fields": missing,
             "quality_ratio": max(0.0, (required_count - len(missing)) / required_count),
         })
-    pending_valuations = [row.get("security_name") for row in snapshot.get("holdings", []) or [] if str(row.get("valuation_status")) != "confirmed_market_value"]
+    pending_valuations = [
+        row.get("security_name")
+        for row in snapshot.get("pending_valuation_assets", []) or []
+    ]
     calendar_confidence = str((macro_result or {}).get("calendar_confidence") or "unknown")
     field_score = round(((sum(market_ok) + sum(macro_ok)) / len(all_rows)) * weights["field_completeness"]) if all_rows else 0
     if calendar_confidence == "low": field_score = max(0, field_score - 1)
@@ -754,13 +796,18 @@ def compute_dqs(
         "预算状态": bool(snapshot.get("bond_to_equity_plan") is not None),
         "事件状态": calendar_confidence not in {"low", "unknown"} and not released_data_missing,
     }
-    scheduled_score = round(sum(25 for ok in scheduled_inputs.values() if ok))
+    core_components = [
+        {"item": name, "score": 25 if available else 0, "max": 25, "reason": "可用" if available else "DATA_INSUFFICIENT"}
+        for name, available in scheduled_inputs.items()
+    ]
+    scheduled_score = round(sum(int(item["score"]) for item in core_components))
     allocation_valid = abs(sum(float(value) for value in strategy.get("target_allocation", {}).values()) - 1.0) <= 1e-10
-    strategic_score = round(
-        40 * int(allocation_valid)
-        + 30 * int(not snapshot.get("holdings_stale"))
-        + 30 * (sum(market_ok) / len(market_ok) if market_ok else 0)
-    )
+    rebalance_components = [
+        {"item": "目标配置完整性", "score": 40 * int(allocation_valid), "max": 40, "reason": "目标权重合计必须为100%"},
+        {"item": "持仓时效", "score": 30 * int(not snapshot.get("holdings_stale")), "max": 30, "reason": "使用统一PortfolioSnapshot"},
+        {"item": "核心市场覆盖", "score": round(30 * (sum(market_ok) / len(market_ok) if market_ok else 0)), "max": 30, "reason": f"核心行情可用{sum(market_ok)}/{len(market_ok)}"},
+    ]
+    strategic_score = round(sum(int(item["score"]) for item in rebalance_components))
     opportunity_score = int(capped_score)
     official_grid_quotes = sum(
         1 for symbol in ["VOO", "QQQ"]
@@ -774,7 +821,11 @@ def compute_dqs(
         100 * transaction_score / weights["transaction_reconciliation_quality"]
         if weights["transaction_reconciliation_quality"] else 0
     )
-    scheduled_dqs_gate_passed = scheduled_score >= 65
+    scheduled_thresholds = strategy.get("scheduled_dca_dqs", {}) or {}
+    hard_min_dqs = int(scheduled_thresholds.get("hard_min_dqs", 65) or 65)
+    normal_execution_dqs = int(scheduled_thresholds.get("normal_execution_dqs", 75) or 75)
+    scheduled_dqs_gate_passed = scheduled_score >= hard_min_dqs
+    scheduled_normal_eligible = scheduled_score >= normal_execution_dqs
     # Enhancement data is intentionally excluded from Scheduled DCA. Missing
     # sentiment/breadth/flow may lower confidence but cannot deny this gate.
     scheduled_legacy_allowed = bool(scheduled_dqs_gate_passed)
@@ -784,11 +835,24 @@ def compute_dqs(
         "scheduled_dca": {
             "label": "Scheduled DCA DQS",
             "score": scheduled_score,
-            "threshold": 65,
+            "threshold": hard_min_dqs,
+            "hard_min_dqs": hard_min_dqs,
+            "normal_execution_dqs": normal_execution_dqs,
             "dqs_gate_passed": scheduled_dqs_gate_passed,
             "allowed": scheduled_legacy_allowed,
-            "final_trade_permission": scheduled_legacy_allowed,
-            "denial_reason": "无" if scheduled_legacy_allowed else "Scheduled DCA独立DQS低于65",
+            "normal_execution_eligible": scheduled_normal_eligible,
+            "permission_band": (
+                "NORMAL_EVALUATION" if scheduled_normal_eligible
+                else "REDUCED_REVIEW_ONLY" if scheduled_dqs_gate_passed
+                else "DENY"
+            ),
+            "final_trade_permission": scheduled_normal_eligible,
+            "denial_reason": (
+                "无" if scheduled_normal_eligible
+                else f"core_dqs介于{hard_min_dqs}与{normal_execution_dqs - 1}，仅允许减额复核，不生成正常金额"
+                if scheduled_dqs_gate_passed
+                else f"Scheduled DCA独立DQS低于{hard_min_dqs}"
+            ),
             "inputs": scheduled_inputs,
             "enhancement_data_required": False,
         },
@@ -844,14 +908,77 @@ def compute_dqs(
         ],
     }
 
+    opportunity_components = [dict(item) for item in legacy_components]
+    opportunity_component_sum = sum(int(item.get("score", 0) or 0) for item in opportunity_components)
+    if opportunity_component_sum != opportunity_score:
+        opportunity_components.append({
+            "item": "场景上限调整",
+            "score": opportunity_score - opportunity_component_sum,
+            "max": 0,
+            "reason": "双源覆盖、严重冲突或增强数据限制形成的显式调整；总分不使用缓存。",
+        })
+    grid_components = [
+        {
+            "item": f"{symbol}正式收盘快照",
+            "score": 50 if (
+                item_time_metadata(items.get(symbol, {}) or {}).get("data_stage") == "OFFICIAL_CLOSE"
+                and bool((items.get(symbol, {}) or {}).get("is_finalized"))
+            ) else 0,
+            "max": 50,
+            "reason": "网格只使用正式收盘且已终值化的可比快照。",
+        }
+        for symbol in ["VOO", "QQQ"]
+    ]
+    grid_component_sum = sum(int(item["score"]) for item in grid_components)
+    if grid_component_sum != grid_score:
+        grid_components.append({
+            "item": "网格数据质量上限调整",
+            "score": grid_score - grid_component_sum,
+            "max": 0,
+            "reason": "使用grid_dqs自身的数据质量上限，禁止与opportunity_dqs混用。",
+        })
+    execution_components = [{
+        "item": "成交、现金、汇率与持仓对账",
+        "score": transaction_quality_score,
+        "max": 100,
+        "reason": "由已确认交易标准字段现场计算。",
+    }]
+    component_scores = {
+        "core_dqs": core_components,
+        "opportunity_dqs": opportunity_components,
+        "execution_dqs": execution_components,
+        "rebalance_dqs": rebalance_components,
+        "grid_dqs": grid_components,
+    }
+    warnings: list[str] = []
+    for scope, issues in data_issues_by_scope.items():
+        for issue in issues:
+            status = str(issue.get("data_status") or "")
+            if status == "DATA_INSUFFICIENT" or (status == "NOT_CONNECTED" and scope == "opportunity_add"):
+                warnings.append(f"{scope}:{issue.get('item')}={status}")
+    if pending_valuations:
+        warnings.append("存在pending_valuation_assets；成本记录已从精确估值、资产占比和再平衡偏离中排除。")
+    lagged_macro = [
+        row["name"] for row in build_market_table(live_market)
+        if row.get("data_status") == "VALID_LAGGED_BY_DESIGN"
+    ]
+    if lagged_macro:
+        warnings.append("风险判断使用按发布频率正常滞后的宏观数据：" + "、".join(lagged_macro))
+
     return {
         "core_dqs": scheduled_score,
         "opportunity_dqs": opportunity_score,
         "execution_dqs": transaction_quality_score,
+        "rebalance_dqs": strategic_score,
+        "grid_dqs": grid_score,
+        "component_scores": component_scores,
+        "warnings": list(dict.fromkeys(warnings)),
         "dqs_contexts": {
             "core_dqs": "Scheduled DCA、持仓判断和风险监控",
             "opportunity_dqs": "Opportunity Add、跨资产比较和机会加仓",
             "execution_dqs": "成交、现金、汇率和持仓对账",
+            "rebalance_dqs": "Strategic Rebalance",
+            "grid_dqs": "Grid Trading（SIMULATION_ONLY）",
         },
         "score": int(capped_score),
         "raw_score": int(raw_score),
@@ -907,14 +1034,33 @@ def _category_status(deviation_ratio: float) -> str:
     return "接近目标"
 
 
-def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]) -> list[dict[str, Any]]:
-    total = _to_float(portfolio_result.get("total_assets_wan")) * 10000
-    amounts = portfolio_result.get("category_amounts", {}) or {}
+def enrich_allocation(
+    portfolio_result: dict[str, Any],
+    strategy: dict[str, Any],
+    portfolio_snapshot: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    snapshot = portfolio_snapshot or {}
+    if snapshot.get("asset_class_values") is not None:
+        total = _to_float(snapshot.get("total_valued_assets"))
+        amounts_yuan = snapshot.get("asset_class_values", {}) or {}
+        weights = snapshot.get("asset_class_weights", {}) or {}
+    else:
+        total = _to_float(portfolio_result.get("total_assets_wan")) * 10000
+        amounts_yuan = {
+            category: _to_float(value) * 10000
+            for category, value in (portfolio_result.get("category_amounts", {}) or {}).items()
+        }
+        weights = {
+            category: (_to_float(value) / total if total else 0.0)
+            for category, value in amounts_yuan.items()
+        }
+    safety_source = snapshot or _portfolio_snapshot()
+    safety_cash = _to_float((safety_source.get("cash", {}) or {}).get("cash_safety_reserve_cny"))
     rows = []
     for category in CATEGORY_KEYS:
-        current_amount = _to_float(amounts.get(category)) * 10000
+        current_amount = _to_float(amounts_yuan.get(category))
         target_ratio = _to_float(strategy["target_allocation"].get(category))
-        current_ratio = current_amount / total if total else 0.0
+        current_ratio = _to_float(weights.get(category), current_amount / total if total else 0.0)
         target_amount = total * target_ratio
         target_basis = "strategic_ratio"
         deviation_ratio = current_ratio - target_ratio
@@ -935,7 +1081,7 @@ def enrich_allocation(portfolio_result: dict[str, Any], strategy: dict[str, Any]
                 "target_ratio": target_ratio,
                 "target_basis": target_basis,
                 "cash_safety_floor_yuan": (
-                    round(_to_float((_portfolio_snapshot().get("cash", {}) or {}).get("cash_safety_reserve_cny")))
+                    round(safety_cash)
                     if category == "现金" else None
                 ),
                 "deviation_amount_yuan": round(deviation_amount),
@@ -961,7 +1107,13 @@ def _category_ratio(allocation: list[dict[str, Any]], category: str) -> float:
     return 0.0
 
 
-def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any], dqs: dict[str, Any], strategy: dict[str, Any]) -> dict[str, Any]:
+def compute_risk_score(
+    live_market: dict[str, Any],
+    macro_result: dict[str, Any],
+    dqs: dict[str, Any],
+    strategy: dict[str, Any],
+    portfolio_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     weights = strategy["risk_weights"]
     market_weights = strategy.get("market_risk_weights", {}) or {
         "valuation": 20,
@@ -980,9 +1132,9 @@ def compute_risk_score(live_market: dict[str, Any], macro_result: dict[str, Any]
     vix = _to_float(items.get("^VIX", {}).get("close"), default=-1)
     dgs10 = _to_float(macro.get("DGS10", {}).get("value"), default=0)
     market_time = aggregate_comparable_market_changes(live_market)
-    snapshot = _portfolio_snapshot()
-    total_assets = float(snapshot.get("decision_total_assets", snapshot.get("total_assets", 0)) or 0)
-    class_totals = snapshot.get("decision_asset_class_totals", snapshot.get("asset_class_totals", {})) or {}
+    snapshot = portfolio_snapshot or _portfolio_snapshot()
+    total_assets = float(snapshot.get("total_valued_assets", 0) or 0)
+    class_totals = snapshot.get("asset_class_values", {}) or {}
     bond_ratio = float(class_totals.get("债券", 0) or 0) / total_assets if total_assets else 0
     gold_ratio = float(class_totals.get("黄金", 0) or 0) / total_assets if total_assets else 0
     investable_cash = float((snapshot.get("cash", {}) or {}).get("investable_cash_cny", 0) or 0)
@@ -1610,9 +1762,17 @@ def _next_dca_date(day: date, strategy: dict[str, Any]) -> date:
     return day
 
 
-def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], risk: dict[str, Any], macro_result: dict[str, Any], opportunity: list[dict[str, Any]], strategy: dict[str, Any]) -> dict[str, Any]:
-    total_yuan = sum(row["current_amount_yuan"] for row in allocation)
-    snapshot = _portfolio_snapshot()
+def build_budget_plan(
+    allocation: list[dict[str, Any]],
+    dqs: dict[str, Any],
+    risk: dict[str, Any],
+    macro_result: dict[str, Any],
+    opportunity: list[dict[str, Any]],
+    strategy: dict[str, Any],
+    portfolio_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    snapshot = portfolio_snapshot or _portfolio_snapshot()
+    total_yuan = _to_float(snapshot.get("total_valued_assets"), sum(row["current_amount_yuan"] for row in allocation))
     cash_detail = snapshot.get("cash", {}) or {}
     confirmed_plan = snapshot.get("bond_to_equity_plan", {}) or {}
     confirmed_transactions = snapshot.get("confirmed_transactions", []) or []
@@ -1627,13 +1787,16 @@ def build_budget_plan(allocation: list[dict[str, Any]], dqs: dict[str, Any], ris
     cash_floor_yuan = _to_float(cash_detail.get("cash_safety_reserve_cny")) or max(total_yuan * strategy["cash"]["safety_ratio"], total_yuan * strategy["cash"]["hard_floor_ratio"])
     live_grid_cash_yuan = _to_float(cash_detail.get("live_grid_cash_cny"))
     reserved_cash_yuan = _to_float(cash_detail.get("other_reserved_cash_cny"))
-    confirmed_cash_available = max(0.0, cash_yuan - cash_floor_yuan - live_grid_cash_yuan - reserved_cash_yuan)
+    confirmed_cash_available = _to_float(
+        snapshot.get("investable_cash"),
+        max(0.0, cash_yuan - cash_floor_yuan - live_grid_cash_yuan - reserved_cash_yuan),
+    )
     today = date.today()
     is_dca_day = strategy["dca"].get("enabled", True) and today.weekday() == int(strategy["dca"].get("scheduled_weekday", 2)) and _week_of_month(today) in _scheduled_weeks(strategy)
     next_dca = _next_dca_date(today + timedelta(days=1), strategy)
     bond_excess = max(0.0, bond_yuan - bond_target_yuan)
     bond_month_cap = min(float(strategy["budget"]["bond_to_equity_monthly_cap_yuan"]), bond_excess)
-    dqs_allows_amount = bool(((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {}).get("allowed"))
+    dqs_allows_amount = bool(((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {}).get("normal_execution_eligible"))
     high_event = bool(macro_result.get("has_high_event_next_7_days"))
     scheduled_risk_gate = evaluate_risk_event_gate(
         "Scheduled DCA", risk, macro_result,
@@ -2006,8 +2169,11 @@ def build_scenarios(budget: dict[str, Any], opportunity: list[dict[str, Any]], s
 
 
 def build_next_triggers(budget: dict[str, Any], dqs: dict[str, Any]) -> list[str]:
+    scheduled = ((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {})
+    normal_dqs = int(scheduled.get("normal_execution_dqs", 75) or 75)
+    hard_min = int(scheduled.get("hard_min_dqs", 65) or 65)
     return [
-        f"下一个基础定投复核日：{budget['next_dca_date']}；若DQS>=75且市场与风险条件通过，可按计划复核。",
+        f"下一个基础定投复核日：{budget['next_dca_date']}；core_dqs<{hard_min}禁止，{hard_min}–{normal_dqs - 1}仅减额复核，>={normal_dqs}进入正常定投评估。",
         f"本月债券资金已到账，剩余专项现金{budget.get('bond_to_equity_remaining_real_cash_yuan', 0):,.0f}元可分批评估，但不代表必须立即或一次性投入。",
         "若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。",
         "若DQS低于60或关键价格缺失，继续禁止新增仓位建议。",
@@ -2083,7 +2249,8 @@ def build_rule_enhanced_analysis(decision: dict[str, Any]) -> dict[str, Any]:
     if ai.get("openai_participated"):
         return ai
 
-    allocation = decision.get("allocation", []) or []
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    allocation = snapshot.get("allocation", decision.get("allocation", [])) or []
     underweight = min(allocation, key=lambda row: row.get("deviation_ratio", 0), default={})
     overweight = max(allocation, key=lambda row: row.get("deviation_ratio", 0), default={})
     budget = decision.get("budget", {}) or {}
@@ -2168,6 +2335,7 @@ def build_opportunity_groups(allocation: list[dict[str, Any]], opportunity: list
 def build_portfolio_repair_priority(
     allocation: list[dict[str, Any]],
     opportunity: list[dict[str, Any]],
+    portfolio_snapshot: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Rank allocation repair separately from instrument attractiveness."""
     broad_market_by_category = {
@@ -2175,16 +2343,13 @@ def build_portfolio_repair_priority(
         "港股": "南方东英恒生科技指数ETF",
         "A股": "沪深300ETF",
     }
-    snapshot = _portfolio_snapshot()
-    exact_totals = snapshot.get("decision_asset_class_totals", {}) or {}
-    exact_total = float(snapshot.get("decision_total_assets", 0) or 0)
     rows: list[dict[str, Any]] = []
     for item in allocation:
         category = str(item.get("category"))
-        current_amount = float(exact_totals.get(category, item.get("current_amount_yuan", 0)) or 0)
-        current_ratio = current_amount / exact_total if exact_total else float(item.get("current_ratio", 0) or 0)
-        target_amount = exact_total * float(item.get("target_ratio", 0) or 0) if exact_total else float(item.get("target_amount_yuan", 0) or 0)
-        deviation = current_ratio - float(item.get("target_ratio", 0) or 0)
+        current_amount = float(item.get("current_amount_yuan", 0) or 0)
+        current_ratio = float(item.get("current_ratio", 0) or 0)
+        target_amount = float(item.get("target_amount_yuan", 0) or 0)
+        deviation = float(item.get("deviation_ratio", 0) or 0)
         if deviation < -0.03:
             direction = "ADD_WITH_NEW_MONEY"
             priority_score = min(100, round(abs(deviation) * 500))
@@ -2285,6 +2450,37 @@ def update_comparability_summary(decision: dict[str, Any]) -> dict[str, Any]:
     dqs = decision.setdefault("dqs", {})
     dqs["non_comparable_metrics"] = non_comparable_items
     dqs["non_comparable_items_count"] = len(non_comparable_items)
+    return decision
+
+
+def refresh_unified_decision_context(
+    decision: dict[str, Any],
+    macro_result: dict[str, Any],
+) -> dict[str, Any]:
+    """Refresh the read-only scenario contract after grid comparability is known."""
+    update_comparability_summary(decision)
+    dqs = decision.get("data_quality_snapshot") or decision.get("dqs", {}) or {}
+    risk = decision.get("risk_snapshot") or decision.get("risk", {}) or {}
+    context = build_trade_permission_gates(
+        dqs,
+        decision.get("budget", {}) or {},
+        risk,
+        macro_result,
+        decision.get("comparability", {}) or {},
+    )
+    decision["decision_context"] = context
+    decision["trade_permission_gates"] = context
+    scheduled = ((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {})
+    scheduled.update((context.get("contexts", {}) or {}).get("scheduled_dca", {}))
+    warnings = list(dqs.get("warnings", []) or [])
+    if str((risk.get("market_risk", {}) or {}).get("confidence") or "").lower() == "low":
+        warnings.append("市场风险置信度为low。")
+    for key, value in (decision.get("comparability", {}) or {}).items():
+        if key.endswith("_comparability") and value not in {"COMPARABLE", "NOT_EVALUATED"}:
+            warnings.append(f"{key}={value}")
+    dqs["warnings"] = list(dict.fromkeys(warnings))
+    decision["data_quality_snapshot"] = dqs
+    decision["dqs"] = dqs
     return decision
 
 
@@ -2426,7 +2622,7 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     target_amount_sum = sum(float(row.get("target_amount_yuan", 0) or 0) for row in allocation)
     current_amount_sum = sum(float(row.get("current_amount_yuan", 0) or 0) for row in allocation)
     deviation_sum = sum(float(row.get("deviation_amount_yuan", 0) or 0) for row in allocation)
-    total_assets = float(decision.get("portfolio_value_yuan", snapshot.get("total_assets", 0)) or 0)
+    total_assets = float(snapshot.get("total_valued_assets", 0) or 0)
     unconfirmed = snapshot.get("unconfirmed_holdings", []) or []
     if unconfirmed:
         canonical_warnings.append(
@@ -2453,6 +2649,12 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
             canonical_errors.append("目标金额合计不等于总资产。")
         if abs(deviation_sum) > 1 or abs(current_amount_sum - total_assets) > 1:
             canonical_errors.append("资产配置偏离金额无法闭合。")
+    exact_class_total = sum(float(value or 0) for value in (snapshot.get("asset_class_values", {}) or {}).values())
+    if abs(exact_class_total - total_assets) > 1:
+        canonical_errors.append("精确资产类别金额之和不等于total_valued_assets。")
+    pending_ids = {id(row) for row in snapshot.get("pending_valuation_assets", []) or []}
+    if any(id(row) in pending_ids for row in snapshot.get("valued_assets", []) or []):
+        canonical_errors.append("待估值资产进入了精确估值资产列表。")
 
     try:
         cutoff_dt = datetime.fromisoformat(str(decision.get("data_cutoff") or decision.get("generated_at")))
@@ -2569,6 +2771,21 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
         dqs_errors.append("Scheduled DCA得分达到门槛但dqs_gate_passed不是是。")
     if scheduled_gate and not scheduled_gate.get("final_trade_permission") and not scheduled_gate.get("denial_reason"):
         dqs_errors.append("最终交易权限为否但未提供denial_reason。")
+    for name, components in (dqs.get("component_scores", {}) or {}).items():
+        component_total = sum(int(row.get("score", 0) or 0) for row in components or [])
+        if component_total != int(dqs.get(name, 0) or 0):
+            dqs_errors.append(f"{name}总分{dqs.get(name)}不等于明细求和{component_total}。")
+    expected_bindings = {
+        "scheduled_dca": "core_dqs",
+        "opportunity_add": "opportunity_dqs",
+        "strategic_rebalance": "rebalance_dqs",
+        "grid": "grid_dqs",
+        "transaction_reconciliation": "execution_dqs",
+    }
+    contexts = (decision.get("decision_context", {}) or {}).get("contexts", {}) or {}
+    for scenario, dqs_name in expected_bindings.items():
+        if contexts and (contexts.get(scenario, {}) or {}).get("used_dqs_name") != dqs_name:
+            dqs_errors.append(f"{scenario}未固定使用{dqs_name}。")
     record("DQS一致性", dqs_errors, dqs_warnings)
 
     risk_weight_errors: list[str] = []
@@ -2847,9 +3064,10 @@ def build_v12_1_decision(
     live_market_result: dict[str, Any],
     macro_result: dict[str, Any],
     ai_advice_result: dict[str, Any],
+    portfolio_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     strategy = load_strategy()
-    snapshot = _portfolio_snapshot()
+    snapshot = portfolio_snapshot or _portfolio_snapshot()
     timing = (live_market_result.get("decision_timing", {}) or {})
     generated_at = str(timing.get("report_generation_time") or datetime.now(tz=ZoneInfo("Asia/Shanghai")).isoformat(timespec="seconds"))
     try:
@@ -2858,21 +3076,34 @@ def build_v12_1_decision(
     except ValueError:
         # An invalid cutoff must never cause later-observed data to enter a decision.
         live_market_result = {**live_market_result, "items": {}, "macro": {"items": {}}, "decision_timing": {**timing, "invalid_cutoff": True}}
-    allocation = enrich_allocation(portfolio_result, strategy)
-    dqs = compute_dqs(live_market_result, strategy, macro_result)
-    risk = compute_risk_score(live_market_result, macro_result, dqs, strategy)
+    trade_reconciliation = build_trade_reconciliation_summary(snapshot, live_market_result)
+    updated_snapshot = trade_reconciliation.pop("updated_portfolio_snapshot", None)
+    if updated_snapshot:
+        snapshot = updated_snapshot
+    allocation = enrich_allocation(portfolio_result, strategy, snapshot)
+    snapshot["allocation"] = allocation
+    dqs = compute_dqs(live_market_result, strategy, macro_result, snapshot)
+    risk = compute_risk_score(live_market_result, macro_result, dqs, strategy, snapshot)
     opportunity = apply_dqs_to_opportunity(build_opportunity_scores(allocation, live_market_result, strategy), dqs)
     opportunity_groups = build_opportunity_groups(allocation, opportunity)
-    portfolio_repair_priority = build_portfolio_repair_priority(allocation, opportunity)
+    portfolio_repair_priority = build_portfolio_repair_priority(allocation, opportunity, snapshot)
+    snapshot["portfolio_repair_priority"] = portfolio_repair_priority
     try:
         write_scoring_trace(opportunity, live_market_result.get("cn_hk_p1a", {}) or {})
     except Exception as exc:  # noqa: BLE001 - trace output must not break decisions
         write_log(f"P1A评分追踪文件写入失败：{exc}", filename="stone_ai.log")
-    budget = build_budget_plan(allocation, dqs, risk, macro_result, opportunity, strategy)
+    budget = build_budget_plan(allocation, dqs, risk, macro_result, opportunity, strategy, snapshot)
     migration = build_migration_plan(allocation, budget)
     holding_diagnostics = build_holding_diagnostics(live_market_result, allocation)
+    snapshot["holding_diagnostics"] = holding_diagnostics
     scenarios = build_scenarios(budget, opportunity, strategy)
-    stress_scenarios = calculate_portfolio_stress_scenarios(allocation, strategy.get("scenario_stress", {}), build_stress_exposures(allocation, snapshot))
+    stress_scenarios = calculate_portfolio_stress_scenarios(
+        allocation,
+        strategy.get("scenario_stress", {}),
+        build_stress_exposures(allocation, snapshot),
+        snapshot,
+    )
+    snapshot["stress_scenarios"] = stress_scenarios
     ai_mode = build_ai_mode(ai_advice_result, dqs)
     market_table = build_market_table(live_market_result)
     decision_cutoff_at = str((live_market_result.get("decision_timing", {}) or {}).get("decision_cutoff_time") or generated_at)
@@ -2898,7 +3129,7 @@ def build_v12_1_decision(
         "triggers": ["市场回撤", "VIX显著变化", "重大事件公布", "风险门槛触发"],
         "description": "满足回撤、波动率、重大事件或风险条件时即时进行。",
     }
-    total_yuan = sum(row["current_amount_yuan"] for row in allocation)
+    total_yuan = _to_float(snapshot.get("total_valued_assets"))
     today_trade = budget["today_total_yuan"] > 0
     for row in opportunity:
         row["today_trade_permission"] = bool(today_trade and row.get("advice") in {"优先加仓", "小额分批", "正常定投"})
@@ -2918,18 +3149,21 @@ def build_v12_1_decision(
     actual_trade_amount = _to_float(primary_confirmed_trade.get("invested_amount_cny"))
     confirmed_trade_origin = str(primary_confirmed_trade.get("trade_origin") or "UNKNOWN")
     scheduled_base_dca_executed = confirmed_trade_origin == "SCHEDULED_BASE_DCA"
-    trade_reconciliation = build_trade_reconciliation_summary(snapshot, live_market_result)
-    trade_permission_gates = build_trade_permission_gates(dqs, budget, risk, macro_result)
     scheduled_dca_gate = ((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {})
-    scheduled_dca_gate.update(trade_permission_gates)
 
     no_trade_reasons = []
     if today_confirmed_trade_executed:
         no_trade_reasons.append("已完成用户确认的周三基础定投；剩余专项资金不强制立即投入")
     if not budget["is_dca_day"] and not today_confirmed_trade_executed:
         no_trade_reasons.append("今日不是基础定投执行日")
-    if budget.get("is_dca_day") and dqs.get("core_dqs", 0) < 65:
-        no_trade_reasons.append(f"core_dqs={dqs.get('core_dqs')}低于Scheduled DCA门槛65")
+    hard_min_dqs = int(scheduled_dca_gate.get("hard_min_dqs", 65) or 65)
+    normal_execution_dqs = int(scheduled_dca_gate.get("normal_execution_dqs", 75) or 75)
+    if budget.get("is_dca_day") and dqs.get("core_dqs", 0) < hard_min_dqs:
+        no_trade_reasons.append(f"core_dqs={dqs.get('core_dqs')}低于Scheduled DCA硬门槛{hard_min_dqs}")
+    elif budget.get("is_dca_day") and dqs.get("core_dqs", 0) < normal_execution_dqs:
+        no_trade_reasons.append(
+            f"core_dqs={dqs.get('core_dqs')}处于减额复核区间，未达到正常定投门槛{normal_execution_dqs}"
+        )
     opportunity_gate = ((dqs.get("use_cases", {}) or {}).get("opportunity_add", {}) or {})
     if not opportunity_gate.get("allowed"):
         no_trade_reasons.append(
@@ -2959,7 +3193,11 @@ def build_v12_1_decision(
         "core_dqs": dqs.get("core_dqs"),
         "opportunity_dqs": dqs.get("opportunity_dqs"),
         "execution_dqs": dqs.get("execution_dqs"),
+        "rebalance_dqs": dqs.get("rebalance_dqs"),
+        "grid_dqs": dqs.get("grid_dqs"),
+        "data_quality_snapshot": dqs,
         "risk": risk,
+        "risk_snapshot": risk,
         "opportunity": opportunity,
         "opportunity_groups": opportunity_groups,
         "portfolio_repair_priority": portfolio_repair_priority,
@@ -2989,7 +3227,6 @@ def build_v12_1_decision(
         "actual_trade_symbol": primary_confirmed_trade.get("symbol") if primary_confirmed_trade else None,
         "actual_trade_amount_yuan": round(actual_trade_amount),
         "trade_reconciliation": trade_reconciliation,
-        "trade_permission_gates": trade_permission_gates,
         "trade_origin": confirmed_trade_origin,
         "execution_status": primary_confirmed_trade.get("execution_status") if primary_confirmed_trade else None,
         "system_pre_authorized": bool(primary_confirmed_trade.get("system_pre_authorized")),
@@ -3054,7 +3291,7 @@ def build_v12_1_decision(
         ),
         "disclaimer": "仅供投资辅助，不构成投资建议；系统不自动交易，不接券商下单权限，不承诺收益。",
     }
-    update_comparability_summary(decision)
+    refresh_unified_decision_context(decision, macro_result)
     decision["consistency"] = build_consistency_checks(decision)
     if not decision["consistency"].get("ok"):
         decision["today_trade"] = False

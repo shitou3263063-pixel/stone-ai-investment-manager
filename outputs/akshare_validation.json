@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T23:44:14+08:00",
+  "generated_at": "2026-07-19T02:31:34+08:00",
   "akshare_status": "partial",
   "akshare_version": "1.18.64",
   "akshare_trade_calendar_status": "ok",
@@ -7,7 +7,7 @@
   "akshare_002558_fundamental_status": "ok",
   "akshare_csi300_valuation_status": "ok",
   "akshare_source_conflicts": [],
-  "akshare_last_success_at": "2026-07-16T23:44:14+08:00",
+  "akshare_last_success_at": "2026-07-19T02:31:34+08:00",
   "circuit_state": {
     "interfaces": {
       "trade_calendar": 0,
