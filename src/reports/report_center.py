@@ -101,8 +101,8 @@ def _unique_text(values: list[Any]) -> list[str]:
 
 def build_today_action_payload(decision: dict[str, Any]) -> dict[str, Any]:
     budget = decision.get("budget", {})
-    dqs = decision.get("dqs", {}) or {}
-    risk = decision.get("risk", {}) or {}
+    dqs = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
+    risk = decision.get("risk_snapshot", decision.get("risk", {})) or {}
     consistency = decision.get("consistency", {}) or {}
     opportunity = decision.get("opportunity", []) or []
     ranked_candidates = [
@@ -209,8 +209,11 @@ def build_run_status(
 ) -> dict[str, Any]:
     action = build_today_action_payload(decision)
     budget = decision.get("budget", {}) or {}
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    quality = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
     consistency = decision.get("consistency", {}) or {}
     warnings = list(action["data_anomalies_or_baseline_conflicts"])
+    warnings.extend(quality.get("warnings", []) or [])
     errors = _unique_text(consistency.get("errors", []) or [])
     p1a = decision.get("cn_hk_p1a", {}) or {}
     tushare = p1a.get("tushare", {}) or {}
@@ -246,15 +249,19 @@ def build_run_status(
         "actual_trade_date": decision.get("actual_trade_date"),
         "report_run_mode": decision.get("report_run_mode"),
         "status": status,
-        "dqs": decision.get("dqs", {}).get("score"),
-        "core_dqs": decision.get("dqs", {}).get("core_dqs"),
-        "opportunity_dqs": decision.get("dqs", {}).get("opportunity_dqs"),
-        "execution_dqs": decision.get("dqs", {}).get("execution_dqs"),
-        "risk_score": decision.get("risk", {}).get("score"),
-        "total_assets": decision.get("portfolio_value_yuan"),
+        "dqs": quality.get("score"),
+        "core_dqs": quality.get("core_dqs"),
+        "opportunity_dqs": quality.get("opportunity_dqs"),
+        "execution_dqs": quality.get("execution_dqs"),
+        "rebalance_dqs": quality.get("rebalance_dqs"),
+        "grid_dqs": quality.get("grid_dqs"),
+        "risk_score": (decision.get("risk_snapshot", decision.get("risk", {})) or {}).get("score"),
+        "total_assets": snapshot.get("total_asset_including_cost_records", decision.get("portfolio_value_yuan")),
+        "total_valued_assets": snapshot.get("total_valued_assets"),
+        "total_asset_including_cost_records": snapshot.get("total_asset_including_cost_records"),
         "total_cash": budget.get("account_total_cash_yuan"),
         "cash_safety_reserve": budget.get("cash_safety_reserve_yuan"),
-        "investable_cash": budget.get("investable_cash_yuan"),
+        "investable_cash": snapshot.get("investable_cash"),
         "today_action": {
             "execute": action["execute"],
             "action_type": action["action_type"],
@@ -350,7 +357,8 @@ def _allocation_table(decision: dict[str, Any]) -> list[str]:
         "| 资产类别 | 当前金额 | 当前占比 | 目标金额 | 目标占比 | 偏离金额 | 偏离 | 状态 | 优先级 |",
         "| -- | -: | -: | -: | -: | -: | -: | -- | -- |",
     ]
-    for item in decision.get("allocation", []) or []:
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    for item in snapshot.get("allocation", []) or []:
         rows.append(
             "| "
             f"{item['category']} | {_yuan(item['current_amount_yuan'])} | {_pct(item['current_ratio'])} | "
@@ -393,7 +401,7 @@ def _transaction_change_table(decision: dict[str, Any]) -> list[str]:
     budget = decision.get("budget", {}) or {}
     snapshot = decision.get("portfolio_snapshot", {}) or {}
     cash = snapshot.get("cash", {}) or {}
-    allocation = {row.get("category"): row for row in decision.get("allocation", []) or []}
+    allocation = {row.get("category"): row for row in snapshot.get("allocation", []) or []}
     before_cash = float(cash.get("opening_cash_before_bond_maturity_cny", 0) or 0)
     arrival = float(cash.get("bond_maturity_arrival_cny", 0) or 0)
     purchase = float(cash.get("voo_purchase_outflow_cny", 0) or 0)
@@ -451,7 +459,8 @@ def _portfolio_repair_table(decision: dict[str, Any]) -> list[str]:
         "| 资产类别 | 当前占比 | 目标占比 | 偏离 | 偏离金额 | 修复方向 | Portfolio Repair Priority | 优先宽基 | 今日权限 |",
         "| -- | --: | --: | --: | --: | -- | --: | -- | -- |",
     ]
-    for item in decision.get("portfolio_repair_priority", []) or []:
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    for item in snapshot.get("portfolio_repair_priority", []) or []:
         rows.append(
             f"| {item.get('category')} | {_pct(item.get('current_ratio'))} | {_pct(item.get('target_ratio'))} | "
             f"{float(item.get('deviation_ratio', 0) or 0):+.1%} | {_yuan(item.get('deviation_amount_yuan'))} | "
@@ -462,18 +471,18 @@ def _portfolio_repair_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _scenario_permission_table(decision: dict[str, Any]) -> list[str]:
-    gates = decision.get("trade_permission_gates", {}) or {}
+    gates = decision.get("decision_context", decision.get("trade_permission_gates", {})) or {}
     rows = [
-        "| 操作类型 | 当前DQS | 要求DQS | DQS | 计划 | 现金 | 风险 | 事件 | 最终权限 | 主要拒绝原因 |",
-        "| -- | --: | --: | -- | -- | -- | -- | -- | -- | -- |",
+        "| 操作类型 | 固定DQS | 当前值 | 要求DQS | DQS | 计划 | 现金 | 风险 | 事件 | 可比较 | 最终权限 | 主要拒绝原因 |",
+        "| -- | -- | --: | --: | -- | -- | -- | -- | -- | -- | -- | -- |",
     ]
     for item in gates.get("scenarios", []) or []:
         reasons = "；".join(item.get("exact_denial_reasons", []) or []) or "无"
         rows.append(
-            f"| {item.get('scenario_name')} | {item.get('scenario_dqs')} | {item.get('required_dqs')} | "
+            f"| {item.get('scenario_name')} | {item.get('used_dqs_name')} | {item.get('used_dqs_value')} | {item.get('required_dqs')} | "
             f"{_yes_no(item.get('dqs_gate_passed'))} | {_yes_no(item.get('schedule_gate_passed'))} | "
             f"{_yes_no(item.get('cash_gate_passed'))} | {_yes_no(item.get('risk_gate_passed'))} | "
-            f"{_yes_no(item.get('event_gate_passed'))} | {item.get('final_permission')} | {reasons} |"
+            f"{_yes_no(item.get('event_gate_passed'))} | {_yes_no(item.get('comparability_gate'))} | {item.get('final_permission')} | {reasons} |"
         )
     return rows
 
@@ -589,7 +598,8 @@ def _holding_table(decision: dict[str, Any]) -> list[str]:
         "| 持仓 | 市值 | 占比 | 基本面 | 趋势 | 风险点 | 重叠度 | 建议 | 加仓条件 | 减仓条件 |",
         "| -- | -: | -: | -- | -- | -- | -- | -- | -- | -- |",
     ]
-    for item in decision.get("holding_diagnostics", []) or []:
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    for item in snapshot.get("holding_diagnostics", []) or []:
         rows.append(
             "| "
             f"{item['name']} | {_yuan(item['amount_yuan'])} | {_pct(item['portfolio_ratio'])} | "
@@ -635,7 +645,7 @@ def _risk_table(decision: dict[str, Any]) -> list[str]:
         "| 风险维度 | 分数 | 等级/含义 |",
         "| -- | --: | -- |",
     ]
-    risk = decision.get("risk", {}) or {}
+    risk = decision.get("risk_snapshot", decision.get("risk", {})) or {}
     for key, label, meaning in [
         ("market_risk", "Market Risk Score", "市场条件"),
         ("portfolio_risk", "Portfolio Risk Score", "组合暴露与压力测试"),
@@ -658,13 +668,15 @@ def _risk_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _dqs_table(decision: dict[str, Any]) -> list[str]:
-    dqs = decision.get("dqs", {}) or {}
+    dqs = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
     rows = [
         "| 明确用途 | 得分 | 对应场景 |",
         "| -- | -: | -- |",
         f"| core_dqs | {dqs.get('core_dqs')} | Scheduled DCA、持仓判断和风险监控 |",
         f"| opportunity_dqs | {dqs.get('opportunity_dqs')} | Opportunity Add、跨资产比较和机会加仓 |",
         f"| execution_dqs | {dqs.get('execution_dqs')} | 成交、现金、汇率和持仓对账 |",
+        f"| rebalance_dqs | {dqs.get('rebalance_dqs')} | Strategic Rebalance |",
+        f"| grid_dqs | {dqs.get('grid_dqs')} | Grid Trading（SIMULATION_ONLY） |",
         "",
         "| DQS项目 | 得分 | 满分 | 原因 |",
         "| ----- | -: | -: | -- |",
@@ -676,9 +688,9 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
         "| 使用场景 | 得分 | 门槛 | DQS门槛通过 | 计划门槛通过 | 现金门槛通过 | 风险门槛通过 | 事件门槛通过 | 最终权限 | 拒绝原因 |",
         "| -- | -: | -: | -- | -- | -- | -- | -- | -- | -- |",
     ])
-    for item in (decision.get("dqs", {}).get("use_cases", {}) or {}).values():
+    for item in (decision.get("decision_context", {}).get("scenarios", []) or []):
         rows.append(
-            f"| {item.get('label')} | {item.get('score')} | {item.get('threshold')} | "
+            f"| {item.get('scenario_name')}（{item.get('used_dqs_name')}） | {item.get('used_dqs_value')} | {item.get('required_dqs')} | "
             f"{_yes_no(item.get('dqs_gate_passed', item.get('allowed')))} | "
             f"{_yes_no(item.get('schedule_gate_passed')) if 'schedule_gate_passed' in item else '不适用'} | "
             f"{_yes_no(item.get('cash_gate_passed')) if 'cash_gate_passed' in item else '不适用'} | "
@@ -691,7 +703,7 @@ def _dqs_table(decision: dict[str, Any]) -> list[str]:
 
 
 def _data_issue_sections(decision: dict[str, Any]) -> list[str]:
-    groups = (decision.get("dqs", {}) or {}).get("data_issues_by_scope", {}) or {}
+    groups = (decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}).get("data_issues_by_scope", {}) or {}
     labels = [
         ("scheduled_dca", "影响Scheduled DCA的数据缺失"),
         ("opportunity_add", "仅影响Opportunity Add的数据缺失"),
@@ -781,7 +793,8 @@ def _stress_scenarios(decision: dict[str, Any]) -> list[str]:
         "| 情景 | 组合收益/损失率 | 组合收益/损失金额 | 最大正贡献/负贡献资产 | 超过25% | 超过35% | 是否需调整长期配置 |",
         "| -- | --: | --: | -- | -- | -- | -- |",
     ]
-    for item in decision.get("stress_scenarios", []) or []:
+    snapshot = decision.get("portfolio_snapshot", {}) or {}
+    for item in snapshot.get("stress_scenarios", []) or []:
         contributors = "；".join(
             f"{row['category']} {row['impact_yuan']:+,.0f}元" for row in item.get("largest_contributors", [])
         ) or "暂无"
@@ -825,17 +838,17 @@ def _source_lines(decision: dict[str, Any]) -> list[str]:
 
 
 def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
-    dqs = decision.get("dqs", {}) or {}
-    risk = decision.get("risk", {}) or {}
+    dqs = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
+    risk = decision.get("risk_snapshot", decision.get("risk", {})) or {}
     budget = decision.get("budget", {}) or {}
     consistency = decision.get("consistency", {}) or {}
     snapshot = decision.get("portfolio_snapshot", {}) or {}
     reconciliation = decision.get("trade_reconciliation", {}) or {}
     comparability = decision.get("comparability", {}) or {}
-    gates = decision.get("trade_permission_gates", {}) or {}
+    gates = decision.get("decision_context", decision.get("trade_permission_gates", {})) or {}
     ai = decision.get("ai", {}) or {}
     transactions = decision.get("confirmed_transactions", []) or []
-    provisional = bool(snapshot.get("has_provisional_values") or reconciliation.get("status") == "WARN")
+    provisional = bool(snapshot.get("pending_valuation_assets") or reconciliation.get("status") == "WARN")
 
     trade_rows = [
         "| 交易日期 | 成交时间 | 标的 | 数量 | 成交价 | 交易/资金币种 | 美元成交额 | 人民币等值记录 | 成交汇率 | 估值汇率 | fx_status | 对账状态 |",
@@ -872,6 +885,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
             + "、".join(comparability.get("non_comparable_items", []) or [])
         )
     anomalies.extend(str(item) for item in consistency.get("warnings", []) or [])
+    anomalies.extend(str(item) for item in dqs.get("warnings", []) or [])
     anomalies.extend("错误：" + str(item) for item in consistency.get("errors", []) or [])
     anomalies = list(dict.fromkeys(anomalies)) or ["无阻断级异常。"]
 
@@ -901,6 +915,8 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         f"- core_dqs={dqs.get('core_dqs')}：用于Scheduled DCA、持仓判断和风险监控",
         f"- opportunity_dqs={dqs.get('opportunity_dqs')}：用于Opportunity Add、跨资产比较和机会加仓",
         f"- execution_dqs={dqs.get('execution_dqs')}：用于成交、现金、汇率和持仓对账",
+        f"- rebalance_dqs={dqs.get('rebalance_dqs')}：仅用于Strategic Rebalance",
+        f"- grid_dqs={dqs.get('grid_dqs')}：仅用于Grid Trading（SIMULATION_ONLY）",
         f"- 是否存在暂估数据：{_yes_no(provisional)}",
         f"- 全局最终交易权限：{gates.get('global_final_permission', 'DENY')}（来源场景：{gates.get('final_trade_permission_source', 'Scheduled DCA')}）",
         f"- 历史实盘交易日期：{decision.get('actual_trade_date') or '无'}",
@@ -917,10 +933,10 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         f"- 建议金额：{_amount_mode_text(decision, budget.get('today_total_yuan', 0))}",
         f"- 资金来源：{decision.get('funding_source', '今日不使用资金')}",
         f"- 可投资现金：{_yuan(budget.get('investable_cash_yuan'))}",
-        f"- core_dqs / opportunity_dqs / execution_dqs：{dqs.get('core_dqs')} / {dqs.get('opportunity_dqs')} / {dqs.get('execution_dqs')}；Market Risk Score：{risk.get('score')}",
+        f"- core/opportunity/execution/rebalance/grid DQS：{dqs.get('core_dqs')} / {dqs.get('opportunity_dqs')} / {dqs.get('execution_dqs')} / {dqs.get('rebalance_dqs')} / {dqs.get('grid_dqs')}；Market Risk Score：{risk.get('score')}",
         f"- 最大风险：{decision.get('max_risk')}",
         f"- 下一复核时间：{decision.get('next_daily_review')}",
-        f"- 警告：{'；'.join(consistency.get('warnings', []) or []) or '无'}",
+        f"- 警告：{'；'.join(dqs.get('warnings', []) or consistency.get('warnings', []) or []) or '无'}",
         f"- 错误：{'；'.join(consistency.get('errors', []) or []) or '无'}",
         "",
         "## 2. 已执行交易事实",
@@ -940,7 +956,8 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         "",
         *_allocation_table(decision),
         "",
-        f"- 精确再平衡资产基数：{_yuan(snapshot.get('decision_total_assets', decision.get('portfolio_value_yuan')))}；待估值成本{_yuan(snapshot.get('provisional_value_cny'))}已排除。",
+        f"- 精确再平衡资产基数：{_yuan(snapshot.get('total_valued_assets'))}；待估值成本{_yuan(snapshot.get('pending_valuation_total'))}已排除。",
+        f"- 包含成本记录的总资产（非精确估值口径）：{_yuan(snapshot.get('total_asset_including_cost_records'))}。",
         "",
         "## 4. 下一触发条件",
         "",
@@ -1304,7 +1321,7 @@ def generate_daily_report(
 def generate_portfolio_snapshot_report(decision: dict[str, Any]) -> str:
     snapshot = decision.get("portfolio_snapshot", {}) or {}
     budget = decision.get("budget", {}) or {}
-    holdings = decision.get("holding_diagnostics", []) or []
+    holdings = snapshot.get("holding_diagnostics", []) or []
     holding_rows = [
         "| 持仓 | 类别 | 当前对账金额 | 数量 | 估值说明 |",
         "| -- | -- | --: | --: | -- |",
@@ -1324,10 +1341,12 @@ def generate_portfolio_snapshot_report(decision: dict[str, Any]) -> str:
             "",
             f"- 持仓确认日期：{snapshot.get('snapshot_date')}",
             f"- 来源：{snapshot.get('source')}",
-            f"- 组合总资产对账值：{_yuan(snapshot.get('total_assets'))}",
-            f"- 账户总现金：{_yuan(budget.get('account_total_cash_yuan'))}",
-            f"- 固定现金安全储备：{_yuan(budget.get('cash_safety_reserve_yuan'))}",
-            f"- 当前真实可投资现金：{_yuan(budget.get('investable_cash_yuan'))}",
+            f"- 精确估值资产：{_yuan(snapshot.get('total_valued_assets'))}",
+            f"- 待估值成本记录：{_yuan(snapshot.get('pending_valuation_total'))}",
+            f"- 包含成本记录的总资产（非精确估值口径）：{_yuan(snapshot.get('total_asset_including_cost_records'))}",
+            f"- 账户总现金：{_yuan((snapshot.get('cash', {}) or {}).get('account_total_cash_cny'))}",
+            f"- 固定现金安全储备：{_yuan(snapshot.get('safety_cash'))}",
+            f"- 当前真实可投资现金：{_yuan(snapshot.get('investable_cash'))}",
             "- 估值限制：VOO新增交易的股数、实际汇率和手续费待补充，9,000元仅作为新增投入成本暂记，不是实时市值。",
             "",
             "## 资产配置",

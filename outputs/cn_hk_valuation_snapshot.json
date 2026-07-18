@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-07-16T23:41:50+08:00",
+  "generated_at": "2026-07-19T02:29:42+08:00",
   "items": {
     "002558.SZ": {
       "api_name": "daily_basic",
       "source": "tushare_pro",
       "source_type": "authorized_api",
       "source_level": 2,
-      "fetched_at": "2026-07-16T23:41:57+08:00",
+      "fetched_at": "2026-07-19T02:29:47+08:00",
       "market_date": null,
       "timezone": "Asia/Shanghai",
       "currency": "CNY",
@@ -46,8 +46,8 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "csindex_official",
-      "fetched_at": "2026-07-16T23:42:58+08:00",
-      "market_date": "2026-07-16",
+      "fetched_at": "2026-07-19T02:30:43+08:00",
+      "market_date": "2026-07-17",
       "reporting_period": null,
       "currency": "CNY",
       "unit": "mixed_valuation_units",
@@ -60,9 +60,9 @@
       "scoring_eligible": true,
       "valuation_basis": "CSI300_total_share_capital_PE1_DP1",
       "metrics": {
-        "pe_ttm": 14.67,
+        "pe_ttm": 14.33,
         "pb": null,
-        "dividend_yield": 2.67
+        "dividend_yield": 2.74
       },
       "metric_units": {
         "pe_ttm": "multiple",

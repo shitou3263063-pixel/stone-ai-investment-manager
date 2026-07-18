@@ -1,6 +1,6 @@
 # Stone AI V12.7.1 Final Freeze System Audit
 
-- 审计时间：2026-07-16T23:44:47
+- 审计时间：2026-07-19T02:32:05
 - 当前实际运行入口：根目录 `main.py`（V12.7.1 Final Freeze唯一正式入口）。
 - GitHub Actions 应调用：`python main.py`。
 - 报告生成模块：`src/reports/report_center.py`。
@@ -25,5 +25,5 @@
 
 - 旧数据质量分：84
 - 旧执行计划：today=0.54万 week=1.35万 month=3.85万
-- 新DQS：51 / 禁止新增仓位建议
-- 新风险评分：53 / 中高风险
+- 新DQS：55 / 禁止新增仓位建议
+- 新风险评分：56 / 中高风险

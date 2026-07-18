@@ -4,7 +4,7 @@
   "version": "1.18.64",
   "status": "partial",
   "source_level": 3,
-  "fetched_at": "2026-07-16T23:44:14+08:00",
+  "fetched_at": "2026-07-19T02:31:34+08:00",
   "trade_calendar": {
     "interface": "trade_calendar",
     "symbol": "SSE",
@@ -13,8 +13,8 @@
     "source_level": 3,
     "source_type": "monitored_aggregator_fallback",
     "underlying_provider": "sina_finance",
-    "fetched_at": "2026-07-16T23:42:16+08:00",
-    "market_date": "2026-07-16",
+    "fetched_at": "2026-07-19T02:30:01+08:00",
+    "market_date": "2026-07-17",
     "reporting_period": null,
     "currency": "CNY",
     "unit": "calendar_day",
@@ -25,8 +25,8 @@
     "error_code": null,
     "error_message": "",
     "scoring_eligible": true,
-    "latest_open_date": "2026-07-16",
-    "next_open_date": "2026-07-17",
+    "latest_open_date": "2026-07-17",
+    "next_open_date": "2026-07-20",
     "records_count": 400,
     "attempts": 1
   },
@@ -41,7 +41,7 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "eastmoney",
-        "fetched_at": "2026-07-16T23:42:18+08:00",
+        "fetched_at": "2026-07-19T02:30:03+08:00",
         "market_date": null,
         "reporting_period": null,
         "currency": "CNY",
@@ -56,9 +56,9 @@
         "valuation_basis": "security_itself_current_snapshot",
         "date_basis": "provider_has_no_explicit_market_date",
         "metrics": {
-          "pe_ttm": 23.13950201,
-          "pb": 3.52720148,
-          "total_market_value": 57549016481.88
+          "pe_ttm": 22.25304817,
+          "pb": 3.39207751,
+          "total_market_value": 55344364595.52
         },
         "metric_units": {
           "pe_ttm": "multiple",
@@ -77,8 +77,8 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "csindex_official",
-        "fetched_at": "2026-07-16T23:42:58+08:00",
-        "market_date": "2026-07-16",
+        "fetched_at": "2026-07-19T02:30:43+08:00",
+        "market_date": "2026-07-17",
         "reporting_period": null,
         "currency": "CNY",
         "unit": "mixed_valuation_units",
@@ -91,9 +91,9 @@
         "scoring_eligible": true,
         "valuation_basis": "CSI300_total_share_capital_PE1_DP1",
         "metrics": {
-          "pe_ttm": 14.67,
+          "pe_ttm": 14.33,
           "pb": null,
-          "dividend_yield": 2.67
+          "dividend_yield": 2.74
         },
         "metric_units": {
           "pe_ttm": "multiple",
@@ -116,7 +116,7 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "eastmoney",
-        "fetched_at": "2026-07-16T23:42:18+08:00",
+        "fetched_at": "2026-07-19T02:30:03+08:00",
         "market_date": null,
         "reporting_period": null,
         "currency": "CNY",
@@ -131,9 +131,9 @@
         "valuation_basis": "security_itself_current_snapshot",
         "date_basis": "provider_has_no_explicit_market_date",
         "metrics": {
-          "pe_ttm": 23.13950201,
-          "pb": 3.52720148,
-          "total_market_value": 57549016481.88
+          "pe_ttm": 22.25304817,
+          "pb": 3.39207751,
+          "total_market_value": 55344364595.52
         },
         "metric_units": {
           "pe_ttm": "multiple",
@@ -152,8 +152,8 @@
         "source_level": 3,
         "source_type": "monitored_aggregator_fallback",
         "underlying_provider": "csindex_official",
-        "fetched_at": "2026-07-16T23:42:58+08:00",
-        "market_date": "2026-07-16",
+        "fetched_at": "2026-07-19T02:30:43+08:00",
+        "market_date": "2026-07-17",
         "reporting_period": null,
         "currency": "CNY",
         "unit": "mixed_valuation_units",
@@ -166,9 +166,9 @@
         "scoring_eligible": true,
         "valuation_basis": "CSI300_total_share_capital_PE1_DP1",
         "metrics": {
-          "pe_ttm": 14.67,
+          "pe_ttm": 14.33,
           "pb": null,
-          "dividend_yield": 2.67
+          "dividend_yield": 2.74
         },
         "metric_units": {
           "pe_ttm": "multiple",
@@ -192,7 +192,7 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-16T23:42:23+08:00",
+      "fetched_at": "2026-07-19T02:30:08+08:00",
       "market_date": null,
       "reporting_period": "2026-03-31",
       "currency": "CNY",
@@ -216,7 +216,7 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-16T23:42:23+08:00",
+          "fetched_at": "2026-07-19T02:30:08+08:00",
           "market_date": null,
           "reporting_period": "2026-03-31",
           "currency": "CNY",
@@ -300,17 +300,17 @@
       "display_only": true,
       "attempts": 1,
       "published_at": null,
-      "retrieved_at": "2026-07-16T23:43:11",
+      "retrieved_at": "2026-07-19T02:30:54",
       "freshness_status": "fresh",
       "cache_used": true,
       "cache_stale": false,
-      "cache_age_days": 1.92,
+      "cache_age_days": 4.03,
       "warning": "",
       "upstream_error_code": "NETWORK_ERROR",
-      "upstream_error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&secid=0.002558&beg=20260601&end=20260716 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+      "upstream_error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&secid=0.002558&beg=20260604&end=20260719 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
       "comparison_source": "yfinance",
       "comparison_status": "not_comparable",
-      "comparison_reason": "交易日不一致(2026-07-14/2026-07-16)"
+      "comparison_reason": "交易日不一致(2026-07-14/2026-07-17)"
     },
     "510300.SS": {
       "interface": "510300_history",
@@ -320,18 +320,38 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-16T23:43:27+08:00",
-      "market_date": null,
+      "fetched_at": "2026-07-17T00:40:31",
+      "market_date": "2026-07-16",
       "reporting_period": null,
       "currency": "CNY",
-      "unit": "not_available",
-      "status": "failed",
-      "freshness": "unavailable",
-      "confidence": "low",
-      "fallback_used": false,
-      "error_code": "NETWORK_ERROR",
-      "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.510300 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
-      "scoring_eligible": false
+      "unit": "CNY_per_share_or_unit",
+      "status": "cached",
+      "freshness": "fresh",
+      "confidence": "medium",
+      "fallback_used": true,
+      "error_code": null,
+      "error_message": "",
+      "scoring_eligible": true,
+      "metrics": {
+        "close": 4.753,
+        "volume": 16578228.0,
+        "turnover": 7909234146.0
+      },
+      "adjustment": "qfq",
+      "display_only": true,
+      "attempts": 1,
+      "published_at": null,
+      "retrieved_at": "2026-07-19T02:31:05",
+      "freshness_status": "fresh",
+      "cache_used": true,
+      "cache_stale": false,
+      "cache_age_days": 2.08,
+      "warning": "",
+      "upstream_error_code": "NETWORK_ERROR",
+      "upstream_error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260604&end=20260719&secid=1.510300 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+      "comparison_source": "yfinance",
+      "comparison_status": "not_comparable",
+      "comparison_reason": "交易日不一致(2026-07-16/2026-07-17)"
     },
     "513060.SS": {
       "interface": "513060_history",
@@ -341,7 +361,7 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-16T23:43:48+08:00",
+      "fetched_at": "2026-07-19T02:31:15+08:00",
       "market_date": null,
       "reporting_period": null,
       "currency": "CNY",
@@ -350,8 +370,8 @@
       "freshness": "unavailable",
       "confidence": "low",
       "fallback_used": false,
-      "error_code": "SSL_ERROR",
-      "error_message": "AKShare底层连接SSL失败：SSLError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513060 (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)')))",
+      "error_code": "NETWORK_ERROR",
+      "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260604&end=20260719&secid=1.513060 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
       "scoring_eligible": false
     },
     "513090.SS": {
@@ -362,7 +382,7 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-16T23:44:07+08:00",
+      "fetched_at": "2026-07-19T02:31:27+08:00",
       "market_date": null,
       "reporting_period": null,
       "currency": "CNY",
@@ -372,7 +392,7 @@
       "confidence": "low",
       "fallback_used": false,
       "error_code": "NETWORK_ERROR",
-      "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260601&end=20260716&secid=1.513090 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
+      "error_message": "AKShare底层网络失败：ProxyError: HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf116&ut=7eea3edcaed734bea9cbfc24409ed989&klt=101&fqt=1&beg=20260604&end=20260719&secid=1.513090 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))",
       "scoring_eligible": false
     },
     "03033.HK": {
@@ -383,8 +403,8 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "sina_finance",
-      "fetched_at": "2026-07-16T23:44:12+08:00",
-      "market_date": "2026-07-16",
+      "fetched_at": "2026-07-19T02:31:32+08:00",
+      "market_date": "2026-07-17",
       "reporting_period": null,
       "currency": "HKD",
       "unit": "HKD_per_share_or_unit",
@@ -396,9 +416,9 @@
       "error_message": "",
       "scoring_eligible": true,
       "metrics": {
-        "close": 4.748,
-        "volume": 3463914678.0,
-        "turnover": 16530529184.0
+        "close": 4.534,
+        "volume": 4332591533.0,
+        "turnover": 19742639236.0
       },
       "adjustment": "qfq",
       "display_only": true,
@@ -415,8 +435,8 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "sina_finance",
-      "fetched_at": "2026-07-16T23:44:14+08:00",
-      "market_date": "2026-07-16",
+      "fetched_at": "2026-07-19T02:31:34+08:00",
+      "market_date": "2026-07-17",
       "reporting_period": null,
       "currency": "HKD",
       "unit": "index_points",
@@ -428,9 +448,9 @@
       "error_message": "",
       "scoring_eligible": true,
       "metrics": {
-        "close": 4834.43994,
-        "volume": 2095651497.0,
-        "turnover": 108768049336.0
+        "close": 4623.16992,
+        "volume": 2290916159.0,
+        "turnover": 115509379524.0
       },
       "adjustment": "not_applicable",
       "display_only": true,
@@ -438,7 +458,7 @@
     }
   },
   "source_conflicts": [],
-  "last_success_at": "2026-07-16T23:44:14+08:00",
+  "last_success_at": "2026-07-19T02:31:34+08:00",
   "circuit_state": {
     "interfaces": {
       "trade_calendar": 0,

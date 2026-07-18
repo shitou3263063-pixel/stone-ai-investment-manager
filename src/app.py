@@ -24,7 +24,7 @@ from src.decision.v12_1_decision import (
     build_consistency_checks,
     build_system_audit_text,
     build_v12_1_decision,
-    update_comparability_summary,
+    refresh_unified_decision_context,
 )
 from src.journal.investment_journal import build_log_row, upsert_investment_log
 from src.journal.review_engine import build_history_review
@@ -42,11 +42,10 @@ from src.reports.report_center import (
 from src.risk.vix_risk import analyze_vix_risk
 from src.strategy.dca_engine import build_dca_plan
 from src.strategy.execution_plan import build_execution_plan
-from src.strategy.rebalance_engine import build_rebalance_plan
 from src.strategies.smart_grid_strategy import build_smart_grid_result
 from src.system.health_check import format_health_report, run_health_check
 from src.validators.decision_validator import write_validation_report
-from src.portfolio_snapshot import portfolio_rows_for_legacy_agents
+from src.portfolio_snapshot import build_portfolio_snapshot, portfolio_rows_for_legacy_agents
 from utils.data_loader import load_config, load_market_data, load_portfolio, project_root
 from utils.logger import write_log
 
@@ -62,7 +61,8 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     config = load_config(root / "data" / "config.yaml")
     config["target_allocation"] = load_config(root / "config" / "strategy.yaml")["target_allocation"]
     # Portfolio Snapshot 是唯一生产资产事实源；CSV仅保留为兼容和人工查看文件。
-    portfolio = portfolio_rows_for_legacy_agents()
+    portfolio_snapshot = build_portfolio_snapshot()
+    portfolio = portfolio_rows_for_legacy_agents(portfolio_snapshot)
     market_data = load_market_data(root / "data" / "market_data.csv")
     live_market_result = (snapshot or {}).get("market") or {}
     macro_result = analyze_macro_calendar()
@@ -72,7 +72,18 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     portfolio_result = PortfolioAgent(config, portfolio).analyze()
     write_log("阶段：资产、DQS、风险、预算与规则引擎计算开始", filename="stone_ai.log")
     dca_result = build_dca_plan(market_data, vix_result, macro_result)
-    allocation_rebalance_result = build_rebalance_plan(portfolio_result)
+    cross_asset_result = analyze_cross_asset(live_market_result, market_data, portfolio_result)
+    decision = build_v12_1_decision(
+        portfolio_result=portfolio_result,
+        live_market_result=live_market_result,
+        macro_result=macro_result,
+        ai_advice_result={"ai_status": "rule_only", "fallback_reason": "pre_ai_rule_pass"},
+        portfolio_snapshot=portfolio_snapshot,
+    )
+    allocation_rebalance_result = {
+        "items": portfolio_snapshot.get("allocation", []),
+        "summary": "由统一PortfolioSnapshot派生；旧再平衡入口不再重复计算。",
+    }
     execution_plan_result = build_execution_plan(
         portfolio_result,
         market_result,
@@ -82,13 +93,6 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
         dca_result,
         allocation_rebalance_result,
         config,
-    )
-    cross_asset_result = analyze_cross_asset(live_market_result, market_data, portfolio_result)
-    decision = build_v12_1_decision(
-        portfolio_result=portfolio_result,
-        live_market_result=live_market_result,
-        macro_result=macro_result,
-        ai_advice_result={"ai_status": "rule_only", "fallback_reason": "pre_ai_rule_pass"},
     )
     try:
         grid_result = build_smart_grid_result(
@@ -104,7 +108,7 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
             "summary": "智能网格模块异常，主日报继续生成。",
         }
     decision["grid"] = grid_result
-    update_comparability_summary(decision)
+    refresh_unified_decision_context(decision, macro_result)
     # 先完成规则与网格一致性校验，再允许OpenAI对已裁决结果做解释复核。
     decision["consistency"] = build_consistency_checks(decision)
     write_log(f"阶段：规则前置一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
