@@ -64,6 +64,7 @@ def _allocation() -> list[dict]:
             },
         },
         load_strategy(),
+        snapshot,
     )
 
 
@@ -122,7 +123,7 @@ def test_07_target_weights_equal_one() -> None:
 
 def test_08_target_amounts_equal_total_assets() -> None:
     snapshot = build_portfolio_snapshot()
-    assert sum(row["target_amount_yuan"] for row in _allocation()) == snapshot["total_assets"]
+    assert sum(row["target_amount_yuan"] for row in _allocation()) == snapshot["investable_portfolio_assets"]
 
 
 def test_09_cash_target_and_fixed_floor_are_separate() -> None:
@@ -154,16 +155,15 @@ def test_12_voo_trade_amount_counted_once() -> None:
     assert sum(row["invested_amount_cny"] for row in snapshot["confirmed_transactions"] if row["id"] == trade["id"]) == 9000
 
 
-def test_13_pending_valuation_does_not_increase_voo_value() -> None:
-    holdings = build_portfolio_snapshot()["holdings"]
-    original = next(row for row in holdings if row["security_code"] == "VOO")
-    pending = next(row for row in holdings if row["security_code"] == "VOO_PENDING_20260715")
-    assert original["market_value_cny"] == 130000
-    assert pending["valuation_status"] == "trade_reconciled_valuation_fx_pending"
-    assert pending["actual_quantity"] == pytest.approx(2.166)
-    assert pending["actual_fx_rate"] is None
-    assert pending["fee"] == 0
-
+def test_13_pending_valuation_does_not_create_second_voo_position() -> None:
+    snapshot = build_portfolio_snapshot()
+    voo = [row for row in snapshot["positions"] if row["security_id"] == "VOO"]
+    cost = next(row for row in snapshot["cost_records"] if row["security_id"] == "VOO")
+    assert len(voo) == 1
+    assert voo[0]["market_value_cny"] == 130000
+    assert voo[0]["quantity"] == pytest.approx(30.166)
+    assert cost["cost_basis_cny"] == 9000
+    assert cost["included_in_market_value"] is False
 
 def test_14_released_event_has_value_or_missing_marker() -> None:
     event = {
@@ -171,7 +171,7 @@ def test_14_released_event_has_value_or_missing_marker() -> None:
         "actual_value": None,
         "release_result_confirmed": False,
     }
-    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=timezone.utc)) == "RELEASED_DATA_MISSING"
+    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=timezone.utc)) == "RELEASED_FETCH_FAILED"
 
 
 def test_15_zero_qqq_holding_action_not_applicable() -> None:
@@ -253,7 +253,7 @@ def test_21_blocking_error_forces_fail() -> None:
 def test_22_single_main_entrypoint_and_historical_suite_preserved() -> None:
     root = project_root()
     main_text = (root / "main.py").read_text(encoding="utf-8")
-    assert "from src.app import main" in main_text
+    assert "from src.pipeline.unified_pipeline import main" in main_text
     assert "raise SystemExit(main())" in main_text
     assert len(list((root / "tests").glob("test_*.py"))) >= 20
 

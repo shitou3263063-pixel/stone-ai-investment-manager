@@ -12,6 +12,7 @@ token.json
 __pycache__/
 .pytest_cache/
 .pytest_tmp*/
+.tmp_pytest*/
 *.pyc
 .venv/
 venv/

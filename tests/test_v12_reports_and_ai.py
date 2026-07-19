@@ -10,6 +10,7 @@ from src.ai.openai_advisor import generate_openai_advice
 from tests.test_v12_1_stable import _live_market, _portfolio
 from src.decision.v12_1_decision import build_v12_1_decision
 from src.reports.report_center import generate_daily_report, generate_today_action
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 class ReportsAndAiTest(unittest.TestCase):
@@ -32,25 +33,12 @@ class ReportsAndAiTest(unittest.TestCase):
         self.assertNotIn("Error code: 429", result["summary"])
         self.assertNotIn("未配置", result["summary"])
 
-    def test_report_uses_v12_1_decision_object(self) -> None:
-        decision = build_v12_1_decision(
-            portfolio_result=_portfolio(),
-            live_market_result=_live_market(),
-            macro_result={"has_high_event_next_7_days": False, "upcoming_events": []},
-            ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
-        )
-        today = generate_today_action(decision)
-        daily = generate_daily_report(decision=decision)
-
-        self.assertIn("金额或金额区间", today)
-        self.assertIn("## 附录 A. 市场吸引力与组合修复优先级", daily)
-        self.assertIn("## 附录 D. DQS、风险门槛与可比较性", daily)
-        self.assertIn("## 附录 E. 事件、压力测试与模拟网格", daily)
-        self.assertIn("## 附录 F. 系统状态、来源与一致性", daily)
-        self.assertIn("最大风险", daily)
-        self.assertIn("今日是否操作", daily)
-        self.assertNotIn("失败/降级原因", daily)
-
+    def test_report_uses_final_decision_bundle(self) -> None:
+        bundle = _fixture_bundle()
+        today = generate_today_action(bundle)
+        report = generate_daily_report(decision=bundle)
+        self.assertIn(bundle["bundle_hash"], today)
+        self.assertIn(bundle["bundle_hash"], report)
     def test_service_health_report_has_no_secret_values(self) -> None:
         rows = collect_service_health()
         report = format_service_health(rows)

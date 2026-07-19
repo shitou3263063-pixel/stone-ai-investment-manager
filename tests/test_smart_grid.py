@@ -35,12 +35,23 @@ def _decision(dqs: int = 90, cash: int = 50000, us_status: str = "严重低配",
         "dqs": {"score": dqs, "mode": "exact" if dqs >= 85 else "safe", "mode_label": "test"},
         "budget": {"confirmed_cash_available_yuan": cash},
         "allocation": [{"category": "美股", "status": us_status}],
-        "events": load_macro_events() if high_event else [],
+        "event_assessment": {
+            "status": "VALID_EVENTS_FOUND" if high_event else "VALID_NO_HIGH_IMPACT_EVENT",
+            "event_gate_passed": not high_event,
+            "reasons": ["存在已核验高影响事件"] if high_event else [],
+        },
+        "portfolio_snapshot": _portfolio(),
     }
 
 
 def _portfolio() -> dict:
-    return {"total_assets_wan": 282.11, "category_amounts": {"美股": 38.5}}
+    return {
+        "total_valued_assets": 2821100,
+        "positions": [
+            {"security_id": "NVDA", "security_name": "NVDA", "market_value_cny": 68000},
+            {"security_id": "VOO", "security_name": "VOO", "market_value_cny": 130000},
+        ],
+    }
 
 
 def _live(price: float = 500, qqq: float = 480) -> dict:
@@ -71,7 +82,7 @@ class SmartGridTest(unittest.TestCase):
     def test_core_position_is_not_sold_by_grid(self) -> None:
         state = GridSymbolState(symbol="VOO", grid_quantity=2, sell_spacing_pct=0.03)
         signal = GridSignal("VOO", "SELL", "SELL_SIGNAL", 520, 515, 5000, 3, 0, "sell")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("核心仓" in reason for reason in review.reasons))
 
     def test_grid_budget_is_separate_from_dca_budget(self) -> None:
@@ -86,12 +97,12 @@ class SmartGridTest(unittest.TestCase):
 
     def test_cash_below_safety_line_blocks_buy(self) -> None:
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(cash=0), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(cash=0), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(cash=0), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(cash=0), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("现金" in reason for reason in review.reasons))
 
     def test_low_dqs_blocks_precise_grid_amount(self) -> None:
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(dqs=70), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(dqs=70), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(dqs=70), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(dqs=70), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("DQS" in reason for reason in review.reasons))
 
     def test_missing_data_does_not_trigger_trade(self) -> None:
@@ -103,7 +114,7 @@ class SmartGridTest(unittest.TestCase):
     def test_data_conflict_conservative_mode_blocks_trade(self) -> None:
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
         decision = _decision(dqs=59)
-        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=decision, portfolio_result=_portfolio(), grid_budget=build_grid_budget(decision, _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=decision, portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(decision, _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(review.rejected)
 
     def test_dynamic_grid_spacing_for_voo(self) -> None:
@@ -127,25 +138,25 @@ class SmartGridTest(unittest.TestCase):
 
     def test_major_event_filter(self) -> None:
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(high_event=True), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(high_event=True), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
-        self.assertTrue(any("48小时" in reason for reason in review.reasons))
+        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(high_event=True), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(high_event=True), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        self.assertTrue(any("高影响事件" in reason for reason in review.reasons))
 
     def test_max_consecutive_buy_levels_effective(self) -> None:
         state = GridSymbolState("VOO", consecutive_buys=3)
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("连续买入" in reason for reason in review.reasons))
 
     def test_daily_trade_limit_effective(self) -> None:
         state = GridSymbolState("VOO", day_trade_count=1)
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("当日" in reason for reason in review.reasons))
 
     def test_monthly_trade_limit_effective(self) -> None:
         state = GridSymbolState("VOO", month_trade_count=8)
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("本月" in reason for reason in review.reasons))
 
     def test_unconfirmed_manual_trade_does_not_update_state(self) -> None:
@@ -181,7 +192,7 @@ class SmartGridTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "simulation.csv"
             signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy", valid_until="2026-07-12")
-            review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), self.config), config=self.config, symbol_cfg=self.voo_cfg, price_available=True)
+            review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), self.config), config=self.config, symbol_cfg=self.voo_cfg, price_available=True)
             key = append_simulated_signal(path, signal, review, "")
             append_simulated_signal(path, signal, review, key)
             self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 2)
@@ -190,7 +201,7 @@ class SmartGridTest(unittest.TestCase):
         cfg = {**self.voo_cfg, "normal_sell_min_pct": 0.01, "normal_sell_max_pct": 0.01}
         state = GridSymbolState("VOO", grid_quantity=10, sell_spacing_pct=0.0001)
         signal = GridSignal("VOO", "SELL", "SELL_SIGNAL", 501, 500, 1000, 2, 0, "sell")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(us_status="接近目标"), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(us_status="接近目标"), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=cfg, price_available=True)
         self.assertTrue(any("利润不足" in reason for reason in review.reasons))
 
     def test_backtest_handles_insufficient_data_without_fake_result(self) -> None:
@@ -233,7 +244,7 @@ class SmartGridTest(unittest.TestCase):
 
     def test_total_risk_can_reject_raw_signal(self) -> None:
         signal = GridSignal("VOO", "BUY", "BUY_SIGNAL", 480, 485, 3000, 6, 1, "buy")
-        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(dqs=50), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(dqs=50), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=GridSymbolState("VOO"), decision=_decision(dqs=50), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(dqs=50), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(review.rejected)
 
     def test_voo_and_qqq_do_not_exceed_total_grid_budget(self) -> None:
@@ -245,7 +256,7 @@ class SmartGridTest(unittest.TestCase):
     def test_grid_sell_can_be_denied_when_us_stock_underweight(self) -> None:
         state = GridSymbolState("VOO", grid_quantity=10, sell_spacing_pct=0.03)
         signal = GridSignal("VOO", "SELL", "SELL_SIGNAL", 520, 515, 2000, 2, 0, "sell")
-        review = review_grid_signal(signal=signal, state=state, decision=_decision(us_status="严重低配"), portfolio_result=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
+        review = review_grid_signal(signal=signal, state=state, decision=_decision(us_status="严重低配"), portfolio_snapshot=_portfolio(), grid_budget=build_grid_budget(_decision(), _config(False)), config=_config(False), symbol_cfg=self.voo_cfg, price_available=True)
         self.assertTrue(any("美股" in reason for reason in review.reasons))
 
     def test_auto_trade_is_always_false(self) -> None:
@@ -257,7 +268,7 @@ class SmartGridTest(unittest.TestCase):
             symbol_cfg=self.voo_cfg,
             state_payload={"symbol": "VOO"},
             decision=_decision(),
-            portfolio_result=_portfolio(),
+            portfolio_snapshot=_portfolio(),
             live_market_result=_live(),
             config=self.config,
             grid_budget=build_grid_budget(_decision(), self.config),

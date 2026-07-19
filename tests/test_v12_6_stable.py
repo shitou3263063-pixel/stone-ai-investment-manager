@@ -9,6 +9,7 @@ from src.analysis.scenario_analysis import calculate_portfolio_stress_scenarios
 from src.decision.v12_1_decision import build_opportunity_scores, enrich_allocation, load_strategy
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 from tests.test_v12_1_stable import _live_market, _portfolio
 from tests.test_v12_5_final_hardening import _ai_payload
 from tests.test_v12_5_stable import _decision
@@ -134,10 +135,8 @@ def test_scenario_analysis_calculation() -> None:
 
 
 def test_report_internal_consistency() -> None:
-    decision = _decision()
-    report = generate_daily_report(decision=decision)
-    assert decision["consistency"]["status"] == "PASS"
-    assert "### 组合情景压力测试" in report
-    assert "### 市场宽度、资金流与情绪数据状态" in report
-    assert "模拟资金" not in decision.get("funding_source", "")
-    assert json.dumps(decision, ensure_ascii=False)
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    assert bundle["render_contract"]["main_bundle_hash"] in report
+    assert bundle["render_contract"]["appendix_bundle_hash"] in report
+    assert bundle["render_contract"]["main_bundle_hash"] == bundle["render_contract"]["appendix_bundle_hash"]

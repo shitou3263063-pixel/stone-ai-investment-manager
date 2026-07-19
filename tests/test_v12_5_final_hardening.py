@@ -17,6 +17,7 @@ from src.macro.macro_calendar import analyze_macro_calendar
 from src.data_sources.data_router import _normalize_point
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 from tests.test_v12_5_stable import _decision
 
 
@@ -138,19 +139,12 @@ def test_unconfirmed_event_is_not_presented_as_confirmed_high_event(tmp_path: Pa
     assert configured["release_at_utc"] is None
 
 
-def test_daily_report_has_single_trigger_section_and_fixed_order() -> None:
-    report = generate_daily_report(decision=_decision())
-    assert report.count("下一触发条件") == 1
-    headings = [
-        "## 1. 今日决策卡",
-        "## 2. 已执行交易事实",
-        "## 3. 资产配置偏离",
-        "## 附录 F. 系统状态、来源与一致性",
-    ]
-    positions = [report.index(heading) for heading in headings]
-    assert positions == sorted(positions)
-
-
+def test_daily_report_uses_single_bundle_and_fixed_section_order() -> None:
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    headings = ["## 今日场景决策", "## 数据质量评分", "## 统一真实资产快照", "## 事件与数据状态", "## 附录：统一快照引用"]
+    assert [report.index(item) for item in headings] == sorted(report.index(item) for item in headings)
+    assert report.count(bundle["bundle_hash"]) >= 3
 def test_hard_validation_detects_live_grid_budget_in_simulation() -> None:
     decision = _decision()
     decision["grid"] = {

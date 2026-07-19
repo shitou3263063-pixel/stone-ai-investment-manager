@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 class EntrypointTest(unittest.TestCase):
     def test_root_main_is_official_entrypoint(self) -> None:
         content = (PROJECT_ROOT / "main.py").read_text(encoding="utf-8")
-        self.assertIn("from src.app import main", content)
+        self.assertIn("from src.pipeline.unified_pipeline import main", content)
 
     def test_legacy_entrypoints_are_archived(self) -> None:
         self.assertFalse((PROJECT_ROOT / "src" / "main.py").exists())

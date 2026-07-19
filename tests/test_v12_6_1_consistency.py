@@ -11,7 +11,7 @@ from src.decision.v12_1_decision import (
     compute_dqs,
     load_strategy,
 )
-from src.grid.validator import _event_within_48h
+from src.domain.event_assessment import build_event_assessment
 from src.macro.macro_calendar import analyze_macro_calendar, get_upcoming_high_risk_events, load_macro_events
 
 
@@ -130,10 +130,9 @@ def test_bls_ppi_date_and_timezone() -> None:
 
 
 def test_same_event_source_used_by_risk_and_grid() -> None:
-    events = load_macro_events()
-    assert _event_within_48h(events, date(2026, 7, 13)) == bool(
-        get_upcoming_high_risk_events(date(2026, 7, 13), hours=48, events=events)
-    )
+    assessment = build_event_assessment(analyze_macro_calendar(today=date(2026, 7, 13)))
+    assert assessment["status"] == "VALID_EVENTS_FOUND"
+    assert assessment["event_gate_passed"] is False
 
 
 def test_high_risk_event_not_reported_as_none() -> None:
