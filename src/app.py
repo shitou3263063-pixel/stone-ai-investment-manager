@@ -27,6 +27,7 @@ from src.decision.v12_1_decision import (
     refresh_unified_decision_context,
 )
 from src.journal.investment_journal import build_log_row, upsert_investment_log
+from src.decision.issue_registry import refresh_issue_registry
 from src.journal.review_engine import build_history_review
 from src.macro.macro_calendar import analyze_macro_calendar
 from src.notifier.email_notifier import send_daily_reports
@@ -61,10 +62,13 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     config = load_config(root / "data" / "config.yaml")
     config["target_allocation"] = load_config(root / "config" / "strategy.yaml")["target_allocation"]
     # Portfolio Snapshot 是唯一生产资产事实源；CSV仅保留为兼容和人工查看文件。
-    portfolio_snapshot = build_portfolio_snapshot()
-    portfolio = portfolio_rows_for_legacy_agents(portfolio_snapshot)
     market_data = load_market_data(root / "data" / "market_data.csv")
     live_market_result = (snapshot or {}).get("market") or {}
+    portfolio_snapshot = (
+        ((snapshot or {}).get("portfolio") or {}).get("snapshot")
+        or build_portfolio_snapshot()
+    )
+    portfolio = portfolio_rows_for_legacy_agents(portfolio_snapshot)
     macro_result = analyze_macro_calendar()
     vix_result = analyze_vix_risk(live_market_result, market_data)
 
@@ -111,11 +115,13 @@ def _build_context(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     refresh_unified_decision_context(decision, macro_result)
     # 先完成规则与网格一致性校验，再允许OpenAI对已裁决结果做解释复核。
     decision["consistency"] = build_consistency_checks(decision)
+    refresh_issue_registry(decision)
     write_log(f"阶段：规则前置一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
     ai_context = build_cio_review_context(decision, live_market_result, macro_result)
     write_log("阶段：OpenAI可选解释复核开始", filename="stone_ai.log")
     ai_advice_result = apply_openai_review(decision, generate_openai_advice(ai_context))
     decision = apply_ai_explanation(decision, ai_advice_result)
+    refresh_issue_registry(decision)
     write_log(f"阶段：OpenAI复核后一致性校验={decision['consistency'].get('status')}", filename="stone_ai.log")
     today = date.today()
     log_row = build_log_row(

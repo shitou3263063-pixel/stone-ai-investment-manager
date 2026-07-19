@@ -266,12 +266,30 @@ def analyze_macro_calendar(
         reminder = "未来7天存在未验证事件；不得把未验证日期当作已确认高等级事件。"
     else:
         reminder = "未来7天暂无已核验高等级宏观事件。"
+    missing_calendar_fields = [
+        str(event.get("event_name") or event.get("name") or "UNKNOWN_EVENT")
+        for event in events
+        if not event.get("release_at_utc") or event.get("verification_status") == "unverified"
+    ]
+    calendar_status = "UNAVAILABLE" if not events else ("PARTIAL" if missing_calendar_fields else "VALID")
+    risk_state = "HIGH_RISK_EVENT_FOUND" if high_7d else ("UNKNOWN" if calendar_status == "UNAVAILABLE" else "CLEAR")
+    gate_result = (
+        "BLOCK" if risk_state == "HIGH_RISK_EVENT_FOUND"
+        else "CONSERVATIVE_BLOCK" if calendar_status == "UNAVAILABLE"
+        else "PASS_WITH_LIMITATIONS" if calendar_status == "PARTIAL"
+        else "PASS"
+    )
     return {
         "as_of": current.isoformat(),
         "report_timezone": report_timezone,
         "window_days": 7,
         "important_event_types": DEFAULT_EVENT_TYPES,
         "events": events,
+        "event_calendar_data_status": calendar_status,
+        "event_risk_state": risk_state,
+        "event_gate_result": gate_result,
+        "event_count": len(events),
+        "calendar_missing_items": missing_calendar_fields,
         "upcoming_events": upcoming,
         "high_risk_events_48h": high_48h,
         "high_risk_events_7d": high_7d,

@@ -1,6 +1,24 @@
 config_version: V12.7.1_FINAL_FREEZE
 config_role: production_data_source_priority_authority
 schema_version: 1
+source_defaults:
+  supported_markets: []
+  supported_fields: []
+  expected_frequency: EVENT_DRIVEN
+  timeout: 20
+  retry_policy:
+    max_attempts: 2
+    backoff_seconds: 2
+  cache_policy:
+    enabled: true
+    stale_if_error: true
+  freshness_policy:
+    mode: frequency_aware
+  authentication_required: false
+  license_or_usage_note: "仅按供应商许可条款用于内部投资辅助；不得再分发或伪造。"
+  fallback_order: []
+  enabled: true
+  health_status: UNKNOWN
 policy:
   official_source_precedence: true
   unregistered_source_policy: block_trade_conclusion
@@ -25,14 +43,28 @@ sources:
     name: "FRED"
     tier: 1
     type: official
+    provider_name: "Federal Reserve Economic Data"
+    supported_markets: [US_MACRO]
+    supported_fields: [yield, spread, cpi, ppi, pce, unemployment, gdp]
+    expected_frequency: DAILY_OFFICIAL_MACRO
+    authentication_required: true
+    fallback_order: [local_cache]
   treasury:
     name: "U.S. Treasury"
     tier: 1
     type: official
+    supported_markets: [US_MACRO]
+    supported_fields: [yield]
+    expected_frequency: DAILY_OFFICIAL_MACRO
+    fallback_order: [fred, local_cache]
   cboe_official:
     name: "Cboe Official"
     tier: 1
     type: official
+    supported_markets: [US]
+    supported_fields: [vix, put_call_ratio]
+    expected_frequency: INTRADAY
+    fallback_order: [yfinance, local_cache]
   sec_edgar:
     name: "SEC EDGAR"
     tier: 1
@@ -53,22 +85,47 @@ sources:
     name: "Alpha Vantage"
     tier: 2
     type: professional_api
+    supported_markets: [US, FX]
+    supported_fields: [price, fx]
+    expected_frequency: DAILY_MARKET_CLOSE
+    authentication_required: true
+    fallback_order: [finnhub, yfinance, local_cache]
   finnhub:
     name: "Finnhub"
     tier: 2
     type: professional_api
+    supported_markets: [US, HK, CN]
+    supported_fields: [price, company_news]
+    expected_frequency: INTRADAY
+    authentication_required: true
+    fallback_order: [yfinance, local_cache]
   yfinance:
     name: "yfinance"
     tier: 3
     type: free_aggregator
+    supported_markets: [US, HK, CN, FX]
+    supported_fields: [price, fx]
+    expected_frequency: DAILY_MARKET_CLOSE
+    license_or_usage_note: "Tier 3聚合备用源；关键行情不得把它显示为官方源。"
+    fallback_order: [local_cache]
   tushare_pro:
     name: "Tushare Pro"
     tier: 2
     type: authorized_api
+    supported_markets: [CN]
+    supported_fields: [price, valuation, fundamentals, trade_calendar]
+    expected_frequency: DAILY_MARKET_CLOSE
+    authentication_required: true
+    fallback_order: [akshare, local_cache]
   akshare:
     name: "AKShare (monitored fallback)"
     tier: 3
     type: monitored_aggregator_fallback
+    supported_markets: [CN, HK]
+    supported_fields: [price, valuation, fundamentals, trade_calendar]
+    expected_frequency: DAILY_MARKET_CLOSE
+    license_or_usage_note: "受监控的Tier 3备用路由；必须保留底层供应商与冲突审计。"
+    fallback_order: [local_cache]
     requirements:
       underlying_provider_required: true
       schema_validation_required: true
@@ -78,26 +135,58 @@ sources:
     name: "Hong Kong Monetary Authority Open API"
     tier: 1
     type: official
+    supported_markets: [HK, FX]
+    supported_fields: [hibor, exchange_rate]
+    expected_frequency: DAILY_OFFICIAL_MACRO
+    fallback_order: [local_cache]
   cninfo_official:
     name: "CNINFO Official Disclosure Platform"
     tier: 1
     type: official
+    supported_markets: [CN]
+    supported_fields: [announcement]
+    expected_frequency: EVENT_DRIVEN
+    fallback_order: [local_cache]
   hkex_official:
     name: "HKEXnews"
     tier: 1
     type: official
+    supported_markets: [HK]
+    supported_fields: [announcement, price_reference]
+    expected_frequency: EVENT_DRIVEN
+    fallback_order: [local_cache]
   local_cache:
     name: "Local Cache"
     tier: 3
     type: cache
+    supported_markets: [US, HK, CN, FX, US_MACRO]
+    supported_fields: [price, fx, macro, announcement]
+    expected_frequency: EVENT_DRIVEN
+    cache_policy:
+      enabled: true
+      stale_if_error: true
+      immutable_source_attribution: true
+    license_or_usage_note: "仅重放已记录的原始来源值；不得改写为官方源。"
   market_data_csv:
     name: "Manual market_data.csv"
     tier: 4
     type: manual
+    supported_markets: [US, HK, CN, FX]
+    supported_fields: [manual_reference]
+    expected_frequency: EVENT_DRIVEN
+    cache_policy:
+      enabled: false
+    license_or_usage_note: "用户维护的人工参考值；不得冒充实时行情。"
   media_news:
     name: "Registered Media News"
     tier: 4
     type: media
+    supported_markets: [GLOBAL]
+    supported_fields: [news_explanation]
+    expected_frequency: EVENT_DRIVEN
+    cache_policy:
+      enabled: false
+    license_or_usage_note: "仅用于解释，不得作为成交、估值或交易权限事实。"
 
 categories:
   macro:
@@ -146,6 +235,7 @@ critical_metrics:
     backup_source: finnhub
     freshness_limit: 2d
     verification_requirement: dual_source
+    fallback_order: [yfinance, local_cache]
   QQQ:
     category: market
     metric_type: price
@@ -154,6 +244,7 @@ critical_metrics:
     backup_source: finnhub
     freshness_limit: 2d
     verification_requirement: dual_source
+    fallback_order: [yfinance, local_cache]
   TLT:
     category: market
     metric_type: price
@@ -162,6 +253,7 @@ critical_metrics:
     backup_source: finnhub
     freshness_limit: 2d
     verification_requirement: dual_source
+    fallback_order: [yfinance, local_cache]
   GLD:
     category: market
     metric_type: price
@@ -170,6 +262,7 @@ critical_metrics:
     backup_source: finnhub
     freshness_limit: 2d
     verification_requirement: dual_source
+    fallback_order: [yfinance, local_cache]
   "03033.HK":
     category: market
     metric_type: price
@@ -234,3 +327,21 @@ critical_metrics:
     backup_source: yfinance
     freshness_limit: 2d
     verification_requirement: dual_source
+  USD/CNY:
+    category: market
+    metric_type: fx
+    evidence_group: market_valuation
+    primary_source: yfinance
+    backup_source: local_cache
+    fallback_order: [local_cache]
+    freshness_limit: 5d
+    verification_requirement: primary_or_timestamped_cache
+  USD/CNH:
+    category: market
+    metric_type: fx
+    evidence_group: market_valuation
+    primary_source: yfinance
+    backup_source: local_cache
+    fallback_order: [local_cache]
+    freshness_limit: 5d
+    verification_requirement: primary_or_timestamped_cache

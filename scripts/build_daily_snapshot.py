@@ -23,14 +23,22 @@ from scripts.preflight_check import (  # noqa: E402
 from src.data_sources.source_audit import build_and_write_source_audit  # noqa: E402
 from src.data_sources.decision_time import filter_market_for_cutoff, now_report_time, to_report_iso  # noqa: E402
 from src.portfolio_snapshot import build_portfolio_snapshot  # noqa: E402
+from src.valuation.valuation_engine import apply_live_valuation  # noqa: E402
 from utils.market_data_provider import fetch_yfinance_market_data  # noqa: E402
 
 
 SNAPSHOT_PATH = PROJECT_ROOT / "data" / "daily_snapshot.json"
 
 
-def _portfolio_summary(master: dict[str, Any]) -> dict[str, Any]:
+def _portfolio_summary(
+    master: dict[str, Any],
+    *,
+    market: dict[str, Any] | None = None,
+    valuation_as_of: str | None = None,
+) -> dict[str, Any]:
     snapshot = build_portfolio_snapshot()
+    if market and valuation_as_of:
+        snapshot = apply_live_valuation(snapshot, market, valuation_as_of=valuation_as_of)
     totals = master.get("totals", {}) or {}
     total_assets = float(totals.get("total_assets", 0) or 0)
     labels = master.get("asset_class_labels", {}) or {}
@@ -151,7 +159,7 @@ def build_snapshot(snapshot_date: date | None = None, *, decision_cutoff_time: d
             "gmail_reports",
             "news_explanation",
         ],
-        "portfolio": _portfolio_summary(master),
+        "portfolio": _portfolio_summary(master, market=market, valuation_as_of=to_report_iso(cutoff)),
         "execution_state": execution_state,
         "market": market,
         "source_audit": source_audit,
