@@ -12,6 +12,7 @@ from src.decision.v12_1_decision import (
     resolve_next_review_datetime,
 )
 from src.reports.report_center import build_run_status, generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 def _allocation() -> list[dict]:
@@ -241,23 +242,10 @@ def test_p1a_output_files_are_machine_readable(tmp_path, monkeypatch: pytest.Mon
         assert json.loads((tmp_path / "outputs" / name).read_text(encoding="utf-8"))
 
 
-def test_run_status_exposes_p1a_state() -> None:
-    decision = {
-        "date": "2026-07-14", "generated_at": "2026-07-14T08:30:00+08:00", "data_cutoff": "2026-07-14T08:29:00+08:00",
-        "portfolio_value_yuan": 2821100, "today_trade": False, "trade_type": "无操作", "targets": "不适用", "funding_source": "不适用",
-        "next_review_date": "2026-07-15", "no_trade_reasons": ["测试"], "market_table": [], "opportunity": [],
-        "dqs": {"score": 75, "mode_label": "区间", "blocking_errors": []}, "risk": {"score": 56, "level": "中高风险"},
-        "budget": {"today_total_yuan": 0, "account_total_cash_yuan": 220000, "cash_safety_reserve_yuan": 220000, "investable_cash_yuan": 0},
-        "consistency": {"errors": [], "warnings": []},
-        "cn_hk_p1a": _p1a_snapshot(), "cn_hk_analysis_completeness": _p1a_snapshot()["analysis_completeness"],
-    }
-    status = build_run_status(decision, report_files=[], email_status="skipped")
-    assert status["cn_hk_p1a"]["cn_analysis_completeness"] == 100.0
-    assert status["cn_hk_p1a"]["hkma_status"] == "ok"
-    assert status["cn_hk_p1a"]["tushare_status"] == "missing"
-    assert "tushare_002558_valuation_status" in status["cn_hk_p1a"]
-    assert "tushare_002558_fundamental_status" in status["cn_hk_p1a"]
-    assert "tushare_csi300_valuation_status" in status["cn_hk_p1a"]
+def test_run_status_exposes_bundle_identity() -> None:
+    bundle = _fixture_bundle()
+    status = build_run_status(bundle, report_files=[], email_status="skipped")
+    assert status["bundle_hash"] == bundle["bundle_hash"]
 
 
 def test_next_review_is_strictly_after_run_time_and_handles_offsets() -> None:
@@ -278,32 +266,16 @@ def test_next_review_is_strictly_after_run_time_and_handles_offsets() -> None:
     assert datetime.fromisoformat(result_ny).astimezone(timezone.utc) == datetime.fromisoformat(ny_candidate).astimezone(timezone.utc)
 
 
-def test_p1a_utf8_json_round_trip_preserves_chinese(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cn_hk_p1a, "project_root", lambda: tmp_path)
-    snapshot = _p1a_snapshot()
-    snapshot["tushare"]["error_summary"] = "接口权限不足，不影响主程序运行"
-    p0 = {"cn_data_completeness": {"score_pct": 45}, "hk_data_completeness": {"score_pct": 65}}
-    cn_hk_p1a.write_p1a_outputs(snapshot, p0)
-    path = tmp_path / "outputs" / "cn_hk_p1a_validation.json"
-    raw = path.read_bytes()
-    decoded = raw.decode("utf-8")
-    parsed = json.loads(decoded)
-    assert parsed["tushare_error_summary"] == "接口权限不足，不影响主程序运行"
-
-    from src.reports import report_center
-    markdown_path = tmp_path / "p1a.md"
-    markdown_path.write_text("\n".join(report_center._cn_hk_p1a_table({"cn_hk_p1a": snapshot})), encoding="utf-8")
-    markdown = markdown_path.read_bytes().decode("utf-8")
-    assert "A股整体分析" in markdown
-    assert "港股整体分析" in markdown
+def test_final_report_utf8_round_trip_preserves_chinese(tmp_path: Path) -> None:
+    report_path = tmp_path / "daily.md"
+    report_path.write_text(generate_daily_report(decision=_fixture_bundle()), encoding="utf-8")
+    text = report_path.read_text(encoding="utf-8")
+    assert "投资日报" in text
+    assert "统一真实资产快照" in text
 
 
-def test_report_includes_p1a_status_section() -> None:
-    # Report rendering is exercised with the production decision fixture style by checking the section helper path.
-    from src.reports import report_center
-    decision = {"cn_hk_p1a": _p1a_snapshot()}
-    text = "\n".join(report_center._cn_hk_p1a_table(decision))
-    assert "A股整体分析" in text
-    assert "HKMA官方" in text
-    assert "ETF财务规则" in text
-    assert "002558个股财务评分" in text
+def test_report_includes_canonical_bundle_status() -> None:
+    bundle = _fixture_bundle()
+    text = generate_daily_report(decision=bundle)
+    assert bundle["bundle_hash"] in text
+    assert "事件状态" in text

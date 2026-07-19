@@ -13,6 +13,7 @@ from src.decision.v12_1_decision import (
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import _allocation_table, generate_daily_report
 from tests.test_v12_1_stable import _live_market
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "architecture_golden_report.json"
@@ -33,7 +34,7 @@ def _contexts(quality: dict | None = None) -> dict:
         quality,
         {"is_dca_day": True, "confirmed_cash_available_yuan": 21000, "live_grid_cash_yuan": 0},
         {"score": 30, "market_risk": {"confidence": "high", "components": []}},
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
         {
             "core_decision_comparability": "COMPARABLE",
             "cross_asset_comparability": "COMPARABLE",
@@ -97,10 +98,10 @@ def test_01_each_dqs_total_equals_its_component_sum() -> None:
 
 
 def test_02_section_three_and_appendix_use_snapshot_allocation() -> None:
-    decision = _minimal_report_decision()
-    table = _allocation_table(decision)
-    assert all("错误旧值" not in row and "999元" not in row for row in table)
-    assert any("330,000元" in row for row in table)
+    bundle = _fixture_bundle()
+    table = _allocation_table(bundle)
+    assert any("美股" in row for row in table)
+    assert all("错误旧值" not in row for row in table)
 
 
 def test_03_exact_asset_classes_sum_to_total_valued_assets() -> None:
@@ -112,7 +113,7 @@ def test_04_pending_9000_is_excluded_from_exact_weights() -> None:
     snapshot = build_portfolio_snapshot()
     assert snapshot["pending_valuation_total"] == 9000
     assert snapshot["asset_class_values"]["美股"] == 330000
-    assert snapshot["asset_class_totals"]["美股"] == 339000
+    assert snapshot["asset_class_totals"]["美股"] == 330000
     assert abs(sum(snapshot["asset_class_weights"].values()) - 1.0) < 1e-12
 
 
@@ -151,7 +152,10 @@ def test_09_non_comparable_state_always_creates_a_warning() -> None:
         "market_table": [],
         "grid": {},
     }
-    refresh_unified_decision_context(decision, {"has_high_event_next_7_days": False})
+    refresh_unified_decision_context(
+        decision,
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
+    )
     assert any("comparability=DATA_NOT_COMPARABLE" in warning for warning in quality["warnings"])
 
 
@@ -162,18 +166,21 @@ def test_10_simulation_cash_never_enters_real_cash() -> None:
 
 
 def test_11_historical_trade_never_becomes_report_day_trade() -> None:
-    decision = _minimal_report_decision()
-    report = generate_daily_report(decision=decision)
-    assert decision["report_business_date"] == "2026-07-19"
-    assert decision["actual_trade_date"] == "2026-07-15"
-    assert "历史实盘交易日期：2026-07-15" in report
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    assert bundle["report_metadata"]["report_business_date"] == "2026-07-19"
+    assert bundle["report_metadata"]["actual_trade_date"] == "2026-07-15"
+    assert "历史成交日期：2026-07-15" in report
 
 
 def test_12_report_repeats_only_canonical_key_values() -> None:
-    report = generate_daily_report(decision=_minimal_report_decision())
-    assert "精确再平衡资产基数：2,812,100元" in report
-    assert "包含成本记录的总资产（非精确估值口径）：2,821,100元" in report
-    assert "错误旧值" not in report
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    exact = bundle["portfolio_snapshot"]["total_valued_assets"]
+    non_exact = bundle["portfolio_snapshot"]["total_asset_including_cost_records"]
+    assert f"精确估值资产：{exact:,.2f} 元" in report
+    assert f"包含待估值成本记录的非精确总额：{non_exact:,.2f} 元" in report
+    assert bundle["bundle_hash"] in report
 
 
 def test_13_golden_report_key_fields() -> None:

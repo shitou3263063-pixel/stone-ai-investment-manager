@@ -193,125 +193,6 @@ PENDING_VALUATION_STATUSES = {
 }
 
 
-def _canonical_portfolio_values(
-    holdings: list[dict[str, Any]],
-    categories: list[str],
-) -> dict[str, Any]:
-    """Compute all portfolio amounts and weights exactly once.
-
-    Cost-only records remain visible, but are excluded from every precise
-    valuation, allocation and rebalance field.
-    """
-    valued_assets = [
-        row for row in holdings
-        if str(row.get("valuation_status")) not in PENDING_VALUATION_STATUSES
-        and not bool(row.get("is_cost_record"))
-    ]
-    pending_assets = [
-        row for row in holdings
-        if str(row.get("valuation_status")) in PENDING_VALUATION_STATUSES
-    ]
-    asset_class_values = {
-        category: round(sum(
-            _to_float(row.get("market_value_cny"))
-            for row in valued_assets
-            if str(row.get("asset_class")) == category
-        ))
-        for category in categories
-    }
-    total_valued_assets = round(sum(asset_class_values.values()))
-    total_including_cost = round(
-        sum(_to_float(row.get("market_value_cny")) for row in valued_assets)
-        + sum(_to_float(row.get("cost_basis_cny", row.get("market_value_cny"))) for row in pending_assets)
-    )
-    pending_valuation_total = round(sum(_to_float(row.get("market_value_cny")) for row in pending_assets))
-    asset_class_weights = {
-        category: (value / total_valued_assets if total_valued_assets else 0.0)
-        for category, value in asset_class_values.items()
-    }
-    return {
-        "valued_assets": valued_assets,
-        "pending_valuation_assets": pending_assets,
-        "pending_valuation_total": pending_valuation_total,
-        "total_valued_assets": total_valued_assets,
-        "total_asset_including_cost_records": total_including_cost,
-        "asset_class_values": asset_class_values,
-        "asset_class_weights": asset_class_weights,
-    }
-
-
-def apply_verified_market_valuation(
-    snapshot: dict[str, Any],
-    *,
-    security_code: str,
-    pending_reference_symbol: str,
-    total_quantity: float,
-    latest_price: float,
-    valuation_fx_rate: float,
-) -> dict[str, Any]:
-    """Return one revalued PortfolioSnapshot; callers never recalculate totals."""
-    holdings = [dict(row) for row in snapshot.get("holdings", []) or []]
-    original = next((row for row in holdings if str(row.get("security_code")) == security_code), None)
-    pending = next((row for row in holdings if str(row.get("reference_symbol")) == pending_reference_symbol), None)
-    if original is None or pending is None:
-        return snapshot
-    market_value_cny = round(total_quantity * latest_price * valuation_fx_rate, 2)
-    original["quantity"] = total_quantity
-    original["market_value_cny"] = market_value_cny
-    original["valuation_status"] = "verified_market_valuation"
-    pending["market_value_cny"] = 0
-    pending["valuation_status"] = "superseded_by_verified_market_valuation"
-    categories = list((snapshot.get("asset_class_values") or snapshot.get("asset_class_totals") or {}).keys())
-    if all(row.get("asset_class") for row in holdings):
-        canonical = _canonical_portfolio_values(holdings, categories)
-    else:
-        asset_class_values = dict(snapshot.get("asset_class_values") or snapshot.get("asset_class_totals") or {})
-        previous_value = _to_float(original.get("market_value_cny"))
-        previous_pending = _to_float(next(
-            (row.get("market_value_cny") for row in snapshot.get("holdings", []) or [] if str(row.get("reference_symbol")) == pending_reference_symbol),
-            0,
-        ))
-        configured_original = _to_float(next(
-            (row.get("market_value_cny") for row in snapshot.get("holdings", []) or [] if str(row.get("security_code")) == security_code),
-            0,
-        ))
-        asset_class_values["美股"] = round(
-            _to_float(asset_class_values.get("美股")) - configured_original - previous_pending + previous_value,
-            2,
-        )
-        total_valued_assets = round(sum(_to_float(value) for value in asset_class_values.values()), 2)
-        canonical = {
-            "valued_assets": holdings,
-            "pending_valuation_assets": [],
-            "pending_valuation_total": 0,
-            "total_valued_assets": total_valued_assets,
-            "total_asset_including_cost_records": total_valued_assets,
-            "asset_class_values": asset_class_values,
-            "asset_class_weights": {
-                category: (_to_float(value) / total_valued_assets if total_valued_assets else 0.0)
-                for category, value in asset_class_values.items()
-            },
-        }
-    return {
-        **snapshot,
-        **canonical,
-        "holdings": holdings,
-        "decision_total_assets": canonical["total_valued_assets"],
-        "decision_asset_class_totals": canonical["asset_class_values"],
-        "has_provisional_values": bool(canonical["pending_valuation_assets"]),
-        "provisional_value_cny": canonical["pending_valuation_total"],
-        "verified_valuations": {
-            **(snapshot.get("verified_valuations", {}) or {}),
-            security_code: {
-                "quantity": total_quantity,
-                "latest_price": latest_price,
-                "valuation_fx_rate": valuation_fx_rate,
-                "market_value_cny": market_value_cny,
-            },
-        },
-    }
-
-
 def build_portfolio_snapshot() -> dict[str, Any]:
     root = project_root()
     master_path = root / "data" / "portfolio_master.yaml"
@@ -377,27 +258,22 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         if item.get("status") == "executed" and item.get("data_source") == "user_confirmed"
     ]
 
-    voo_trade = next((item for item in transactions if str(item.get("symbol")) == "VOO"), None)
-    if voo_trade:
-        pending_voo = next((item for item in holdings if str(item.get("reference_symbol")) == "VOO"), None)
-        if pending_voo is not None:
-            pending_voo["actual_quantity"] = voo_trade.get("quantity")
-            pending_voo["actual_fx_rate"] = voo_trade.get("actual_fx_rate_cny_per_usd")
-            pending_voo["valuation_fx_rate_cny_per_usd"] = voo_trade.get("valuation_fx_rate_cny_per_usd")
-            pending_voo["trade_currency"] = voo_trade.get("trade_currency")
-            pending_voo["funding_currency"] = voo_trade.get("funding_currency")
-            pending_voo["trade_amount_usd"] = voo_trade.get("trade_amount_usd")
-            pending_voo["trade_fx_status"] = voo_trade.get("fx_status")
-            pending_voo["fee"] = voo_trade.get("fee")
-            if not voo_trade.get("missing_reconciliation_fields"):
-                pending_voo["quantity"] = voo_trade.get("quantity")
-                pending_voo["unit"] = "share"
-                pending_voo["valuation_status"] = "trade_reconciled_valuation_fx_pending"
-                pending_voo["confidence"] = "medium"
-
-    canonical = _canonical_portfolio_values(holdings, list(configured_totals))
-    decision_class_totals = canonical["asset_class_values"]
-    decision_total_assets = canonical["total_valued_assets"]
+    trades_by_symbol = {str(item.get("symbol") or "").upper(): item for item in transactions}
+    for cost_record in (row for row in holdings if row.get("reference_symbol")):
+        trade = trades_by_symbol.get(str(cost_record.get("reference_symbol") or "").upper())
+        if not trade:
+            continue
+        cost_record.update({
+            "actual_quantity": trade.get("quantity"),
+            "actual_fx_rate": trade.get("actual_fx_rate_cny_per_usd"),
+            "valuation_fx_rate_cny_per_usd": trade.get("valuation_fx_rate_cny_per_usd"),
+            "trade_currency": trade.get("trade_currency"),
+            "funding_currency": trade.get("funding_currency"),
+            "trade_amount_usd": trade.get("trade_amount_usd"),
+            "trade_fx_status": trade.get("fx_status"),
+            "fee": trade.get("fee"),
+            "is_cost_record": True,
+        })
 
     gold_detail_total = sum(int(item["market_value_cny"]) for item in holdings if item["asset_class"] == "黄金")
     snapshot_date = str(master.get("as_of") or date.today().isoformat())
@@ -407,7 +283,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         holding_age_days = 9999
     holdings_stale = holding_age_days > 31
     freshness_warning = "持仓市值可能滞后" if holdings_stale else "持仓数据在人工确认有效期内"
-    return {
+    raw_snapshot = {
         "as_of": snapshot_date,
         "snapshot_date": snapshot_date,
         "built_at": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -419,12 +295,7 @@ def build_portfolio_snapshot() -> dict[str, Any]:
         "holdings_stale": holdings_stale,
         "freshness_warning": freshness_warning,
         "total_assets": total_assets,
-        "decision_total_assets": decision_total_assets,
         "asset_class_totals": configured_totals,
-        "decision_asset_class_totals": decision_class_totals,
-        **canonical,
-        "has_provisional_values": decision_total_assets != total_assets,
-        "provisional_value_cny": total_assets - decision_total_assets,
         "holding_class_totals": class_totals,
         "holdings": holdings,
         "unconfirmed_holdings": unconfirmed_holdings,
@@ -459,12 +330,15 @@ def build_portfolio_snapshot() -> dict[str, Any]:
             "class_totals_from_holdings": class_totals,
         },
     }
+    from src.valuation.valuation_engine import apply_live_valuation
+
+    return apply_live_valuation(raw_snapshot, {}, valuation_as_of=f"{snapshot_date}T23:59:59+08:00")
 
 
-def portfolio_rows_for_legacy_agents(snapshot: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def portfolio_rows_from_snapshot(snapshot: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     snapshot = snapshot or build_portfolio_snapshot()
     rows: list[dict[str, Any]] = []
-    for holding in snapshot["holdings"]:
+    for holding in snapshot["positions"]:
         rows.append(
             {
                 "category": holding["asset_class"],

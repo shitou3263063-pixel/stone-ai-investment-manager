@@ -9,7 +9,7 @@ from typing import Any
 from .backtest import run_backtest_suite
 from .budget_manager import build_grid_budget, symbol_budget
 from .models import GRID_VERSION, GridSignal, GridSymbolState
-from .position_manager import load_portfolio_quantities, split_core_grid
+from .position_manager import split_core_grid
 from .regime_detector import detect_market_regime
 from .signal_engine import build_signal, dynamic_grid_spacing, signal_key, update_next_prices
 from .simulator import append_simulated_signal
@@ -128,10 +128,8 @@ def build_grid_decision_snapshot(
     symbols: tuple[str, ...] = ("VOO", "QQQ"),
     max_gap_minutes: int = 30,
     decision_cutoff_time: str | None = None,
-    dqs_score: int | None = None,
-    require_dqs: int | None = None,
 ) -> dict[str, Any]:
-    """Build one comparable decision snapshot while retaining display quotes."""
+    """Build a data-comparability snapshot without applying decision gates."""
     display_quotes = {symbol: _quote(live_market_result, symbol) for symbol in symbols}
     normalized: dict[str, dict[str, Any]] = {}
     reasons: list[str] = []
@@ -150,9 +148,8 @@ def build_grid_decision_snapshot(
             and str(item.get("status") or "").lower() in {"ok", "success"}
             and not bool(item.get("stale"))
             and observed_utc is not None
-            and phase == "OFFICIAL_CLOSE"
-            and data_stage == "OFFICIAL_CLOSE"
-            and bool(item.get("is_finalized"))
+            and phase in {"OFFICIAL_CLOSE", "PREVIOUS_OFFICIAL_CLOSE"}
+            and data_stage in {"OFFICIAL_CLOSE", "PREVIOUS_OFFICIAL_CLOSE"}
             and bool(market_date)
         )
         if decision_cutoff_time and observed_utc:
@@ -160,10 +157,8 @@ def build_grid_decision_snapshot(
                 valid = valid and observed_utc <= datetime.fromisoformat(decision_cutoff_time).astimezone(timezone.utc)
             except ValueError:
                 valid = False
-        if dqs_score is not None and require_dqs is not None:
-            valid = valid and dqs_score >= require_dqs
         if not valid:
-            reasons.append(f"{symbol}缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。")
+            reasons.append(f"{symbol}缺少截至决策时间可用、带时区且未过期的正式收盘行情。")
         quote_ref = market_quote_reference(item, symbol)
         normalized[symbol] = {
             **quote_ref,
@@ -222,7 +217,7 @@ def evaluate_symbol(
     symbol_cfg: dict[str, Any],
     state_payload: dict[str, Any],
     decision: dict[str, Any],
-    portfolio_result: dict[str, Any],
+    portfolio_snapshot: dict[str, Any],
     live_market_result: dict[str, Any],
     config: dict[str, Any],
     grid_budget: dict[str, Any],
@@ -273,7 +268,7 @@ def evaluate_symbol(
         signal=signal,
         state=state,
         decision=decision,
-        portfolio_result=portfolio_result,
+        portfolio_snapshot=portfolio_snapshot,
         grid_budget=grid_budget,
         config=config,
         symbol_cfg=symbol_cfg,
@@ -309,7 +304,7 @@ def evaluate_symbol(
     }
 
 
-def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, Any], portfolio_result: dict[str, Any]) -> dict[str, Any]:
+def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, Any]) -> dict[str, Any]:
     config = load_smart_grid_config()
     smart = config.get("smart_grid", {})
     if not smart.get("enabled", False):
@@ -319,13 +314,15 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
     state = load_grid_state()
     applied_manual_trades = _apply_confirmed_manual_trades(state, _grid_dir() / "manual_trades.csv")
     grid_budget = build_grid_budget(decision, config)
-    quantities = load_portfolio_quantities()
+    portfolio_snapshot = decision["portfolio_snapshot"]
+    quantities = {
+        str(row["security_id"]): float(row.get("total_quantity", row.get("quantity")) or 0)
+        for row in portfolio_snapshot.get("positions", []) or []
+    }
     max_gap_minutes = int(smart.get("risk", {}).get("max_decision_snapshot_gap_minutes", 30) or 30)
     decision_snapshot = build_grid_decision_snapshot(
         live_market_result, max_gap_minutes=max_gap_minutes,
         decision_cutoff_time=(decision.get("data_time_summary", {}) or {}).get("decision_cutoff_time"),
-        dqs_score=int((decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}).get("grid_dqs", 0) or 0),
-        require_dqs=int((smart.get("risk", {}) or {}).get("require_dqs", 85) or 85),
     )
     symbols = {}
     for symbol, symbol_cfg in smart.get("symbols", {}).items():
@@ -337,7 +334,7 @@ def run_smart_grid(*, decision: dict[str, Any], live_market_result: dict[str, An
                 symbol_cfg=symbol_cfg,
                 state_payload=(state.get("symbols", {}) or {}).get(symbol, {"symbol": symbol}),
                 decision=decision,
-                portfolio_result=portfolio_result,
+                portfolio_snapshot=portfolio_snapshot,
                 live_market_result=live_market_result,
                 config=config,
                 grid_budget=grid_budget,

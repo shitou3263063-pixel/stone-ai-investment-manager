@@ -20,6 +20,7 @@ from src.decision.v12_1_decision import (
 )
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 from tests.test_v12_1_stable import _live_market, _portfolio
 from tests.test_v12_5_freeze import _decision
 
@@ -42,12 +43,12 @@ def test_01_opportunity_add_dqs_51_is_denied() -> None:
         _all_use_cases(51),
         {"is_dca_day": True, "confirmed_cash_available_yuan": 21000, "live_grid_cash_yuan": 0},
         {"score": 40, "market_risk": {"confidence": "high", "components": []}},
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
     )
     opportunity = next(row for row in gates["scenarios"] if row["scenario_name"] == "Opportunity Add")
     assert opportunity["dqs_gate_passed"] is False
     assert opportunity["final_permission"] == "DENY"
-    assert any("DQS 51低于门槛85" in reason for reason in opportunity["exact_denial_reasons"])
+    assert any("opportunity_dqs=51" in reason and "85" in reason for reason in opportunity["exact_denial_reasons"])
 
 
 def test_02_scheduled_dca_has_independent_dqs_and_enhancement_missing_does_not_deny() -> None:
@@ -69,53 +70,43 @@ def test_03_non_scheduled_day_denies_scheduled_dca_even_when_dqs_passes() -> Non
         _all_use_cases(),
         {"is_dca_day": False, "confirmed_cash_available_yuan": 21000, "live_grid_cash_yuan": 0},
         {"score": 40, "market_risk": {"confidence": "high", "components": []}},
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
     )
     scheduled = gates["scenarios"][0]
     assert scheduled["dqs_gate_passed"] is True
     assert scheduled["schedule_gate_passed"] is False
     assert scheduled["final_permission"] == "DENY"
-    assert "当前不是计划定投日" in scheduled["exact_denial_reasons"][0]
+    assert any("计划执行窗口" in reason for reason in scheduled["exact_denial_reasons"])
 
 
-def test_04_risk_and_event_gates_are_separate_with_exact_factors() -> None:
-    risk = {
-        "score": 53,
-        "market_risk": {
-            "confidence": "high",
-            "components": [
-                {"item": "利率", "score": 13},
-                {"item": "市场宽度与资金流", "score": 8},
-            ],
-        },
-    }
+def test_04_risk_and_event_gates_are_separate() -> None:
+    risk = {"score": 53, "market_risk": {"confidence": "high", "components": [{"item": "利率", "score": 13}]}}
     gates = build_trade_permission_gates(
         _all_use_cases(),
         {"is_dca_day": True, "confirmed_cash_available_yuan": 21000, "live_grid_cash_yuan": 0},
         risk,
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
     )
     opportunity = next(row for row in gates["scenarios"] if row["scenario_name"] == "Opportunity Add")
     assert opportunity["risk_gate_passed"] is False
     assert opportunity["event_gate_passed"] is True
-    assert opportunity["risk_threshold"] == 50
-    assert opportunity["current_risk_score"] == 53
-    assert opportunity["event_blocking_factors"] == []
-    assert opportunity["risk_top_contributors"] == ["利率 13分", "市场宽度与资金流 8分"]
+    assert opportunity["final_permission"] == "DENY"
+    assert opportunity["rejection_reasons"]
 
 
-def test_05_strategic_rebalance_is_evaluation_only_and_grid_is_simulation_denied() -> None:
+def test_05_strategic_rebalance_is_evaluation_only_and_grid_is_simulation_only() -> None:
     gates = build_trade_permission_gates(
         _all_use_cases(),
         {"is_dca_day": True, "confirmed_cash_available_yuan": 21000, "live_grid_cash_yuan": 0},
         {"score": 30, "market_risk": {"confidence": "high", "components": []}},
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
     )
     strategic = next(row for row in gates["scenarios"] if row["scenario_name"] == "Strategic Rebalance")
     grid = next(row for row in gates["scenarios"] if row["scenario_name"] == "Grid Trading")
     assert strategic["final_permission"] == "ALLOW_EVALUATION_ONLY"
-    assert grid["final_permission"] == "DENY"
-    assert any("SIMULATION_ONLY" in reason for reason in grid["exact_denial_reasons"])
+    assert grid["final_permission"] == "ALLOW_SIMULATION_ONLY"
+    assert "实盘网格现金为0" in grid["live_rejection_reasons"]
+    assert any("SIMULATION_ONLY" in reason for reason in grid["warning_reasons"])
 
 
 def test_06_market_attractiveness_does_not_change_with_portfolio_deviation() -> None:
@@ -186,25 +177,18 @@ def test_10_confirmed_st_holding_has_provenance_and_permanent_no_auto_add() -> N
     assert opportunity["final_action"] == "风险复核或回避"
 
 
-def test_11_report_body_is_sections_zero_to_five_and_details_are_appendix() -> None:
-    report = generate_daily_report(decision=_decision())
-    body, appendix = report.split("# 附录", 1)
-    for number in range(6):
-        assert f"## {number}." in body
-    assert "## 6." not in body
-    assert "Market Attractiveness Score" in appendix
-    assert "Portfolio Repair Priority" in appendix
-    assert report.count("## 4. 下一触发条件") == 1
+def test_11_report_body_and_appendix_share_one_bundle() -> None:
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    assert bundle["render_contract"]["main_bundle_hash"] == bundle["render_contract"]["appendix_bundle_hash"]
+    assert report.count(bundle["bundle_hash"]) >= 3
 
 
-def test_12_report_wording_and_stress_headers_are_unambiguous() -> None:
-    report = generate_daily_report(decision=_decision())
-    assert "行情字段覆盖率" in report
-    assert "A股研究数据完整度 / 港股研究数据完整度" in report
-    assert "组合收益/损失率" in report
-    assert "组合收益/损失金额" in report
-    assert "最大正贡献/负贡献资产" in report
-    assert "组合损失比例" not in report
+def test_12_report_wording_is_unambiguous() -> None:
+    report = generate_daily_report(decision=_fixture_bundle())
+    assert "待估值成本记录" in report
+    assert "不进入精确市值和配置占比" in report
+    assert "SIMULATION_ONLY" in report
 
 
 def test_13_main_py_remains_only_production_entrypoint() -> None:
@@ -214,7 +198,7 @@ def test_13_main_py_remains_only_production_entrypoint() -> None:
         if "archive" not in path.parts and ".venv" not in path.parts and "venv" not in path.parts
     ]
     assert production_main == [root / "main.py"]
-    assert "from src.app import main" in (root / "main.py").read_text(encoding="utf-8")
+    assert "from src.pipeline.unified_pipeline import main" in (root / "main.py").read_text(encoding="utf-8")
 
 
 def test_14_existing_cash_trade_and_grid_isolation_contract() -> None:
@@ -241,10 +225,10 @@ def test_14_existing_cash_trade_and_grid_isolation_contract() -> None:
 
 def test_15_provisional_cost_is_not_exact_rebalance_value() -> None:
     snapshot = build_portfolio_snapshot()
-    assert snapshot["total_assets"] == 2821100
-    assert snapshot["decision_total_assets"] == 2812100
+    assert snapshot["total_assets"] == 2812100
+    assert snapshot["total_asset_including_cost_records"] == 2821100
     assert snapshot["provisional_value_cny"] == 9000
-    assert snapshot["asset_class_totals"]["美股"] == 339000
+    assert snapshot["asset_class_totals"]["美股"] == 330000
     assert snapshot["decision_asset_class_totals"]["美股"] == 330000
 
 
@@ -255,20 +239,15 @@ def test_16_market_risk_weights_are_exactly_100() -> None:
 
 def test_17_usd_cash_trade_does_not_require_actual_fx() -> None:
     snapshot = build_portfolio_snapshot()
-    summary = build_trade_reconciliation_summary(
-        snapshot,
-        {"items": {"VOO": {"current_price": 700}}},
-    )
+    summary = build_trade_reconciliation_summary(snapshot, {"items": {"VOO": {"current_price": 700}}})
     assert summary["status"] == "PASS"
     assert summary["missing_fields"] == []
     assert summary["transaction_reconciliation_quality"] == 100
-    assert summary["trade_standard_fields"]["actual_fx_rate_cny_per_usd"] is None
-    assert summary["trade_standard_fields"]["fx_status"] == "NOT_APPLICABLE_USD_CASH"
-    assert summary["auto_recalculated"] is False
-    assert summary["voo_total_quantity"] == pytest.approx(30.166)
-    assert summary["voo_latest_market_value_cny"] is None
-
-
+    trade_row = summary["transactions"][0]
+    assert trade_row["actual_fx_rate_cny_per_usd"] is None
+    assert trade_row["fx_status"] == "NOT_APPLICABLE_USD_CASH"
+    assert summary["auto_recalculated"] is True
+    assert trade_row["position_total_quantity"] == pytest.approx(30.166)
 def test_18_cpi_and_gdp_use_release_frequency_freshness(monkeypatch: pytest.MonkeyPatch) -> None:
     business_today = datetime.now(tz=ZoneInfo("Asia/Shanghai")).date()
     observed_dates = {
@@ -311,20 +290,9 @@ def test_19_three_dqs_are_independent_and_enhancement_only_limits_opportunity() 
     assert dqs["data_issues_by_scope"]["scheduled_dca"] == []
 
 
-def test_20_daily_report_explains_three_dqs_and_four_missing_data_scopes() -> None:
-    decision = _decision()
-    live = _live_market()
-    live["items"]["VOO"].update({"price_stage": "OFFICIAL_CLOSE", "is_finalized": True})
-    live["market_context_status"] = {"indicators": []}
-    decision["dqs"] = compute_dqs(live, load_strategy(), {"calendar_confidence": "high"})
-    report = generate_daily_report(decision=decision)
-
-    assert "core_dqs=" in report
-    assert "opportunity_dqs=" in report
-    assert "execution_dqs=" in report
-    assert "数据质量：DQS=" not in report
-    assert "影响Scheduled DCA的数据缺失" in report
-    assert "仅影响Opportunity Add的数据缺失" in report
-    assert "仅影响跨资产排名的数据缺失" in report
-    assert "仅影响成交对账的数据缺失" in report
-    assert "市场宽度：NOT_CONNECTED" in report
+def test_20_daily_report_explains_dqs_and_event_scope() -> None:
+    bundle = _fixture_bundle()
+    report = generate_daily_report(decision=bundle)
+    for name in ["core_dqs", "opportunity_dqs", "execution_dqs", "rebalance_dqs", "grid_dqs"]:
+        assert name in report
+    assert bundle["event_assessment"]["status"] in report

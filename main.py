@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.app import main
+from src.pipeline.unified_pipeline import main
 
 
 if __name__ == "__main__":

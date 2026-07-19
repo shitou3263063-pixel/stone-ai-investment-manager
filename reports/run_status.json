@@ -1,111 +1,536 @@
 {
-  "run_time": "2026-07-19T02:32:02+08:00",
-  "data_cutoff_time": "2026-07-19T02:32:02+08:00",
+  "status": "success",
+  "bundle_hash": "6cf8c188155731269d51bec9fb5991537da4feac9f22397421fd64b6006df1ee",
+  "validation": {
+    "ok": true,
+    "status": "PASS",
+    "errors": [],
+    "checks": {
+      "dqs_total_equals_breakdown": true,
+      "positions_unique_by_security_id": true,
+      "asset_totals_reconcile": true,
+      "cost_records_excluded_from_market_value": true,
+      "deny_requires_rejection_reason": true,
+      "allowed_has_no_failed_gate": true,
+      "event_insufficient_cannot_pass": true,
+      "scenario_event_gates_use_dependency_policy": true,
+      "all_permission_surfaces_share_scenario_decision": true,
+      "main_and_appendix_share_bundle_hash": true,
+      "simulation_excluded_from_real_portfolio": true,
+      "market_freshness_comparability_are_independent": true,
+      "warning_counts_have_distinct_semantics": true,
+      "risk_score_equals_component_contributions": true,
+      "bundle_hash_valid": true
+    }
+  },
+  "email": {
+    "sent": false,
+    "skipped": true,
+    "message": "email skipped"
+  },
   "report_date": "2026-07-19",
-  "report_business_date": "2026-07-19",
-  "report_generated_at": "2026-07-19T02:32:02+08:00",
-  "decision_cutoff_at": "2026-07-19T02:32:02+08:00",
-  "actual_trade_date": "2026-07-15",
-  "report_run_mode": "RERUN",
-  "status": "warning",
-  "dqs": 55,
-  "core_dqs": 75,
-  "opportunity_dqs": 55,
-  "execution_dqs": 100,
-  "rebalance_dqs": 100,
-  "grid_dqs": 0,
-  "risk_score": 56,
-  "total_assets": 2821100,
-  "total_valued_assets": 2812100,
-  "total_asset_including_cost_records": 2821100,
-  "total_cash": 241000,
-  "cash_safety_reserve": 220000,
+  "data_cutoff_time": "2026-07-19T16:29:59+08:00",
   "investable_cash": 21000,
+  "dqs": {
+    "core_dqs": 75,
+    "execution_dqs": 100,
+    "grid_dqs": 100,
+    "opportunity_dqs": 63,
+    "rebalance_dqs": 100
+  },
   "today_action": {
     "execute": false,
-    "action_type": "历史实盘交易（交易日2026-07-15，本报告仅补运行/对账）",
-    "targets": "不适用",
-    "amount_yuan": 0.0,
-    "amount_or_range": "0元",
-    "funding_source": "2026-07-15到期债券资金；不占用固定现金安全储备",
-    "manual_confirmation_required": true
-  },
-  "next_review_date": "2026-07-20T08:30:00+08:00",
-  "fund_classification": {
-    "confirmed_fact_total_cash": 241000,
-    "rule_engine_investable_cash": 21000,
-    "approved_bond_to_equity": 30000,
-    "actual_arrived_bond_cash": 30000,
-    "unsettled_bond_cash": 0,
-    "remaining_bond_to_equity_cash": 21000,
-    "confirmed_executed_trade_today": 0,
-    "simulated_grid_cash": 0,
-    "real_executable_today": 0
-  },
-  "report_files": [
-    "reports/today_action.md",
-    "reports/daily_report.md",
-    "reports/portfolio_snapshot.md",
-    "reports/weekly_report.md",
-    "reports/run_status.json"
-  ],
-  "email_status": "failed",
-  "email_error": "TLS_HANDSHAKE_ERROR [tls_handshake]：TLS安全连接握手失败。",
-  "cn_hk_p1a": {
-    "cn_analysis_completeness": 85,
-    "hk_analysis_completeness": 65,
-    "tushare_configured": true,
-    "tushare_status": "failed",
-    "tushare_error_code": "PERMISSION_DENIED",
-    "tushare_error_summary": "Tushare 接口权限不足：抱歉，您没有接口(trade_cal)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
-    "tushare_trade_calendar_status": "failed",
-    "tushare_002558_valuation_status": "failed",
-    "tushare_002558_fundamental_status": "failed",
-    "tushare_csi300_valuation_status": "failed",
-    "tushare_last_success_at": null,
-    "akshare_status": "partial",
-    "akshare_version": "1.18.64",
-    "akshare_trade_calendar_status": "ok",
-    "akshare_002558_valuation_status": "ok",
-    "akshare_002558_fundamental_status": "ok",
-    "akshare_csi300_valuation_status": "ok",
-    "akshare_source_conflicts": [],
-    "akshare_last_success_at": "2026-07-19T02:31:34+08:00",
-    "akshare_03033_history_status": "ok",
-    "akshare_03033_history_date": "2026-07-17",
-    "akshare_03033_underlying_provider": "sina_finance",
-    "akshare_hstech_history_status": "ok",
-    "akshare_hstech_history_date": "2026-07-17",
-    "akshare_hstech_underlying_provider": "sina_finance",
-    "effective_sources": {
-      "trade_calendar": "akshare",
-      "002558_valuation": "unavailable",
-      "002558_fundamental": "akshare",
-      "csi300_valuation": "akshare"
-    },
-    "hkma_status": "partial",
-    "hkma_hibor_status": "ok",
-    "hkma_hibor_date": "2026-06-30",
-    "hkma_hibor_freshness": "stale",
-    "hkma_exchange_rate_status": "ok",
-    "hkma_exchange_rate_date": "2026-06-30",
-    "hkma_exchange_rate_freshness": "stale",
-    "official_announcement_status": "partial",
-    "high_confidence_buy_restricted": true
+    "targets": "manual review only",
+    "amount_or_range": "0元"
   },
   "warnings": [
-    "scheduled_dca:事件状态=DATA_INSUFFICIENT",
-    "opportunity_add:Put/Call Ratio=NOT_CONNECTED",
-    "opportunity_add:市场宽度=NOT_CONNECTED",
-    "opportunity_add:ETF资金流=NOT_CONNECTED",
-    "opportunity_add:AAII情绪=NOT_CONNECTED",
-    "存在pending_valuation_assets；成本记录已从精确估值、资产占比和再平衡偏离中排除。",
-    "风险判断使用按发布频率正常滞后的宏观数据：CPIAUCSL",
-    "市场风险置信度为low。",
-    "cross_asset_comparability=DATA_NOT_COMPARABLE",
-    "grid_snapshot_comparability=DATA_NOT_COMPARABLE",
-    "Tushare PERMISSION_DENIED：Tushare 接口权限不足：抱歉，您没有接口(trade_cal)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
-    "邮件发送失败：TLS_HANDSHAKE_ERROR [tls_handshake]：TLS安全连接握手失败。"
+    {
+      "warning_id": "ISSUE-01790210DE",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "风险分数56高于实盘上限50",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-01790210DE",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-0421B303C9",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "事件数据不足仅阻断实盘，不阻断数据完整的模拟评估",
+      "affected_scenarios": [
+        "grid"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-0421B303C9",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "grid",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-0FB546B3E5",
+      "severity": "WARN",
+      "scope": "scheduled_dca",
+      "message": "事件数据仅作软警告：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "scheduled_dca"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-0FB546B3E5",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "scheduled_dca",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-143E221AE3",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "Put/Call Ratio: NOT_CONNECTED",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-143E221AE3",
+      "category": "DATA_QUALITY",
+      "affected_scenario": "opportunity_add",
+      "blocking": false,
+      "source": "data_quality_snapshot",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-14FE53A5F5",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "市场宽度: NOT_CONNECTED",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-14FE53A5F5",
+      "category": "DATA_QUALITY",
+      "affected_scenario": "opportunity_add",
+      "blocking": false,
+      "source": "data_quality_snapshot",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-366337498C",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "AAII情绪: NOT_CONNECTED",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-366337498C",
+      "category": "DATA_QUALITY",
+      "affected_scenario": "opportunity_add",
+      "blocking": false,
+      "source": "data_quality_snapshot",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-366BD4E7F2",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "ETF资金流: NOT_CONNECTED",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-366BD4E7F2",
+      "category": "DATA_QUALITY",
+      "affected_scenario": "opportunity_add",
+      "blocking": false,
+      "source": "data_quality_snapshot",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-5297D769E9",
+      "severity": "WARN",
+      "scope": "scheduled_dca",
+      "message": "当前不在计划执行窗口",
+      "affected_scenarios": [
+        "scheduled_dca"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-5297D769E9",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "scheduled_dca",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-5CAD17E392",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "风险分数56高于场景上限50",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-5CAD17E392",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-6746D3242C",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "事件数据硬阻断：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-6746D3242C",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-76EC3F6606",
+      "severity": "WARN",
+      "scope": "strategic_rebalance",
+      "message": "事件数据不足，不影响偏离评估：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "strategic_rebalance"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-76EC3F6606",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "strategic_rebalance",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-87DDEC42EA",
+      "severity": "WARN",
+      "scope": "strategic_rebalance",
+      "message": "仅输出资产偏离与修复方向，不生成即时成交指令",
+      "affected_scenarios": [
+        "strategic_rebalance"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-87DDEC42EA",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "strategic_rebalance",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-96FA3FCD16",
+      "severity": "WARN",
+      "scope": "risk_monitoring",
+      "message": "市场风险置信度为low",
+      "affected_scenarios": [
+        "risk_monitoring"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-96FA3FCD16",
+      "category": "RISK_CONFIDENCE",
+      "affected_scenario": "risk_monitoring",
+      "blocking": false,
+      "source": "risk_snapshot",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-9DD95FD872",
+      "severity": "WARN",
+      "scope": "SYSTEM",
+      "message": "关键行情或宏观数据存在过期项。",
+      "affected_scenarios": [
+        "SYSTEM"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-9DD95FD872",
+      "category": "CONSISTENCY_WARNING",
+      "affected_scenario": "SYSTEM",
+      "blocking": false,
+      "source": "consistency_check",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-A45700B061",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "Smart Grid固定为SIMULATION_ONLY，模拟资金与实盘隔离",
+      "affected_scenarios": [
+        "grid"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-A45700B061",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "grid",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-C7501EAF80",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "实盘网格现金为0",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-C7501EAF80",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-C9D560B70A",
+      "severity": "WARN",
+      "scope": "SYSTEM",
+      "message": "存在过期数据：UNRATE, GDP。",
+      "affected_scenarios": [
+        "SYSTEM"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "等待下一次数据刷新并复核",
+      "issue_id": "ISSUE-C9D560B70A",
+      "category": "CONSISTENCY_WARNING",
+      "affected_scenario": "SYSTEM",
+      "blocking": false,
+      "source": "consistency_check",
+      "suggested_action": "等待下一次数据刷新并复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-D2FDFDBB63",
+      "severity": "WARN",
+      "scope": "risk_monitoring",
+      "message": "事件数据不足，仅降低监控完整度：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "risk_monitoring"
+      ],
+      "is_hard_block": false,
+      "recommended_action": "按场景下一步动作复核，不自动交易",
+      "issue_id": "ISSUE-D2FDFDBB63",
+      "category": "DECISION_WARNING",
+      "affected_scenario": "risk_monitoring",
+      "blocking": false,
+      "source": "scenario_decision",
+      "suggested_action": "按场景下一步动作复核，不自动交易",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-D6F5FE2531",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "实盘事件门槛未通过：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-D6F5FE2531",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-F891DD458E",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "opportunity_dqs=63低于门槛85",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-F891DD458E",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    }
   ],
-  "errors": []
+  "errors": [
+    {
+      "warning_id": "ISSUE-01790210DE",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "风险分数56高于实盘上限50",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-01790210DE",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-5297D769E9",
+      "severity": "WARN",
+      "scope": "scheduled_dca",
+      "message": "当前不在计划执行窗口",
+      "affected_scenarios": [
+        "scheduled_dca"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-5297D769E9",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "scheduled_dca",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-5CAD17E392",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "风险分数56高于场景上限50",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-5CAD17E392",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-6746D3242C",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "事件数据硬阻断：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-6746D3242C",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-C7501EAF80",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "实盘网格现金为0",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-C7501EAF80",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-D6F5FE2531",
+      "severity": "WARN",
+      "scope": "grid",
+      "message": "实盘事件门槛未通过：事件数据不足，不能静默通过",
+      "affected_scenarios": [
+        "grid:live"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "issue_id": "ISSUE-D6F5FE2531",
+      "category": "LIVE_EXECUTION_BLOCK",
+      "affected_scenario": "grid",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "保持模拟与实盘隔离；满足实盘条件后再人工复核",
+      "status": "OPEN"
+    },
+    {
+      "warning_id": "ISSUE-F891DD458E",
+      "severity": "WARN",
+      "scope": "opportunity_add",
+      "message": "opportunity_dqs=63低于门槛85",
+      "affected_scenarios": [
+        "opportunity_add"
+      ],
+      "is_hard_block": true,
+      "recommended_action": "满足该场景硬门槛后重新评估",
+      "issue_id": "ISSUE-F891DD458E",
+      "category": "DECISION_BLOCK",
+      "affected_scenario": "opportunity_add",
+      "blocking": true,
+      "source": "scenario_decision",
+      "suggested_action": "满足该场景硬门槛后重新评估",
+      "status": "OPEN"
+    }
+  ]
 }

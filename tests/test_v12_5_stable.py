@@ -74,9 +74,9 @@ def _decision() -> dict:
 
 def test_portfolio_snapshot_totals_are_reconciled() -> None:
     snapshot = build_portfolio_snapshot()
-    assert snapshot["total_assets"] == 2821100
-    assert sum(row["market_value_cny"] for row in snapshot["holdings"]) == 2821100
-    assert snapshot["asset_class_totals"] == snapshot["holding_class_totals"]
+    assert snapshot["total_assets"] == 2812100
+    assert sum(row["market_value_cny"] for row in snapshot["positions"]) == 2812100
+    assert snapshot["asset_class_totals"] == snapshot["asset_class_values"]
 
 
 def test_cash_buckets_are_explicit_and_match_user_confirmed_fixed_reserve() -> None:
@@ -148,13 +148,13 @@ def test_conditional_bond_plan_is_not_cash() -> None:
 
 def test_voo_trade_keeps_ignored_fx_unknown_and_does_not_fake_market_value() -> None:
     snapshot = build_portfolio_snapshot()
-    original = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo")
-    pending = next(row for row in snapshot["holdings"] if row["asset_id"] == "us_voo_20260715_pending_valuation")
-    trade = snapshot["confirmed_transactions"][0]
+    original = next(row for row in snapshot["positions"] if row["security_id"] == "VOO")
+    cost = next(row for row in snapshot["cost_records"] if row["security_id"] == "VOO")
+    trade = snapshot["transaction_ledger"][0]
     assert original["market_value_cny"] == 130000
-    assert original["quantity"] == 28
-    assert pending["market_value_cny"] == 9000
-    assert pending["valuation_status"] == "trade_reconciled_valuation_fx_pending"
+    assert abs(original["quantity"] - 30.166) < 1e-9
+    assert cost["cost_basis_cny"] == 9000
+    assert cost["included_in_market_value"] is False
     assert trade["trade_datetime"] == "2026-07-15T10:24:00-04:00"
     assert trade["quantity"] == 2.166
     assert trade["actual_fx_rate_cny_per_usd"] is None

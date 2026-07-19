@@ -154,7 +154,7 @@ def test_19_grid_report_declares_simulation_only() -> None:
 
 
 def test_20_intraday_quote_cannot_form_grid_anchor() -> None:
-    snapshot = build_grid_decision_snapshot({"items": {"VOO": _point(100, session="intraday_delayed"), "QQQ": _point(100, session="intraday_delayed")}}, dqs_score=90, require_dqs=85)
+    snapshot = build_grid_decision_snapshot({"items": {"VOO": _point(100, session="intraday_delayed"), "QQQ": _point(100, session="intraday_delayed")}})
     assert not snapshot["snapshot_comparable"]
 
 
