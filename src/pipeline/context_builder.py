@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from src.ai.openai_advisor import apply_openai_review, build_cio_review_context, generate_openai_advice
@@ -22,7 +23,7 @@ def build_context(snapshot: dict[str, Any]) -> dict[str, Any]:
         portfolio_snapshot, live_market,
         valuation_as_of=str(snapshot.get("decision_cutoff_time") or snapshot.get("built_at") or date.today().isoformat()),
     )
-    macro = analyze_macro_calendar()
+    macro = analyze_macro_calendar(macro_snapshot=live_market.get("macro", {}) or {})
     event_assessment = build_event_assessment(macro)
     decision = build_v12_1_decision(
         portfolio_result={}, live_market_result=live_market, macro_result=macro,

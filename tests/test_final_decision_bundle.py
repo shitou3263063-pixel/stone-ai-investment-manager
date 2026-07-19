@@ -97,14 +97,15 @@ def test_event_insufficient_cannot_silently_pass() -> None:
     assert bundle["event_assessment"]["event_gate_passed"] is False
 
 
-def test_released_event_without_actual_data_is_insufficient() -> None:
+def test_released_event_without_actual_data_does_not_pollute_future_gate() -> None:
     assessment = build_event_assessment({
         "event_calendar_data_status": "VALID",
         "as_of": "2026-07-19T00:00:00+08:00",
-        "events": [{"status": "RELEASED_DATA_MISSING", "release_at": "2026-07-15T08:30:00-04:00"}],
+        "events": [{"status": "RELEASED_FETCH_FAILED", "release_at": "2026-07-15T08:30:00-04:00"}],
     })
-    assert assessment["status"] == "DATA_INSUFFICIENT"
-    assert assessment["event_gate_passed"] is False
+    assert assessment["status"] == "VALID_NO_HIGH_IMPACT_EVENT"
+    assert assessment["event_gate_passed"] is True
+    assert assessment["released_data_issues"]
 
 
 def test_deny_requires_rejection_reason() -> None:

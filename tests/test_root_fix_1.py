@@ -60,9 +60,11 @@ def test_cost_stays_pending_without_independent_fx() -> None:
     assert result["pending_valuation_assets"][0]["valuation_status"] == "PENDING_VALUATION"
 
 
-def test_intraday_price_cannot_resolve_official_valuation() -> None:
+def test_intraday_price_produces_realtime_valuation() -> None:
     result = apply_live_valuation(_base_snapshot(), _market(stage="INTRADAY"), valuation_as_of="2026-07-19T08:00:00+08:00")
-    assert result["pending_valuation_total"] == 9000
+    voo = next(row for row in result["positions"] if row["security_id"] == "VOO")
+    assert result["pending_valuation_total"] == 0
+    assert voo["valuation_status"] == "VALUED_REALTIME"
 
 
 def test_same_currency_holding_has_not_applicable_fx() -> None:
@@ -133,7 +135,8 @@ def test_scenario_dqs_binding_configuration(scenario: str, dqs_name: str) -> Non
 
 def test_issue_registry_counts_pending_valuation_once() -> None:
     result = build_issue_registry({"portfolio_snapshot": {"pending_valuation_assets": [{"security_code": "VOO", "pending_reason": "MISSING_FX"}]}, "data_quality_snapshot": {}, "comparability": {}, "consistency": {"errors": [], "warnings": []}})
-    assert result["warning_count"] == 1 and result["blocking_count"] == 1
+    assert result["warning_count"] == 0 and result["blocking_count"] == 1
+    assert not ({row["issue_id"] for row in result["warnings"]} & {row["issue_id"] for row in result["blocking"]})
 
 
 def test_simulation_cash_is_excluded() -> None:

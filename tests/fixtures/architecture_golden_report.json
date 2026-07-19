@@ -11,8 +11,8 @@
     "现金": 241000
   },
   "core_dqs": 75,
-  "opportunity_dqs": 75,
+  "opportunity_dqs": 80,
   "execution_dqs": 100,
-  "rebalance_dqs": 100,
+  "rebalance_dqs": 90,
   "grid_dqs": 0
 }

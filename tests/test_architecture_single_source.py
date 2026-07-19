@@ -176,8 +176,8 @@ def test_11_historical_trade_never_becomes_report_day_trade() -> None:
 def test_12_report_repeats_only_canonical_key_values() -> None:
     bundle = _fixture_bundle()
     report = generate_daily_report(decision=bundle)
-    exact = bundle["portfolio_snapshot"]["total_valued_assets"]
-    non_exact = bundle["portfolio_snapshot"]["total_asset_including_cost_records"]
+    exact = bundle["portfolio_snapshot"]["precise_valued_assets"]
+    non_exact = bundle["portfolio_snapshot"]["household_total_assets_estimated"]
     assert f"精确估值资产：{exact:,.2f} 元" in report
     assert f"包含待估值成本记录的非精确总额：{non_exact:,.2f} 元" in report
     assert bundle["bundle_hash"] in report

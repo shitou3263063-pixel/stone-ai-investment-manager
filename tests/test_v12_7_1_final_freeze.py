@@ -227,7 +227,7 @@ def test_15_provisional_cost_is_not_exact_rebalance_value() -> None:
     snapshot = build_portfolio_snapshot()
     assert snapshot["total_assets"] == 2812100
     assert snapshot["total_asset_including_cost_records"] == 2821100
-    assert snapshot["provisional_value_cny"] == 9000
+    assert snapshot["provisional_value_cny"] == snapshot["stale_valued_assets"] + snapshot["unvalued_cost_records"]
     assert snapshot["asset_class_totals"]["美股"] == 330000
     assert snapshot["decision_asset_class_totals"]["美股"] == 330000
 

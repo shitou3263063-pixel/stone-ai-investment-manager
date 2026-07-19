@@ -204,7 +204,7 @@ def build_issue_registry(decision: dict[str, Any]) -> dict[str, Any]:
     unique = {item["issue_id"]: item for item in issues}
     rows = sorted(unique.values(), key=lambda item: (item["severity"] != "ERROR", item["issue_id"]))
     errors = [item for item in rows if item["severity"] == "ERROR"]
-    warnings = [item for item in rows if item["severity"] == "WARN"]
+    warnings = [item for item in rows if item["severity"] == "WARN" and not item["blocking"]]
     blocking = [item for item in rows if item["blocking"]]
     return {
         "issues": rows,

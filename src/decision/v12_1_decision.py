@@ -423,8 +423,11 @@ def market_points_comparable(left: dict[str, Any], right: dict[str, Any]) -> boo
 
 
 def aggregate_comparable_market_changes(
-    live_market: dict[str, Any], symbols: tuple[str, str] = ("VOO", "QQQ")
+    live_market: dict[str, Any],
+    symbols: tuple[str, str] = ("VOO", "QQQ"),
+    weights: dict[str, float] | None = None,
 ) -> dict[str, Any]:
+    """Aggregate comparable trends once using explicit normalized weights."""
     items = _market_items(live_market)
     left, right = items.get(symbols[0], {}) or {}, items.get(symbols[1], {}) or {}
     comparable = market_points_comparable(left, right)
@@ -433,15 +436,34 @@ def aggregate_comparable_market_changes(
         return {
             "comparable": False,
             "combined_change_pct": None,
+            "weighted_change_pct": None,
+            "broad_market_trend": None,
+            "growth_style_trend": None,
             "confidence": "low",
             "explanation": "行情时点不一致，暂不计算指数当日合计变化",
             "symbols": list(symbols),
         }
+    configured = weights or {symbols[0]: 0.70, symbols[1]: 0.30}
+    raw_weights = [max(0.0, _to_float(configured.get(symbol))) for symbol in symbols]
+    weight_sum = sum(raw_weights)
+    normalized = [value / weight_sum for value in raw_weights] if weight_sum else [0.5, 0.5]
+    changes = [_to_float(left.get("change_pct")), _to_float(right.get("change_pct"))]
+    weighted_change = sum(change * weight for change, weight in zip(changes, normalized))
     return {
         "comparable": True,
-        "combined_change_pct": _to_float(left.get("change_pct")) + _to_float(right.get("change_pct")),
+        # Kept as a read-compatible alias; this is now the weighted result,
+        # never the direct sum of two highly correlated ETF returns.
+        "combined_change_pct": weighted_change,
+        "weighted_change_pct": weighted_change,
+        "broad_market_trend": {
+            "symbol": symbols[0], "change_pct": changes[0], "weight": normalized[0]
+        },
+        "growth_style_trend": {
+            "symbol": symbols[1], "change_pct": changes[1], "weight": normalized[1]
+        },
+        "aggregation_method": "EXPLICIT_WEIGHTED_AVERAGE",
         "confidence": "normal",
-        "explanation": "行情日期和交易口径一致，可进行横向比较",
+        "explanation": "行情日期和交易口径一致；按明确权重计算一次市场趋势，不直接相加ETF收益率",
         "symbols": list(symbols),
         "comparable_date": left.get("comparable_date"),
     }
@@ -504,13 +526,21 @@ def compute_dqs(
         row.get("security_name")
         for row in snapshot.get("pending_valuation_assets", []) or []
     ]
+    valuation_audit = snapshot.get("valuation_audit", {}) or {}
+    incomplete_valuation_positions = valuation_audit.get("incomplete_positions", []) or []
+    valuation_audit_complete = bool(valuation_audit.get("complete", not incomplete_valuation_positions))
+    precise_valuation_coverage = max(
+        0.0,
+        min(1.0, float(snapshot.get("precise_valuation_coverage", snapshot.get("valuation_coverage_ratio", 1.0)) or 0.0)),
+    )
     calendar_confidence = str((macro_result or {}).get("calendar_confidence") or "unknown")
     field_score = round(((sum(market_ok) + sum(macro_ok)) / len(all_rows)) * weights["field_completeness"]) if all_rows else 0
     if calendar_confidence == "low": field_score = max(0, field_score - 1)
     timeliness_score = round((len(fresh_rows) / len(all_rows)) * weights["timeliness"]) if all_rows else 0
     source_score = round((len(tier1_rows) / len(all_rows)) * weights["source_quality"]) if all_rows else 0
     dual_score = round((len(dual_rows) / len(all_rows)) * weights["dual_source_validation"]) if all_rows else 0
-    valuation_score = weights["valuation_readiness"] if not pending_valuations and not snapshot.get("holdings_stale") else max(0, round(weights["valuation_readiness"] * 0.35))
+    valuation_ready = bool(precise_valuation_coverage >= 0.999999 and valuation_audit_complete)
+    valuation_score = round(weights["valuation_readiness"] * precise_valuation_coverage)
     transaction_score = (
         weights["transaction_reconciliation_quality"]
         if not reconciliation
@@ -527,9 +557,14 @@ def compute_dqs(
     released_data_missing = [
         event.get("event_name") or event.get("name")
         for event in (macro_result or {}).get("released_events", []) or []
-        if event.get("event_data_status") == "RELEASED_DATA_MISSING"
+        if event.get("event_data_status") == "RELEASED_FETCH_FAILED"
     ]
-    macro_event_data_penalty = min(10, len(released_data_missing) * 5)
+    released_data_partial = [
+        event.get("event_name") or event.get("name")
+        for event in (macro_result or {}).get("released_events", []) or []
+        if event.get("event_data_status") == "PARTIAL_DATA"
+    ]
+    macro_event_data_penalty = min(10, len(released_data_missing) * 5 + len(released_data_partial) * 2)
     raw_score = max(0, field_score + timeliness_score + source_score + dual_score + valuation_score + transaction_score + consistency_score - macro_event_data_penalty)
     dual_coverage = len(dual_rows) / len(all_rows) if all_rows else 0.0
     blocking_errors: list[str] = []
@@ -537,13 +572,53 @@ def compute_dqs(
     if conflicts: blocking_errors.append("关键数据存在来源冲突。")
     if not _is_ok_item(items.get("VOO", {})) or not _is_ok_item(items.get("^VIX", {})): blocking_errors.append("核心价格或VIX缺失。")
     if snapshot.get("holdings_stale"): blocking_errors.append("持仓市值可能滞后。")
+    core_valuation_gaps = [
+        str(row.get("security_id") or row.get("security_name"))
+        for row in snapshot.get("positions", []) or []
+        if str(row.get("strategy_bucket") or "") == "core_etf" and not bool(row.get("precise_valuation"))
+    ]
+    if core_valuation_gaps:
+        blocking_errors.append("核心资产缺少可复核价格或估值汇率：" + "、".join(core_valuation_gaps))
     capped_score = raw_score
+    market_last_success = max(
+        (
+            str(item.get("fetched_at") or item.get("retrieved_at"))
+            for item in usable_rows
+            if item.get("fetched_at") or item.get("retrieved_at")
+        ),
+        default="无成功记录",
+    )
+    valuation_missing = [
+        f"{row.get('security_id')}:{','.join(row.get('missing_fields', []) or [])}"
+        for row in incomplete_valuation_positions
+    ]
     legacy_components = [
-        {"item": "field_completeness", "score": field_score, "max": weights["field_completeness"], "reason": f"核心行情与宏观可用{sum(market_ok) + sum(macro_ok)}/{len(all_rows)}"},
-        {"item": "timeliness", "score": timeliness_score, "max": weights["timeliness"], "reason": f"新鲜且非STALE数据{len(fresh_rows)}/{len(all_rows)}"},
+        {
+            "item": "field_completeness", "score": field_score, "max": weights["field_completeness"],
+            "reason": f"核心行情与宏观可用{sum(market_ok) + sum(macro_ok)}/{len(all_rows)}",
+            "missing_data": required_missing,
+            "data_source": "MarketSnapshot",
+            "last_success_at": market_last_success,
+            "score_impact": field_score - weights["field_completeness"],
+        },
+        {
+            "item": "timeliness", "score": timeliness_score, "max": weights["timeliness"],
+            "reason": f"新鲜且非STALE数据{len(fresh_rows)}/{len(all_rows)}",
+            "missing_data": stale_metrics,
+            "data_source": "MarketSnapshot",
+            "last_success_at": market_last_success,
+            "score_impact": timeliness_score - weights["timeliness"],
+        },
         {"item": "source_quality", "score": source_score, "max": weights["source_quality"], "reason": f"一级来源{len(tier1_rows)}/{len(all_rows)}"},
         {"item": "dual_source_validation", "score": dual_score, "max": weights["dual_source_validation"], "reason": f"双源验证{len(dual_rows)}/{len(all_rows)}"},
-        {"item": "valuation_readiness", "score": valuation_score, "max": weights["valuation_readiness"], "reason": "存在待估值持仓或持仓市值滞后" if pending_valuations or snapshot.get("holdings_stale") else "持仓估值可用于配置口径"},
+        {
+            "item": "valuation_readiness", "score": valuation_score, "max": weights["valuation_readiness"],
+            "reason": f"精确估值覆盖率{precise_valuation_coverage:.2%}，按覆盖率计分",
+            "missing_data": [*pending_valuations, *valuation_missing],
+            "data_source": "PortfolioSnapshot.valuation_audit",
+            "last_success_at": snapshot.get("valuation_as_of") or snapshot.get("last_confirmed_at") or "无成功记录",
+            "score_impact": valuation_score - weights["valuation_readiness"],
+        },
         {"item": "transaction_reconciliation_quality", "score": transaction_score, "max": weights["transaction_reconciliation_quality"], "reason": "无待对账实盘交易" if not reconciliation else f"{sum(1 for item in reconciliation if item['status'] == 'RECONCILED')}/{len(reconciliation)}笔实盘交易已完成对账"},
         {"item": "consistency", "score": consistency_score, "max": weights["consistency"], "reason": "无异常0值或严重冲突" if consistency_score == weights["consistency"] else "存在冲突或异常0值"},
     ]
@@ -563,21 +638,78 @@ def compute_dqs(
 
     voo = items.get("VOO", {}) or {}
     voo_stage = item_time_metadata(voo).get("data_stage")
+    future_event_gate = (macro_result or {}).get("future_event_gate", {}) or {}
+    future_calendar_status = str(
+        future_event_gate.get("calendar_status")
+        or (macro_result or {}).get("event_calendar_data_status")
+        or ("VALID" if calendar_confidence in {"high", "medium"} else "UNAVAILABLE")
+    ).upper()
+    future_event_data_available = future_calendar_status == "VALID"
     scheduled_inputs = {
         "核心价格": _is_ok_item(voo) and voo_stage in {"INTRADAY", "OFFICIAL_CLOSE", "PREVIOUS_OFFICIAL_CLOSE"},
         "现金口径": _to_float((snapshot.get("cash", {}) or {}).get("account_total_cash_cny")) >= 0,
         "预算状态": bool(snapshot.get("bond_to_equity_plan") is not None),
-        "事件状态": calendar_confidence not in {"low", "unknown"} and not released_data_missing,
+        "事件状态": future_event_data_available,
     }
-    core_components = [
-        {"item": name, "score": 25 if available else 0, "max": 25, "reason": "可用" if available else "DATA_INSUFFICIENT"}
-        for name, available in scheduled_inputs.items()
+    released_event_missing = [
+        event for event in (macro_result or {}).get("released_events", []) or []
+        if event.get("event_data_status") == "RELEASED_FETCH_FAILED"
     ]
+    event_missing_fields = [
+        f"{name}.release_at_utc/verification_status"
+        for name in (macro_result or {}).get("calendar_missing_items", []) or []
+    ] or ["event_calendar.verified_event_coverage"]
+    voo_item = items.get("VOO", {}) or {}
+    core_missing_contract = {
+        "核心价格": {
+            "missing_data": ["VOO.close", "VOO.price_stage"],
+            "data_source": voo_item.get("source") or "MarketSnapshot",
+            "last_success_at": voo_item.get("fetched_at") or voo_item.get("retrieved_at") or "无成功记录",
+        },
+        "现金口径": {
+            "missing_data": ["PortfolioSnapshot.portfolio_cash"],
+            "data_source": snapshot.get("source") or "PortfolioSnapshot",
+            "last_success_at": snapshot.get("last_confirmed_at") or "无成功记录",
+        },
+        "预算状态": {
+            "missing_data": ["PortfolioSnapshot.bond_to_equity_plan"],
+            "data_source": "execution_state",
+            "last_success_at": snapshot.get("last_confirmed_at") or "无成功记录",
+        },
+        "事件状态": {
+            "missing_data": event_missing_fields,
+            "data_source": "EconomicCalendar",
+            "last_success_at": (macro_result or {}).get("last_success_at") or "无成功记录",
+        },
+    }
+    core_components = []
+    for name, available in scheduled_inputs.items():
+        detail = core_missing_contract[name]
+        core_components.append(
+            {
+                "item": name,
+                "score": 25 if available else 0,
+                "max": 25,
+                "reason": "可用" if available else "DATA_INSUFFICIENT",
+                "missing_data": [] if available else detail["missing_data"],
+                "data_source": detail["data_source"],
+                "last_success_at": detail["last_success_at"],
+                "score_impact": 0 if available else -25,
+            }
+        )
     scheduled_score = round(sum(int(item["score"]) for item in core_components))
     allocation_valid = abs(sum(float(value) for value in strategy.get("target_allocation", {}).values()) - 1.0) <= 1e-10
+    rebalance_holding_score = round(30 * precise_valuation_coverage)
     rebalance_components = [
         {"item": "目标配置完整性", "score": 40 * int(allocation_valid), "max": 40, "reason": "目标权重合计必须为100%"},
-        {"item": "持仓时效", "score": 30 * int(not snapshot.get("holdings_stale")), "max": 30, "reason": "使用统一PortfolioSnapshot"},
+        {
+            "item": "持仓时效", "score": rebalance_holding_score, "max": 30,
+            "reason": f"按精确估值市值覆盖率{precise_valuation_coverage:.2%}计分",
+            "missing_data": valuation_missing,
+            "data_source": "PortfolioSnapshot.valuation_audit",
+            "last_success_at": snapshot.get("valuation_as_of") or snapshot.get("last_confirmed_at") or "无成功记录",
+            "score_impact": rebalance_holding_score - 30,
+        },
         {"item": "核心市场覆盖", "score": round(30 * (sum(market_ok) / len(market_ok) if market_ok else 0)), "max": 30, "reason": f"核心行情可用{sum(market_ok)}/{len(market_ok)}"},
     ]
     strategic_score = round(sum(int(item["score"]) for item in rebalance_components))
@@ -673,6 +805,10 @@ def compute_dqs(
                 "item": name,
                 "data_status": "DATA_INSUFFICIENT",
                 "note": "影响Scheduled DCA核心判断。",
+                "missing_fields": core_missing_contract[name]["missing_data"],
+                "data_source": core_missing_contract[name]["data_source"],
+                "last_success_at": core_missing_contract[name]["last_success_at"],
+                "score_impact": -25,
             }
             for name, available in scheduled_inputs.items()
             if not available
@@ -689,6 +825,10 @@ def compute_dqs(
                 "item": name,
                 "data_status": "DATA_INSUFFICIENT",
                 "note": "Opportunity Add required core input is missing.",
+                "missing_fields": [name],
+                "data_source": "MarketSnapshot",
+                "last_success_at": market_last_success,
+                "score_impact": -int(opportunity_spec.get("optional_missing_score_penalty_each", 5) or 5),
             }
             for name in opportunity_required_missing
         ],
@@ -717,7 +857,9 @@ def compute_dqs(
             "item": "released_macro_event_data_quality",
             "score": -macro_event_data_penalty,
             "max": 0,
-            "reason": "Auditable deduction for released macro events missing factual data.",
+            "reason": "已发布宏观数据的抓取失败或非核心字段不完整，仅影响发布数据质量，不污染未来事件门控。",
+            "missing_data": [*released_data_missing, *released_data_partial],
+            "data_source": "EconomicReleaseData",
         })
     opportunity_score = sum(int(item.get("score", 0) or 0) for item in opportunity_components)
     grid_components = [
@@ -813,7 +955,7 @@ def compute_dqs(
         "tier1_coverage": len(tier1_rows) / len(all_rows) if all_rows else 0.0,
         "dual_source_coverage": dual_coverage,
         "freshness_coverage": len(fresh_rows) / len(all_rows) if all_rows else 0.0,
-        "holding_freshness_ok": not bool(snapshot.get("holdings_stale")),
+        "holding_freshness_ok": precise_valuation_coverage >= 0.999999,
         "fx_available": _is_ok_item(items.get("DX-Y.NYB", {})),
         "event_calendar_confidence": calendar_confidence,
         "blocking_errors": blocking_errors,
@@ -829,7 +971,11 @@ def compute_dqs(
         "non_comparable_metrics": non_comparable,
         "conflicts": conflicts,
         "suspicious_zero": suspicious_zero,
-        "valuation_readiness": {"pending_holdings": pending_valuations, "ready": not pending_valuations and not bool(snapshot.get("holdings_stale"))},
+        "valuation_readiness": {
+            "pending_holdings": pending_valuations,
+            "ready": valuation_ready,
+            "precise_valuation_coverage": precise_valuation_coverage,
+        },
         "transaction_reconciliation": reconciliation,
         "data_issues_by_scope": data_issues_by_scope,
         "released_event_data_missing": released_data_missing,
@@ -862,7 +1008,11 @@ def enrich_allocation(
     portfolio_snapshot: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     snapshot = portfolio_snapshot or {}
-    if snapshot.get("asset_class_values") is not None:
+    if snapshot.get("investable_asset_class_values") is not None:
+        total = _to_float(snapshot.get("investable_portfolio_assets"))
+        amounts_yuan = snapshot.get("investable_asset_class_values", {}) or {}
+        weights = snapshot.get("investable_asset_class_weights", {}) or {}
+    elif snapshot.get("asset_class_values") is not None:
         total = _to_float(snapshot.get("total_valued_assets"))
         amounts_yuan = snapshot.get("asset_class_values", {}) or {}
         weights = snapshot.get("asset_class_weights", {}) or {}
@@ -955,8 +1105,14 @@ def compute_risk_score(
     dgs10 = _to_float(macro.get("DGS10", {}).get("value"), default=0)
     market_time = aggregate_comparable_market_changes(live_market)
     snapshot = portfolio_snapshot or _portfolio_snapshot()
-    total_assets = float(snapshot.get("total_valued_assets", 0) or 0)
-    class_totals = snapshot.get("asset_class_values", {}) or {}
+    total_assets = float(
+        snapshot.get("investable_portfolio_assets", snapshot.get("total_valued_assets", 0)) or 0
+    )
+    class_totals = (
+        snapshot.get("investable_asset_class_values")
+        or snapshot.get("asset_class_values", {})
+        or {}
+    )
     bond_ratio = float(class_totals.get("债券", 0) or 0) / total_assets if total_assets else 0
     gold_ratio = float(class_totals.get("黄金", 0) or 0) / total_assets if total_assets else 0
     investable_cash = float((snapshot.get("cash", {}) or {}).get("investable_cash_cny", 0) or 0)
@@ -976,8 +1132,8 @@ def compute_risk_score(
         interest = min(weights["interest_rate"], interest + 3)
     liquidity = 10 if investable_cash <= 0 else (5 if dqs["market_coverage"] >= 0.7 else 8)
     macro_event = weights["macro_event"] if macro_result.get("has_high_event_next_7_days") else 5
-    combined_change = market_time.get("combined_change_pct")
-    trend = 8 if combined_change is not None and combined_change < -2 else 5
+    weighted_change = market_time.get("weighted_change_pct")
+    trend = 8 if weighted_change is not None and weighted_change < -2 else 5
     policy_geo = 7 if gold_ratio > float(strategy["target_allocation"]["黄金"]) else 6
     core_dqs = int(dqs.get("core_dqs", dqs["score"]))
     data_quality = round((100 - core_dqs) / 100 * weights["data_quality"])
@@ -1020,9 +1176,13 @@ def compute_risk_score(
         if dgs10 else "美国10年期收益率暂无可靠数据。"
     )
     trend_basis = (
-        f"VOO与QQQ在{market_time.get('comparable_date')}口径一致，当日变化合计约{combined_change:.2f}%。"
+        f"VOO（宽基）{market_time['broad_market_trend']['change_pct']:.2f}%×"
+        f"{market_time['broad_market_trend']['weight']:.0%} + "
+        f"QQQ（成长风格）{market_time['growth_style_trend']['change_pct']:.2f}%×"
+        f"{market_time['growth_style_trend']['weight']:.0%} = 加权趋势{weighted_change:.2f}%；"
+        "高度相关ETF只计入一次市场趋势。"
         if market_time["comparable"] else
-        "行情时点不一致，暂不计算指数当日合计变化；趋势按中性分处理，置信度低。"
+        "行情时点不一致，暂不计算加权市场趋势；趋势按中性分处理，置信度低。"
     )
     market_components = [
         {"item": "估值", "score": min(valuation, market_weights["valuation"]), "weight": market_weights["valuation"], "basis": "估值数据不完整时按中性偏高风险处理。"},
@@ -2429,7 +2589,10 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     target_amount_sum = sum(float(row.get("target_amount_yuan", 0) or 0) for row in allocation)
     current_amount_sum = sum(float(row.get("current_amount_yuan", 0) or 0) for row in allocation)
     deviation_sum = sum(float(row.get("deviation_amount_yuan", 0) or 0) for row in allocation)
-    total_assets = float(snapshot.get("total_valued_assets", 0) or 0)
+    household_total_assets = float(snapshot.get("total_valued_assets", 0) or 0)
+    total_assets = float(
+        snapshot.get("investable_portfolio_assets", household_total_assets) or 0
+    )
     unconfirmed = snapshot.get("unconfirmed_holdings", []) or []
     if unconfirmed:
         canonical_warnings.append(
@@ -2457,8 +2620,19 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
         if abs(deviation_sum) > 1 or abs(current_amount_sum - total_assets) > 1:
             canonical_errors.append("资产配置偏离金额无法闭合。")
     exact_class_total = sum(float(value or 0) for value in (snapshot.get("asset_class_values", {}) or {}).values())
-    if abs(exact_class_total - total_assets) > 1:
+    if abs(exact_class_total - household_total_assets) > 1:
         canonical_errors.append("精确资产类别金额之和不等于total_valued_assets。")
+    investable_class_total = sum(
+        float(value or 0)
+        for value in (snapshot.get("investable_asset_class_values", {}) or {}).values()
+    )
+    if snapshot.get("investable_asset_class_values") is not None and abs(investable_class_total - total_assets) > 1:
+        canonical_errors.append("可投资资产类别金额之和不等于investable_portfolio_assets。")
+    safety_reserve = float(snapshot.get("household_safety_reserve", snapshot.get("safety_cash", 0)) or 0)
+    household_cash = float((snapshot.get("asset_class_values", {}) or {}).get("现金", 0) or 0)
+    portfolio_cash = float(snapshot.get("portfolio_cash", snapshot.get("investable_cash", 0)) or 0)
+    if portfolio_cash > max(0.0, household_cash - safety_reserve) + 1:
+        canonical_errors.append("portfolio_cash包含了household_safety_reserve。")
     pending_ids = {id(row) for row in snapshot.get("pending_valuation_assets", []) or []}
     if any(id(row) in pending_ids for row in snapshot.get("valued_assets", []) or []):
         canonical_errors.append("待估值资产进入了精确估值资产列表。")
@@ -2510,8 +2684,8 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
         if symbol in quote_stages and str(row.get("price_stage") or row.get("data_stage") or "UNKNOWN").upper() != quote_stages[symbol]:
             canonical_errors.append(f"{symbol}在市场表和统一行情对象中的数据阶段不一致。")
     for event in decision.get("released_events", []) or []:
-        if event.get("risk_level") == "high" and event.get("actual_value") is None and event.get("event_data_status") != "RELEASED_DATA_MISSING":
-            canonical_errors.append(f"已公布重大事件{event.get('event_name')}缺少实际值且未标记RELEASED_DATA_MISSING。")
+        if event.get("risk_level") == "high" and event.get("actual_value") is None and event.get("event_data_status") != "RELEASED_FETCH_FAILED":
+            canonical_errors.append(f"已公布重大事件{event.get('event_name')}缺少实际值且未标记RELEASED_FETCH_FAILED。")
     forbidden_actions = ["小额分批", "建议加仓", "优先加仓", "立即配置", "买入"]
     for item in decision.get("opportunity", []) or []:
         if float(item.get("current_holding_yuan", 0) or 0) <= 0 and item.get("current_holding_action") == "继续持有":
@@ -2539,7 +2713,10 @@ def build_consistency_checks(decision: dict[str, Any]) -> dict[str, Any]:
     try:
         as_of_raw = decision.get("generated_at") or decision.get("date") or date.today().isoformat()
         as_of = datetime.fromisoformat(str(as_of_raw))
-        events = decision.get("events", []) or []
+        events = [
+            event for event in decision.get("events", []) or []
+            if event.get("event_scope") != "POSITION_LEVEL"
+        ]
         actual_48h = bool(get_upcoming_high_risk_events(as_of, hours=48, events=events))
         actual_7d = bool(get_upcoming_high_risk_events(as_of, days=7, events=events))
         if actual_48h != bool(decision.get("macro_event_high_next_48_hours", actual_48h)):

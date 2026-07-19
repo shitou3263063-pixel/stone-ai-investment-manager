@@ -100,7 +100,7 @@ def test_09_cutoff_has_real_timezone_timestamp() -> None:
 
 def test_10_released_event_is_not_upcoming() -> None:
     event = {"release_at_utc": "2026-07-15T12:30:00+00:00"}
-    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=ZoneInfo("UTC"))) == "RELEASED"
+    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=ZoneInfo("UTC"))) == "RELEASED_FETCH_FAILED"
 
 
 def test_11_next_event_selector_ignores_released_event() -> None:

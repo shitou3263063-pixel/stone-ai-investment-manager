@@ -65,7 +65,7 @@ def _decision() -> dict:
 def test_released_event_is_not_upcoming_or_grid_gate() -> None:
     report_time = datetime(2026, 7, 14, 14, 51, tzinfo=ZoneInfo("America/New_York"))
     cpi = _event("CPI")
-    assert classify_event_status(cpi, report_time) == "RELEASED_DATA_MISSING"
+    assert classify_event_status(cpi, report_time) == "RELEASED_FETCH_FAILED"
     selected = get_upcoming_high_risk_events(report_time, hours=48, events=[cpi])
     assert selected == []
 
@@ -73,14 +73,14 @@ def test_released_event_is_not_upcoming_or_grid_gate() -> None:
 def test_future_event_is_upcoming_and_enters_48_hour_window() -> None:
     report_time = datetime(2026, 7, 14, 14, 51, tzinfo=ZoneInfo("America/New_York"))
     ppi = _event("PPI")
-    assert classify_event_status(ppi, report_time) == "UPCOMING"
-    assert get_upcoming_high_risk_events(report_time, hours=48, events=[ppi]) == [{**ppi, "status": "UPCOMING"}]
+    assert classify_event_status(ppi, report_time) == "NOT_RELEASED"
+    assert get_upcoming_high_risk_events(report_time, hours=48, events=[ppi]) == [{**ppi, "status": "NOT_RELEASED"}]
 
 
 def test_event_at_report_time_is_released() -> None:
     event = _event("PPI")
     report_time = datetime(2026, 7, 15, 8, 30, tzinfo=ZoneInfo("America/New_York"))
-    assert classify_event_status(event, report_time) == "RELEASED_DATA_MISSING"
+    assert classify_event_status(event, report_time) == "RELEASED_FETCH_FAILED"
 
 
 def test_cross_timezone_event_times_are_equal() -> None:
@@ -174,7 +174,7 @@ def test_same_market_snapshot_is_comparable() -> None:
 def test_next_review_is_fifteen_minutes_after_next_upcoming_event() -> None:
     report_time = datetime(2026, 7, 14, 14, 51, tzinfo=ZoneInfo("America/New_York"))
     result = analyze_macro_calendar(as_of=report_time)
-    assert next(item for item in result["events"] if item["event_name"] == "CPI")["status"] == "RELEASED_DATA_MISSING"
-    assert next(item for item in result["events"] if item["event_name"] == "PPI")["status"] == "UPCOMING"
+    assert next(item for item in result["events"] if item["event_name"] == "CPI")["status"] == "RELEASED_FETCH_FAILED"
+    assert next(item for item in result["events"] if item["event_name"] == "PPI")["status"] == "NOT_RELEASED"
     assert result["next_review_date"] == "2026-07-15T20:45:00+08:00"
     assert "PPI公布后15分钟" in result["next_review_reason"]

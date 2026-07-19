@@ -39,8 +39,8 @@ def _count_categories(issue_registry: dict[str, Any], consistency: dict[str, Any
         "blocking_count": len(blocking),
         "consistency_warning_count": len(consistency_warnings),
         "count_semantics": {
-            "warning_count": "all user-visible WARN records; hard blocks are explicitly flagged",
-            "blocking_count": "the subset of records with is_hard_block=true",
+            "warning_count": "soft warnings only; is_hard_block=false",
+            "blocking_count": "hard blocks only; is_hard_block=true",
             "consistency_warning_count": "cross-object consistency warnings only",
         },
     }
@@ -95,6 +95,32 @@ def validate_final_decision_bundle(bundle: dict[str, Any], *, tolerance: float =
     asset_total_ok = abs(sum(float(value or 0) for value in asset_values.values()) - float(portfolio.get("total_valued_assets", 0) or 0)) <= tolerance
     checks["asset_totals_reconcile"] = asset_total_ok
     if not asset_total_ok: errors.append("Asset-class values do not reconcile to total_valued_assets")
+    precise_assets = float(portfolio.get("precise_valued_assets", portfolio.get("precise_market_value", 0)) or 0)
+    stale_assets = float(portfolio.get("stale_valued_assets", 0) or 0)
+    unvalued_cost = float(portfolio.get("unvalued_cost_records", portfolio.get("pending_valuation_total", 0)) or 0)
+    household_estimated = float(
+        portfolio.get("household_total_assets_estimated", portfolio.get("household_total_assets", 0)) or 0
+    )
+    expected_coverage = precise_assets / household_estimated if household_estimated else 1.0
+    valuation_total_ok = (
+        abs(precise_assets + stale_assets + unvalued_cost - household_estimated) <= tolerance
+        and abs(float(portfolio.get("valuation_coverage_ratio", expected_coverage) or 0) - expected_coverage) <= 1e-8
+    )
+    checks["valuation_totals_and_coverage_reconcile"] = valuation_total_ok
+    if not valuation_total_ok: errors.append("Estimated, precise, stale, cost-record totals or valuation coverage do not reconcile")
+    investable_values = portfolio.get("investable_asset_class_values", {}) or {}
+    investable_total = float(portfolio.get("investable_portfolio_assets", 0) or 0)
+    investable_ok = (
+        not investable_values
+        or abs(sum(float(value or 0) for value in investable_values.values()) - investable_total) <= tolerance
+    )
+    safety_reserve = float(portfolio.get("household_safety_reserve", portfolio.get("safety_cash", 0)) or 0)
+    household_cash = float(asset_values.get("现金", 0) or 0)
+    portfolio_cash = float(portfolio.get("portfolio_cash", portfolio.get("investable_cash", 0)) or 0)
+    safety_excluded = portfolio_cash <= max(0.0, household_cash - safety_reserve) + tolerance
+    checks["investable_portfolio_totals_reconcile"] = investable_ok and safety_excluded
+    if not checks["investable_portfolio_totals_reconcile"]:
+        errors.append("Investable portfolio denominator includes excluded household cash or does not reconcile")
     cost_ok = all(not row.get("is_cost_record") for row in positions)
     checks["cost_records_excluded_from_market_value"] = cost_ok
     if not cost_ok: errors.append("Cost record entered final positions")
@@ -112,6 +138,9 @@ def validate_final_decision_bundle(bundle: dict[str, Any], *, tolerance: float =
     event_ok = not (event.get("status") in {"DATA_INSUFFICIENT", "SOURCE_ERROR"} and event.get("event_gate_passed"))
     checks["event_insufficient_cannot_pass"] = event_ok
     if not event_ok: errors.append("Insufficient/error event data silently passed")
+    event_missing_ok = event.get("status") != "DATA_INSUFFICIENT" or bool(event.get("missing_data"))
+    checks["event_insufficient_has_audit_details"] = event_missing_ok
+    if not event_missing_ok: errors.append("Insufficient event data has no source/field audit detail")
     scenario_event_ok = True
     for row in decisions:
         mode = str(row.get("event_data_mode") or "")
@@ -155,6 +184,10 @@ def validate_final_decision_bundle(bundle: dict[str, Any], *, tolerance: float =
         and int(issues.get("blocking_count", -1)) == len(issues.get("blocking_reasons", []) or [])
         and int(issues.get("consistency_warning_count", -1))
         == len(issues.get("consistency_warning_reasons", []) or [])
+        and not (
+            {str(item.get("issue_id")) for item in issues.get("warning_reasons", []) or []}
+            & {str(item.get("issue_id")) for item in issues.get("blocking_reasons", []) or []}
+        )
     )
     checks["warning_counts_have_distinct_semantics"] = count_ok
     if not count_ok: errors.append("Warning/blocking/consistency counts are not distinct")
@@ -166,6 +199,19 @@ def validate_final_decision_bundle(bundle: dict[str, Any], *, tolerance: float =
     )
     checks["risk_score_equals_component_contributions"] = risk_sum_ok
     if not risk_sum_ok: errors.append("Risk score does not equal the sum of component contributions")
+    dqs_missing_ok = all(
+        str(row.get("reason") or "") != "DATA_INSUFFICIENT" or bool(row.get("missing_data"))
+        for result in (bundle.get("dqs_results", {}) or {}).values()
+        for row in result.get("breakdown", []) or []
+    )
+    checks["dqs_insufficient_has_missing_details"] = dqs_missing_ok
+    if not dqs_missing_ok: errors.append("DATA_INSUFFICIENT DQS row has missing_data=empty")
+    audit = portfolio.get("valuation_audit", {}) or {}
+    rebalance_rows = ((bundle.get("dqs_results", {}) or {}).get("rebalance_dqs", {}) or {}).get("breakdown", []) or []
+    timeliness = next((row for row in rebalance_rows if row.get("item") == "持仓时效"), {})
+    valuation_dqs_ok = bool(audit.get("complete", True)) or int(timeliness.get("score", 0) or 0) < int(timeliness.get("max", 30) or 30)
+    checks["incomplete_valuation_cannot_get_full_rebalance_timeliness"] = valuation_dqs_ok
+    if not valuation_dqs_ok: errors.append("Incomplete valuation audit received full rebalance timeliness score")
     hash_ok = stable_hash({key: value for key, value in bundle.items() if key not in {"bundle_hash", "render_contract"}}) == bundle.get("bundle_hash")
     checks["bundle_hash_valid"] = hash_ok
     if not hash_ok: errors.append("FinalDecisionBundle hash validation failed")

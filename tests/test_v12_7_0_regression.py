@@ -64,6 +64,7 @@ def _allocation() -> list[dict]:
             },
         },
         load_strategy(),
+        snapshot,
     )
 
 
@@ -122,7 +123,7 @@ def test_07_target_weights_equal_one() -> None:
 
 def test_08_target_amounts_equal_total_assets() -> None:
     snapshot = build_portfolio_snapshot()
-    assert sum(row["target_amount_yuan"] for row in _allocation()) == snapshot["total_assets"]
+    assert sum(row["target_amount_yuan"] for row in _allocation()) == snapshot["investable_portfolio_assets"]
 
 
 def test_09_cash_target_and_fixed_floor_are_separate() -> None:
@@ -170,7 +171,7 @@ def test_14_released_event_has_value_or_missing_marker() -> None:
         "actual_value": None,
         "release_result_confirmed": False,
     }
-    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=timezone.utc)) == "RELEASED_DATA_MISSING"
+    assert classify_event_status(event, datetime(2026, 7, 15, 13, tzinfo=timezone.utc)) == "RELEASED_FETCH_FAILED"
 
 
 def test_15_zero_qqq_holding_action_not_applicable() -> None:
