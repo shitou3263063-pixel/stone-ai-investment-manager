@@ -7,10 +7,12 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from src.analysis.scenario_analysis import calculate_portfolio_stress_scenarios
+from src.analysis.comparability_engine import build_comparability_snapshot
 from src.data_sources.cn_hk_p1a import write_scoring_trace
 from src.data_sources.decision_time import filter_market_for_cutoff, item_time_metadata
 from src.data_sources.normalized_market import PRICE_STAGES, classify_price_stage, market_quote_reference
 from src.macro.macro_calendar import get_upcoming_high_risk_events
+from src.decision.permission_engine import finalize_permission_context
 from src.portfolio_snapshot import (
     TRADE_RECONCILIATION_FIELDS,
     apply_verified_market_valuation,
@@ -243,9 +245,17 @@ def evaluate_risk_event_gate(
         if macro_result.get("has_high_event_next_7_days")
         else []
     )
+    event_result = str(macro_result.get("event_gate_result") or (
+        "BLOCK" if macro_result.get("has_high_event_next_7_days") else "PASS"
+    ))
+    if event_result == "CONSERVATIVE_BLOCK":
+        event_blocking_factors = ["事件日历不可用，按保守规则阻断"]
+    elif event_result in {"PASS", "PASS_WITH_LIMITATIONS"}:
+        event_blocking_factors = []
     return {
         "risk_gate_passed": not risk_blocking_factors,
-        "event_gate_passed": not event_blocking_factors,
+        "event_gate_passed": event_result in {"PASS", "PASS_WITH_LIMITATIONS"},
+        "event_gate_result": event_result,
         "risk_threshold": threshold,
         "current_risk_score": current_score,
         "risk_blocking_factors": risk_blocking_factors,
@@ -479,7 +489,11 @@ def build_trade_reconciliation_summary(
             "warning": "交易字段已补齐，但VOO持仓股数不可用；保持WARN且不估算最新市值。",
         }
 
-    total_quantity = original_quantity + added_quantity
+    already_merged = bool(snapshot.get("voo_trade_merged_once"))
+    total_quantity = original_quantity if already_merged else original_quantity + added_quantity
+    if already_merged:
+        valuation_fx = _to_float(original.get("fx_rate"))
+        latest_price = _to_float(original.get("latest_price"), latest_price)
     if valuation_fx <= 0 or latest_price <= 0:
         return {
             **base,
@@ -489,7 +503,7 @@ def build_trade_reconciliation_summary(
             "voo_total_quantity": round(total_quantity, 8),
         }
 
-    updated_snapshot = apply_verified_market_valuation(
+    updated_snapshot = snapshot if already_merged else apply_verified_market_valuation(
         snapshot,
         security_code="VOO",
         pending_reference_symbol="VOO",
@@ -497,7 +511,9 @@ def build_trade_reconciliation_summary(
         latest_price=latest_price,
         valuation_fx_rate=valuation_fx,
     )
-    voo_market_value = _to_float(((updated_snapshot.get("verified_valuations", {}) or {}).get("VOO", {}) or {}).get("market_value_cny"))
+    voo_market_value = _to_float(original.get("market_value_cny")) if already_merged else _to_float(
+        ((updated_snapshot.get("verified_valuations", {}) or {}).get("VOO", {}) or {}).get("market_value_cny")
+    )
     us_stock_total = _to_float((updated_snapshot.get("asset_class_values", {}) or {}).get("美股"))
     total_assets = _to_float(updated_snapshot.get("total_valued_assets"))
     ratios = updated_snapshot.get("asset_class_weights", {}) or {}
@@ -508,6 +524,7 @@ def build_trade_reconciliation_summary(
         "auto_recalculated": True,
         "voo_total_quantity": round(total_quantity, 8),
         "voo_latest_price_usd": latest_price,
+        "valuation_fx_rate_cny_per_usd": valuation_fx,
         "voo_latest_market_value_cny": voo_market_value,
         "us_stock_total_market_value_cny": us_stock_total,
         "recalculated_total_assets_cny": total_assets,
@@ -871,6 +888,30 @@ def compute_dqs(
         "transaction_reconciliation": {"label": "Transaction Reconciliation DQS", "score": transaction_quality_score, "threshold": 100, "allowed": transaction_quality_score >= 100},
     }
 
+    opportunity_spec = strategy.get("opportunity_data", {}) or {}
+    configured_required = list(opportunity_spec.get("required_core_inputs", ["VOO", "^VIX", "DGS10"]) or [])
+    configured_optional = list(opportunity_spec.get("optional_confirmation_inputs", enhancement_missing) or [])
+    opportunity_required_missing = [
+        name for name in configured_required
+        if not _is_ok_item((items if name in items else macro).get(name, {}) or {})
+    ]
+    available_optional = {
+        str(row.get("name")) for row in enhancement_rows
+        if str(row.get("status") or "").lower() in {"ok", "success"}
+    }
+    enhancement_missing = [name for name in configured_optional if name not in available_optional]
+    strict_enhancement_ready = not enhancement_missing
+    use_cases["opportunity_add"]["required_inputs"] = configured_required
+    use_cases["opportunity_add"]["optional_inputs"] = configured_optional
+    use_cases["opportunity_add"]["required_missing"] = opportunity_required_missing
+    use_cases["opportunity_add"]["optional_missing"] = enhancement_missing
+    use_cases["opportunity_add"]["allowed"] = bool(
+        opportunity_score >= int(use_cases["opportunity_add"]["threshold"])
+        and not opportunity_required_missing
+        and not blocking_errors
+        and (strict_enhancement_ready or not opportunity_spec.get("optional_missing_blocks", True))
+    )
+
     data_issues_by_scope = {
         "scheduled_dca": [
             {
@@ -888,6 +929,13 @@ def compute_dqs(
                 "note": "仅限制Opportunity Add；不单独阻止Scheduled DCA。",
             }
             for name in enhancement_missing
+        ] + [
+            {
+                "item": name,
+                "data_status": "DATA_INSUFFICIENT",
+                "note": "Opportunity Add required core input is missing.",
+            }
+            for name in opportunity_required_missing
         ],
         "cross_asset_ranking": [
             {
@@ -965,6 +1013,18 @@ def compute_dqs(
     if lagged_macro:
         warnings.append("风险判断使用按发布频率正常滞后的宏观数据：" + "、".join(lagged_macro))
 
+    score_deductions = [
+        {
+            "metric": issue.get("item"),
+            "issue_type": issue.get("data_status"),
+            "required_or_optional": "optional" if scope == "opportunity_add" and issue.get("data_status") == "NOT_CONNECTED" else "required",
+            "score_impact": -int(opportunity_spec.get("optional_missing_score_penalty_each", 5) or 5) if scope == "opportunity_add" else 0,
+            "affected_scenario": scope,
+            "blocking": bool(scope in {"scheduled_dca", "execution_reconciliation"} or issue.get("data_status") == "DATA_INSUFFICIENT"),
+        }
+        for scope, issues in data_issues_by_scope.items()
+        for issue in issues
+    ]
     return {
         "core_dqs": scheduled_score,
         "opportunity_dqs": opportunity_score,
@@ -972,6 +1032,7 @@ def compute_dqs(
         "rebalance_dqs": strategic_score,
         "grid_dqs": grid_score,
         "component_scores": component_scores,
+        "score_deductions": score_deductions,
         "warnings": list(dict.fromkeys(warnings)),
         "dqs_contexts": {
             "core_dqs": "Scheduled DCA、持仓判断和风险监控",
@@ -2384,27 +2445,30 @@ def build_portfolio_repair_priority(
 
 
 def update_comparability_summary(decision: dict[str, Any]) -> dict[str, Any]:
-    """Unify core, cross-asset, and grid comparability counts in one report contract."""
-    market_time = (decision.get("risk", {}) or {}).get("market_time_consistency", {}) or {}
-    core_comparable = bool(market_time.get("comparable"))
-    core_items = [] if core_comparable else [str(item) for item in market_time.get("symbols", []) or []]
-
+    """Use frequency-aware windows instead of requiring identical observation dates."""
     market_rows = decision.get("market_table", []) or []
-    successful_rows = [row for row in market_rows if row.get("success")]
-    comparable_dates = {
-        str(row.get("comparable_date"))
-        for row in successful_rows
-        if row.get("comparable_date")
-    }
-    cross_missing = [
-        str(row.get("name"))
-        for row in market_rows
-        if not row.get("success") or not row.get("comparable_date")
-    ]
-    cross_comparable = bool(successful_rows) and len(comparable_dates) == 1 and not cross_missing
-    cross_items = [] if cross_comparable else sorted(
-        set(cross_missing or [str(row.get("name")) for row in successful_rows])
+    strategy = load_strategy()
+    frequency = build_comparability_snapshot(
+        market_rows,
+        decision_as_of=str(decision.get("decision_cutoff_at") or decision.get("generated_at") or decision.get("date")),
+        settings=strategy.get("comparability", {}) or {},
     )
+    blocking_items = list(frequency.get("blocking_non_comparable_dimensions", []) or [])
+    cross_items = list(frequency.get("non_comparable_dimensions", []) or [])
+    core_comparable = not blocking_items
+    core_items = blocking_items
+    cross_comparable = frequency.get("final_status") == "COMPARABLE"
+    # Compatibility for legacy/test payloads that predate an auditable decision
+    # timestamp. Production decisions always carry the timestamp and therefore
+    # always use the frequency-aware branch above.
+    if not any(decision.get(key) for key in ("decision_cutoff_at", "generated_at", "date")):
+        market_time = (decision.get("risk", {}) or {}).get("market_time_consistency", {}) or {}
+        core_comparable = bool(market_time.get("comparable"))
+        core_items = [] if core_comparable else [str(item) for item in market_time.get("symbols", []) or []]
+        successful_rows = [row for row in market_rows if row.get("success")]
+        comparable_dates = {str(row.get("comparable_date")) for row in successful_rows if row.get("comparable_date")}
+        cross_comparable = bool(successful_rows) and len(comparable_dates) == 1
+        cross_items = [] if cross_comparable else [str(row.get("name")) for row in successful_rows]
 
     grid = decision.get("grid", {}) or {}
     grid_snapshot = grid.get("decision_snapshot", {}) or {}
@@ -2438,6 +2502,9 @@ def update_comparability_summary(decision: dict[str, Any]) -> dict[str, Any]:
             "cross_asset_items": cross_items,
             "grid_snapshot_items": grid_items,
         },
+        "frequency_aware_snapshot": frequency,
+        "coverage_pct": frequency.get("coverage_pct"),
+        "confidence": frequency.get("confidence"),
     }
     decision["comparability"] = summary
     for key in [
@@ -2468,6 +2535,7 @@ def refresh_unified_decision_context(
         macro_result,
         decision.get("comparability", {}) or {},
     )
+    context = finalize_permission_context(context, today_trade=bool(decision.get("today_trade")))
     decision["decision_context"] = context
     decision["trade_permission_gates"] = context
     scheduled = ((dqs.get("use_cases", {}) or {}).get("scheduled_dca", {}) or {})
@@ -3219,6 +3287,9 @@ def build_v12_1_decision(
         "high_risk_events_48h": macro_result.get("high_risk_events_48h", []) or [],
         "high_risk_events_7d": macro_result.get("high_risk_events_7d", []) or [],
         "events": macro_result.get("events", []) or [],
+        "event_calendar_data_status": macro_result.get("event_calendar_data_status"),
+        "event_risk_state": macro_result.get("event_risk_state"),
+        "event_gate_result": macro_result.get("event_gate_result"),
         "upcoming_events": macro_result.get("upcoming_events", []) or [],
         "released_events": macro_result.get("released_events", []) or [],
         "today_trade": today_trade,

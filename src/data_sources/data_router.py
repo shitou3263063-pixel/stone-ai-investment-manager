@@ -10,6 +10,7 @@ from src.data_sources import alpha_vantage_client, finnhub_client, fred_client, 
 from src.data_sources.cn_hk_p1a import build_cn_hk_p1a_snapshot
 from src.data_sources.data_cache import read_cache, write_cache
 from src.data_sources.normalized_market import normalize_market_quote, select_best_normalized_quote
+from src.data_sources.source_registry import DataSourceRegistry
 from src.data_sources.time_normalization import TIMEZONE_UNKNOWN, calculate_age_hours, normalize_to_utc
 from utils.data_loader import project_root
 from utils.logger import write_log
@@ -37,13 +38,29 @@ MARKET_TICKERS = [
     "UUP",
     "DX-Y.NYB",
     "^VIX",
+    "USD/CNY",
+    "USD/CNH",
 ]
 
 US_ETF_TICKERS = {"VOO", "QQQ", "NVDA", "GOOG", "BABA", "IBKR", "XLF", "GLD", "TLT", "IEF", "UUP"}
 HK_CN_TICKERS = {"03033.HK", "2800.HK", "510300.SS", "002558.SZ", "513060.SS", "513090.SS"}
-YFINANCE_ONLY_TICKERS = {"^GSPC", "^IXIC", "DX-Y.NYB"}
+YFINANCE_ONLY_TICKERS = {"^GSPC", "^IXIC", "DX-Y.NYB", "USD/CNY", "USD/CNH"}
 
 INSTRUMENT_METADATA: dict[str, dict[str, str]] = {
+    "USD/CNY": {
+        "official_name": "美元兑人民币估值汇率",
+        "exchange": "FX",
+        "market": "FX",
+        "currency": "CNY",
+        "timezone": "UTC",
+    },
+    "USD/CNH": {
+        "official_name": "美元兑离岸人民币估值汇率",
+        "exchange": "FX",
+        "market": "FX",
+        "currency": "CNH",
+        "timezone": "UTC",
+    },
     "03033.HK": {
         "official_name": "南方东英恒生科技指数ETF",
         "exchange": "HKEX",
@@ -98,7 +115,11 @@ INSTRUMENT_METADATA: dict[str, dict[str, str]] = {
 # 3033.HK 是同一只03033.HK证券在部分供应商中的去前导零代码，不是代理ETF。
 PROVIDER_SYMBOLS: dict[str, dict[str, str]] = {
     "03033.HK": {"yfinance": "3033.HK"},
+    "USD/CNY": {"yfinance": "CNY=X"},
+    "USD/CNH": {"yfinance": "CNH=X"},
 }
+
+SOURCE_REGISTRY = DataSourceRegistry.load()
 
 CN_HELD_MARKET_SYMBOLS = ["510300.SS", "002558.SZ"]
 HK_ALLOCATION_SYMBOLS = ["03033.HK", "513060.SS", "513090.SS"]
@@ -280,6 +301,42 @@ def _normalize_point(item: dict[str, Any]) -> dict[str, Any]:
         "source_timezone": item.get("source_timezone") or SOURCE_TIMEZONES.get(str(item.get("source") or "").replace("cache:", "")) or metadata.get("timezone"),
     }
     return normalize_market_quote(enriched, decision_cutoff=decision_cutoff, metadata=metadata)
+
+
+MACRO_FRESHNESS_DAYS = {
+    "DGS10": 3, "DGS2": 3, "T10Y2Y": 3, "BAMLH0A0HYM2": 3,
+    "CPIAUCSL": 50, "PPIACO": 50, "PCEPI": 50,
+    "UNRATE": 45, "GDP": 130,
+}
+
+
+def _apply_macro_freshness(series_id: str, item: dict[str, Any]) -> dict[str, Any]:
+    """Judge official macro data by publication frequency, including weekends."""
+    row = dict(item)
+    observed = row.get("market_date") or row.get("comparable_date") or row.get("date") or row.get("published_at")
+    try:
+        observation_date = date.fromisoformat(str(observed)[:10])
+        reference_date = datetime.now(tz=ZoneInfo("America/New_York")).date()
+        retrieved = row.get("retrieved_at") or row.get("fetched_at")
+        if retrieved:
+            reference_date = datetime.fromisoformat(str(retrieved).replace("Z", "+00:00")).date()
+        age_days = (reference_date - observation_date).days
+    except (TypeError, ValueError):
+        age_days = None
+    threshold = int(MACRO_FRESHNESS_DAYS.get(series_id, 3))
+    usable = str(row.get("status") or "").lower() in {"ok", "success"} and row.get("value") is not None
+    stale = not usable or age_days is None or age_days > threshold
+    frequency = "quarterly" if series_id == "GDP" else "monthly" if threshold >= 45 else "daily_official"
+    row.update({
+        "data_frequency": frequency,
+        "age_days": age_days,
+        "freshness_threshold_days": threshold,
+        "stale": stale,
+        "freshness_status": "stale" if stale else "valid_lagged_by_design",
+        "data_status": "DATA_INSUFFICIENT" if stale else "VALID_LAGGED_BY_DESIGN",
+        "decision_eligible": bool(not stale),
+    })
+    return row
 
 
 def merge_newer_validated_cn_hk_quotes(
@@ -595,46 +652,50 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
 
     if symbol == "^VIX":
-        data = _try_provider("cboe_official", lambda _: _official_vix_quote(), symbol, errors)
+        defaults = ["cboe_official", "yfinance"]
+    elif symbol in US_ETF_TICKERS:
+        defaults = ["alpha_vantage", "finnhub", "yfinance"]
+    elif symbol in HK_CN_TICKERS:
+        defaults = ["finnhub", "yfinance"]
+    else:
+        defaults = ["yfinance"]
+    provider_order = SOURCE_REGISTRY.provider_order(symbol, default=defaults)
+    provider_functions: dict[str, Callable[[str], dict[str, Any]]] = {
+        "alpha_vantage": alpha_vantage_client.get_quote,
+        "finnhub": finnhub_client.get_quote,
+        "yfinance": yfinance_client.get_quote,
+        "cboe_official": lambda _: _official_vix_quote(),
+    }
+    attempted: list[str] = []
+    for provider_name in provider_order:
+        if provider_name == "local_cache":
+            continue
+        fn = provider_functions.get(provider_name)
+        if fn is None:
+            continue
+        attempted.append(provider_name)
+        data = _try_provider(provider_name, fn, symbol, errors)
         if data:
             candidates.append(data)
-
-    if symbol in US_ETF_TICKERS:
-        for provider_name, fn in [
-            ("alpha_vantage", alpha_vantage_client.get_quote),
-            ("finnhub", finnhub_client.get_quote),
-            ("yfinance", yfinance_client.get_quote),
-        ]:
-            data = _try_provider(provider_name, fn, symbol, errors)
-            if data:
-                candidates.append(data)
-    elif symbol in HK_CN_TICKERS:
-        for provider_name, fn in [
-            ("finnhub", finnhub_client.get_quote),
-            ("yfinance", yfinance_client.get_quote),
-        ]:
-            data = _try_provider(provider_name, fn, symbol, errors)
-            if data:
-                candidates.append(data)
-    else:
-        for provider_name, fn in [
-            ("yfinance", yfinance_client.get_quote),
-        ]:
-            data = _try_provider(provider_name, fn, symbol, errors)
-            if data:
-                candidates.append(data)
 
     if candidates:
         normalized_candidates = [_normalize_point(item) for item in candidates]
         selected = select_best_normalized_quote(normalized_candidates) or normalized_candidates[0]
         verified = _dual_source_verified(normalized_candidates)
+        selected_source = str(selected.get("source") or "unavailable").replace("cache:", "")
+        primary_source = attempted[0] if attempted else selected_source
+        fallback_used = selected_source != primary_source or bool(errors)
         return validate_market_item(symbol, {
             **selected,
             "candidates": normalized_candidates,
             "source_count": len({item.get("source") for item in normalized_candidates}),
             "verified_by_second_source": verified,
             "cross_validation_status": selected.get("cross_validation_status") or ("VERIFIED" if verified else "SINGLE_SOURCE"),
-            "fallback_used": bool(selected.get("fallback_used")) or bool(errors),
+            "primary_source": primary_source,
+            "primary_failed": bool(errors) and not any(str(row.get("source")) == primary_source for row in normalized_candidates),
+            "fallback_used": bool(selected.get("fallback_used")) or fallback_used,
+            "fallback_reason": "；".join(errors) if fallback_used and errors else "",
+            "source_confidence_adjustment": -0.15 if fallback_used else 0.0,
             "provider_errors": errors,
         })
 
@@ -643,7 +704,16 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
         write_log(f"{symbol} 使用缓存行情：{cached.get('source')}", filename="data_router.log")
         return validate_market_item(
             symbol,
-            _normalize_point(_with_symbol(symbol, {**cached, "status": "ok", "source": f"cache:{cached.get('source', 'unknown')}"})),
+            _normalize_point(_with_symbol(symbol, {
+                **cached,
+                "status": "ok",
+                "source": f"cache:{cached.get('source', 'unknown')}",
+                "primary_source": attempted[0] if attempted else None,
+                "primary_failed": True,
+                "fallback_used": True,
+                "fallback_reason": "；".join(errors) or "主源不可用，使用带时间戳缓存",
+                "source_confidence_adjustment": -0.25,
+            })),
         )
 
     write_log(f"{symbol} 行情全部失败，数据缺失，不做激进判断", filename="data_router.log")
@@ -686,7 +756,7 @@ def get_macro_snapshot() -> dict[str, Any]:
                     "warning": "数据缺失，不做激进判断。",
                 }
 
-    items = {key: _normalize_point(value) for key, value in items.items()}
+    items = {key: _apply_macro_freshness(key, _normalize_point(value)) for key, value in items.items()}
     return {
         "source": "fred_cache_router",
         "items": items,
@@ -966,6 +1036,8 @@ def fetch_layered_market_data() -> dict[str, Any]:
         "cn_data_completeness": market_completeness["cn_data_completeness"]["score_pct"],
         "hk_data_completeness": market_completeness["hk_data_completeness"]["score_pct"],
         "data_quality": quality,
+        "source_registry": SOURCE_REGISTRY.health_snapshot(),
+        "source_registry_version": "root_fix_1",
         "errors": errors,
     }
     try:

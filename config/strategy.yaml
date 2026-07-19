@@ -1,6 +1,7 @@
 config_version: V12.7.1_FINAL_FREEZE
 config_role: production_strategy_authority
 version: V12.7.1 Final Freeze
+patch_level: root_fix_1
 
 target_allocation:
   美股: 0.30
@@ -25,6 +26,50 @@ dqs_thresholds:
 scheduled_dca_dqs:
   hard_min_dqs: 65
   normal_execution_dqs: 75
+
+valuation:
+  report_currency: CNY
+  precise_rebalance_coverage_min: 0.98
+  market_close_max_business_day_lag: 3
+  fx_max_calendar_day_lag: 5
+  price_source_conflict_tolerance_pct: 1.0
+  usd_cny_pairs:
+    - USD/CNY
+    - USD/CNH
+
+comparability:
+  overall_coverage_min: 0.75
+  blocking_dimensions:
+    - VOO
+    - ^VIX
+    - DGS10
+  frequency_windows_days:
+    REALTIME: 1
+    INTRADAY: 1
+    DAILY_MARKET_CLOSE: 5
+    DAILY_OFFICIAL_MACRO: 3
+    WEEKLY: 14
+    MONTHLY: 50
+    QUARTERLY: 130
+    ANNUAL: 400
+    EVENT_DRIVEN: 30
+
+opportunity_data:
+  required_core_inputs:
+    - VOO
+    - ^VIX
+    - DGS10
+  optional_confirmation_inputs:
+    - Put/Call Ratio
+    - 市场宽度
+    - ETF资金流
+    - AAII情绪
+  optional_missing_score_penalty_each: 5
+  optional_missing_blocks: true
+
+event_policy:
+  unavailable_policy: CONSERVATIVE_BLOCK
+  partial_policy: PASS_WITH_LIMITATIONS
 
 dqs_weights:
   field_completeness: 20

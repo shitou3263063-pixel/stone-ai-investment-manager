@@ -212,9 +212,9 @@ def build_run_status(
     snapshot = decision.get("portfolio_snapshot", {}) or {}
     quality = decision.get("data_quality_snapshot", decision.get("dqs", {})) or {}
     consistency = decision.get("consistency", {}) or {}
-    warnings = list(action["data_anomalies_or_baseline_conflicts"])
-    warnings.extend(quality.get("warnings", []) or [])
-    errors = _unique_text(consistency.get("errors", []) or [])
+    issue_registry = decision.get("issue_registry", {}) or {}
+    warnings = [str(item.get("message")) for item in issue_registry.get("warnings", []) or []]
+    errors = [str(item.get("message")) for item in issue_registry.get("errors", []) or []]
     p1a = decision.get("cn_hk_p1a", {}) or {}
     tushare = p1a.get("tushare", {}) or {}
     akshare = p1a.get("akshare", {}) or {}
@@ -237,7 +237,13 @@ def build_run_status(
         warnings.append(f"AKShare与主源存在{len(akshare_conflicts)}项SOURCE_CONFLICT，相关数据禁止进入评分。")
     if email_status == "failed" and email_error:
         warnings.append(f"邮件发送失败：{email_error}")
+    # The Issue Registry is the sole data/decision warning source.  This layer
+    # may append only failures produced by the current delivery operation.
+    warnings = [str(item.get("message")) for item in issue_registry.get("warnings", []) or []]
+    if email_status == "failed" and email_error:
+        warnings.append(f"邮件发送失败：{email_error}")
     warnings = _unique_text(warnings)
+    errors = _unique_text([str(item.get("message")) for item in issue_registry.get("errors", []) or []])
     status = "failed" if errors else ("warning" if warnings or email_status == "failed" else "success")
     return {
         "run_time": decision.get("generated_at"),
@@ -328,6 +334,9 @@ def build_run_status(
         },
         "warnings": warnings,
         "errors": errors,
+        "issue_registry": issue_registry,
+        "error_count": int(issue_registry.get("error_count", len(errors)) or 0),
+        "warning_count": int(issue_registry.get("warning_count", len(warnings)) or 0),
     }
 
 
@@ -847,6 +856,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
     comparability = decision.get("comparability", {}) or {}
     gates = decision.get("decision_context", decision.get("trade_permission_gates", {})) or {}
     ai = decision.get("ai", {}) or {}
+    issue_registry = decision.get("issue_registry", {}) or {}
     transactions = decision.get("confirmed_transactions", []) or []
     provisional = bool(snapshot.get("pending_valuation_assets") or reconciliation.get("status") == "WARN")
 
@@ -854,6 +864,11 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         "| 交易日期 | 成交时间 | 标的 | 数量 | 成交价 | 交易/资金币种 | 美元成交额 | 人民币等值记录 | 成交汇率 | 估值汇率 | fx_status | 对账状态 |",
         "| -- | -- | -- | --: | -- | -- | --: | --: | -- | -- | -- | -- |",
     ]
+    voo_holding = next(
+        (row for row in snapshot.get("holdings", []) or [] if str(row.get("security_code")) == "VOO"),
+        {},
+    )
+    voo_valuation_fx = voo_holding.get("fx_rate") if voo_holding.get("fx_status") == "VALID_VALUATION_FX" else None
     for trade in transactions:
         trade_rows.append(
             f"| {trade.get('trade_date')} | {trade.get('trade_datetime') or '待补'} | {trade.get('symbol')} | "
@@ -863,7 +878,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
             f"{trade.get('trade_amount_usd') if trade.get('trade_amount_usd') is not None else 'DATA_INSUFFICIENT'} | "
             f"{_yuan(trade.get('invested_amount_cny'))} | "
             f"{trade.get('actual_fx_rate_cny_per_usd') if trade.get('actual_fx_rate_cny_per_usd') is not None else 'NOT_APPLICABLE'} | "
-            f"{trade.get('valuation_fx_rate_cny_per_usd') if trade.get('valuation_fx_rate_cny_per_usd') is not None else 'DATA_INSUFFICIENT'} | "
+            f"{trade.get('valuation_fx_rate_cny_per_usd') if trade.get('valuation_fx_rate_cny_per_usd') is not None else voo_valuation_fx if voo_valuation_fx is not None else 'DATA_INSUFFICIENT'} | "
             f"{trade.get('fx_status') or 'DATA_INSUFFICIENT'} | "
             f"{'PASS' if trade.get('reconciliation_status') == 'RECONCILED' else trade.get('reconciliation_status')} |"
         )
@@ -889,6 +904,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
     anomalies.extend("错误：" + str(item) for item in consistency.get("errors", []) or [])
     anomalies = list(dict.fromkeys(anomalies)) or ["无阻断级异常。"]
 
+    anomalies = [str(item.get("message")) for item in issue_registry.get("issues", []) or []] or ["无开放问题"]
     risk_gate_lines: list[str] = []
     for item in gates.get("scenarios", []) or []:
         contributors = "、".join(item.get("risk_top_contributors", []) or []) or "无"
@@ -901,6 +917,24 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
             f"阻断依据={item.get('risk_blocking_basis')}。"
         )
 
+    top_reasons = list(decision.get("no_trade_reasons", []) or [])[:3]
+    canonical_status_fields = [
+        "## 今日任务卡",
+        "",
+        f"- precise_market_value={_yuan(snapshot.get('precise_market_value', snapshot.get('total_valued_assets')))}",
+        f"- pending_valuation_cost={_yuan(snapshot.get('pending_valuation_cost', snapshot.get('pending_valuation_total')))}",
+        f"- total_book_value={_yuan(snapshot.get('total_book_value', snapshot.get('total_asset_including_cost_records')))}（非精确估值口径）",
+        f"- valuation_coverage_pct={snapshot.get('valuation_coverage_pct')}%",
+        f"- 今日交易权限：{gates.get('today_trade_permission', 'DENY')}；自动交易：否",
+        f"- 问题清单：错误{issue_registry.get('error_count', 0)}项，警告{issue_registry.get('warning_count', 0)}项，阻断{issue_registry.get('blocking_count', 0)}项",
+        f"- 当前闲置专项可投资现金：{_yuan(snapshot.get('investable_cash', budget.get('investable_cash_yuan')))}",
+        f"- 今日继续：风险监控={gates.get('monitoring_permission', 'DENY')}；成交对账={gates.get('reconciliation_permission', 'DENY')}",
+        "- 今日暂停：新增交易、实盘再平衡执行、实盘网格交易",
+        f"- 前三项原因：{'；'.join(str(item) for item in top_reasons) or '当前无新增交易场景'}",
+        "- 禁止事项：自动交易、把模拟网格资金计入实盘、把历史成交冒充今日交易、把成本记录冒充实时市值",
+        f"- 下一复核时间：{decision.get('next_daily_review') or decision.get('next_review_date')}",
+        "",
+    ]
     grid_section = generate_grid_daily_section(decision.get("grid", {})).replace("## ", "### ")
     grid_section = grid_section.replace("# Stone Smart Grid", "## 附录 E. Stone Smart Grid（SIMULATION_ONLY）", 1)
     lines = [
@@ -1039,6 +1073,7 @@ def _generate_final_freeze_daily_report(decision: dict[str, Any]) -> str:
         "",
         decision.get("disclaimer", "仅供投资辅助，不构成投资建议；系统不自动交易，不承诺收益。"),
     ]
+    lines[2:2] = canonical_status_fields
     return "\n".join(lines)
 
 

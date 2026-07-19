@@ -11,6 +11,7 @@ credentials.json
 token.json
 __pycache__/
 .pytest_cache/
+.pytest_tmp*/
 *.pyc
 .venv/
 venv/

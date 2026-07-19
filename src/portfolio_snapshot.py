@@ -205,6 +205,7 @@ def _canonical_portfolio_values(
     valued_assets = [
         row for row in holdings
         if str(row.get("valuation_status")) not in PENDING_VALUATION_STATUSES
+        and not bool(row.get("is_cost_record"))
     ]
     pending_assets = [
         row for row in holdings
@@ -219,7 +220,10 @@ def _canonical_portfolio_values(
         for category in categories
     }
     total_valued_assets = round(sum(asset_class_values.values()))
-    total_including_cost = round(sum(_to_float(row.get("market_value_cny")) for row in holdings))
+    total_including_cost = round(
+        sum(_to_float(row.get("market_value_cny")) for row in valued_assets)
+        + sum(_to_float(row.get("cost_basis_cny", row.get("market_value_cny"))) for row in pending_assets)
+    )
     pending_valuation_total = round(sum(_to_float(row.get("market_value_cny")) for row in pending_assets))
     asset_class_weights = {
         category: (value / total_valued_assets if total_valued_assets else 0.0)
