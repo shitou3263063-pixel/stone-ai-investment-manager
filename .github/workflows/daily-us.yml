@@ -20,8 +20,6 @@ jobs:
 
     env:
       PYTHONIOENCODING: utf-8
-      REPORT_RUN_LABEL: ${{ github.event_name == 'schedule' && '美东时间 08:40' || '手动运行｜美东报表' }}
-      REPORT_INSTANCE_ID: US_PREOPEN
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -95,6 +93,9 @@ jobs:
         if: steps.schedule_gate.outputs.should_run == 'true' && always()
         continue-on-error: true
         shell: bash
+        env:
+          REPORT_RUN_LABEL: ${{ github.event_name == 'schedule' && '美东时间 08:40' || '手动运行｜美东报表' }}
+          REPORT_INSTANCE_ID: US_PREOPEN
         run: |
           mkdir -p logs
           set -o pipefail
@@ -103,6 +104,9 @@ jobs:
       - name: Send main.py failure notification email
         if: always() && steps.schedule_gate.outputs.should_run == 'true' && steps.production.outcome == 'failure'
         continue-on-error: true
+        env:
+          REPORT_RUN_LABEL: ${{ github.event_name == 'schedule' && '美东时间 08:40' || '手动运行｜美东报表' }}
+          REPORT_INSTANCE_ID: US_PREOPEN
         run: python scripts/send_workflow_failure_email.py
 
       - name: Upload US reports and logs artifact
