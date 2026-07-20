@@ -12,16 +12,23 @@ EVENT_STATUSES = {
 
 
 def build_event_assessment(macro_result: dict[str, Any]) -> dict[str, Any]:
-    calendar_status = str(macro_result.get("event_calendar_data_status") or "").upper()
-    events = list(macro_result.get("events", []) or [])
-    if macro_result.get("error") or calendar_status == "ERROR":
-        status = "SOURCE_ERROR"
-    elif calendar_status in {"UNAVAILABLE", "PARTIAL", ""}:
-        status = "DATA_INSUFFICIENT"
-    elif macro_result.get("has_high_event_next_7_days"):
-        status = "VALID_EVENTS_FOUND"
-    else:
-        status = "VALID_NO_HIGH_IMPACT_EVENT"
+    has_valid_success_record = bool(
+    last_success_at
+    and last_success_at not in {"无成功记录", "NONE", "NULL"}
+)
+
+if macro_result.get("error") or calendar_status == "ERROR":
+    status = "SOURCE_ERROR"
+elif (
+    calendar_status in {"UNAVAILABLE", "PARTIAL", ""}
+    or calendar_missing_items
+    or not has_valid_success_record
+):
+    status = "DATA_INSUFFICIENT"
+elif macro_result.get("has_high_event_next_7_days"):
+    status = "VALID_EVENTS_FOUND"
+else:
+    status = "VALID_NO_HIGH_IMPACT_EVENT"
     if status not in EVENT_STATUSES:
         raise ValueError(f"Invalid event assessment status: {status}")
     gate_passed, reasons = event_gate_for_status(status)
