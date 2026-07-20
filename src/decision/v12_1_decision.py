@@ -162,18 +162,14 @@ def build_report_metadata(
         generated = datetime.now(tz=ZoneInfo("Asia/Shanghai"))
     if generated.tzinfo is None:
         generated = generated.replace(tzinfo=ZoneInfo("Asia/Shanghai"))
-   report_instance_id = str(
-    os.getenv("REPORT_INSTANCE_ID") or ""
-).strip().upper()
-
-report_timezone = (
-    "America/New_York"
-    if report_instance_id == "US_PREOPEN"
-    else "Asia/Shanghai"
-)
-
-generated = generated.astimezone(ZoneInfo(report_timezone))
-business_date = generated.date().isoformat()
+    report_instance_id = str(os.getenv("REPORT_INSTANCE_ID") or "").strip().upper()
+    report_timezone = (
+        "America/New_York"
+        if report_instance_id == "US_PREOPEN"
+        else "Asia/Shanghai"
+    )
+    business_datetime = generated.astimezone(ZoneInfo(report_timezone))
+    business_date = business_datetime.date().isoformat()
     actual_trade_dates = sorted(
         {
             str(item.get("trade_date"))
