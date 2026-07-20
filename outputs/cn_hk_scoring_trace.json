@@ -1,31 +1,30 @@
 {
-  "generated_at": "2026-07-19T02:32:02+08:00",
-  "p1a_snapshot_generated_at": "2026-07-19T02:29:42+08:00",
+  "generated_at": "2026-07-21T01:15:20+08:00",
+  "p1a_snapshot_generated_at": null,
   "rows": [
     {
       "symbol": "510300.SS",
       "name": "沪深300ETF",
       "asset_type": "core_etf",
       "financial_model": "not_applicable_etf",
-      "p1a_inputs_used": [
-        "akshare（底层：csindex_official）估值:CSI300_total_share_capital_PE1_DP1"
-      ],
+      "p1a_inputs_used": [],
       "components": {
-        "估值吸引力": 78.0,
-        "趋势与市场宽度": 44.75,
+        "估值吸引力": 58,
+        "趋势与市场宽度": 64.5,
         "基本面或盈利质量": 74,
         "宏观环境适配": 58,
-        "资金流或成交结构": 80,
+        "资金流或成交结构": 24,
         "组合适配度": 60,
         "数据置信度": 52
       },
       "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "final_score": 72,
+      "final_score": 64,
       "advice": "等待条件，今日不交易",
       "limitations": [
         "ETF不适用个股财务评分",
-        "Opportunity Add DQS=55，当前不允许新增仓位建议"
+        "可靠ETF资金流未接入，成交结构项按低置信度处理",
+        "Opportunity Add DQS=46，当前不允许新增仓位建议"
       ]
     },
     {
@@ -33,75 +32,24 @@
       "name": "南方东英恒生科技指数ETF",
       "asset_type": "core_etf",
       "financial_model": "not_applicable_etf",
-      "p1a_inputs_used": [
-        "HKMA:银行体系总结余"
-      ],
+      "p1a_inputs_used": [],
       "components": {
-        "估值吸引力": 68,
-        "趋势与市场宽度": 40,
+        "估值吸引力": 58,
+        "趋势与市场宽度": 64.5,
         "基本面或盈利质量": 74,
         "宏观环境适配": 58,
-        "资金流或成交结构": 67.486,
+        "资金流或成交结构": 24,
         "组合适配度": 60,
         "数据置信度": 52
       },
       "data_quality_adjustment": -3,
       "portfolio_constraint_adjustment": 0,
-      "final_score": 67,
+      "final_score": 64,
       "advice": "等待条件，今日不交易",
       "limitations": [
         "ETF不适用个股财务评分",
-        "Opportunity Add DQS=55，当前不允许新增仓位建议"
-      ]
-    },
-    {
-      "symbol": "002558.SZ",
-      "name": "巨人网络",
-      "asset_type": "single_stock",
-      "financial_model": "single_stock_fundamental",
-      "p1a_inputs_used": [
-        "akshare（底层：eastmoney）:002558财务指标"
-      ],
-      "components": {
-        "估值吸引力": 58,
-        "趋势与市场宽度": 42.85,
-        "基本面或盈利质量": 66.6,
-        "宏观环境适配": 58,
-        "资金流或成交结构": 52.4815,
-        "组合适配度": 45,
-        "数据置信度": 52
-      },
-      "data_quality_adjustment": -3,
-      "portfolio_constraint_adjustment": -5,
-      "final_score": 53,
-      "advice": "继续持有",
-      "limitations": [
-        "个股不得仅因资产类别低配而加仓"
-      ]
-    },
-    {
-      "symbol": "513090.SS",
-      "name": "香港证券ETF",
-      "asset_type": "thematic_etf",
-      "financial_model": "not_applicable_etf",
-      "p1a_inputs_used": [
-        "HKMA:银行体系总结余"
-      ],
-      "components": {
-        "估值吸引力": 51,
-        "趋势与市场宽度": 48.25,
-        "基本面或盈利质量": 54,
-        "宏观环境适配": 58,
-        "资金流或成交结构": 58.848,
-        "组合适配度": 60,
-        "数据置信度": 52
-      },
-      "data_quality_adjustment": -3,
-      "portfolio_constraint_adjustment": -5,
-      "final_score": 50,
-      "advice": "暂停新增",
-      "limitations": [
-        "ETF不适用个股财务评分"
+        "可靠ETF资金流未接入，成交结构项按低置信度处理",
+        "Opportunity Add DQS=46，当前不允许新增仓位建议"
       ]
     },
     {
@@ -109,15 +57,61 @@
       "name": "恒生医疗ETF",
       "asset_type": "thematic_etf",
       "financial_model": "not_applicable_etf",
-      "p1a_inputs_used": [
-        "HKMA:银行体系总结余"
-      ],
+      "p1a_inputs_used": [],
       "components": {
-        "估值吸引力": 56,
-        "趋势与市场宽度": 40,
+        "估值吸引力": 46,
+        "趋势与市场宽度": 64.5,
         "基本面或盈利质量": 54,
         "宏观环境适配": 58,
-        "资金流或成交结构": 44.071,
+        "资金流或成交结构": 24,
+        "组合适配度": 60,
+        "数据置信度": 52
+      },
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "final_score": 48,
+      "advice": "暂停新增",
+      "limitations": [
+        "ETF不适用个股财务评分",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ]
+    },
+    {
+      "symbol": "002558.SZ",
+      "name": "巨人网络",
+      "asset_type": "single_stock",
+      "financial_model": "single_stock_fundamental",
+      "p1a_inputs_used": [],
+      "components": {
+        "估值吸引力": 48,
+        "趋势与市场宽度": 64.5,
+        "基本面或盈利质量": 48,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
+        "组合适配度": 45,
+        "数据置信度": 52
+      },
+      "data_quality_adjustment": -3,
+      "portfolio_constraint_adjustment": -5,
+      "final_score": 47,
+      "advice": "观察",
+      "limitations": [
+        "个股不得仅因资产类别低配而加仓",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
+      ]
+    },
+    {
+      "symbol": "513090.SS",
+      "name": "香港证券ETF",
+      "asset_type": "thematic_etf",
+      "financial_model": "not_applicable_etf",
+      "p1a_inputs_used": [],
+      "components": {
+        "估值吸引力": 46,
+        "趋势与市场宽度": 64.5,
+        "基本面或盈利质量": 54,
+        "宏观环境适配": 58,
+        "资金流或成交结构": 24,
         "组合适配度": 60,
         "数据置信度": 52
       },
@@ -126,7 +120,8 @@
       "final_score": 40,
       "advice": "暂停新增",
       "limitations": [
-        "ETF不适用个股财务评分"
+        "ETF不适用个股财务评分",
+        "可靠ETF资金流未接入，成交结构项按低置信度处理"
       ]
     }
   ],

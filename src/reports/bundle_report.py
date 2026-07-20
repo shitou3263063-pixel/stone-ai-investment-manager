@@ -501,6 +501,30 @@ def render_daily_report(bundle: dict[str, Any]) -> str:
         "| security_id | 数量 | price | currency | fx_rate | price_as_of | source | valuation_status | precise valuation | 市值（CNY） | 资产分类 |",
         "|---|---:|---:|---|---:|---|---|---|---|---:|---|",
     ]
+    fallback_positions = [
+        row
+        for row in portfolio.get("positions", []) or []
+        if str(row.get("valuation_status") or "").upper()
+        in {
+            "STALE_USER_CONFIRMED_VALUE",
+            "STALE_MARKET_PRICE",
+            "MISSING_PRICE",
+            "MISSING_FX",
+        }
+    ]
+    if fallback_positions:
+        lines.extend(
+            [
+                "",
+                "### 估值回退警告",
+                "",
+                f"- 本次共有 {len(fallback_positions)} 个持仓未使用完整有效行情估值。",
+                "- 回退估值不计入精确估值资产或精确估值覆盖率。",
+                "- 相关金额仅用于组合估算，不应视为实时精确市值。",
+                "",
+            ]
+        )
+
     for row in portfolio.get("positions", []):
         lines.append(
             f"| {row.get('security_id')} | {row.get('total_quantity', row.get('quantity')) or '-'} | "

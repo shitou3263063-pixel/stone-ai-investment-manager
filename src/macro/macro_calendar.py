@@ -404,6 +404,7 @@ def analyze_macro_calendar(
         if not event.get("release_at_utc") or event.get("verification_status") == "unverified"
     ]
     calendar_status = "UNAVAILABLE" if not events else ("PARTIAL" if missing_calendar_fields else "VALID")
+    verified_event_coverage = bool(events) and calendar_status == "VALID"
     risk_state = "HIGH_RISK_EVENT_FOUND" if high_7d else ("UNKNOWN" if calendar_status == "UNAVAILABLE" else "CLEAR")
     gate_result = (
         "BLOCK" if risk_state == "HIGH_RISK_EVENT_FOUND"
@@ -427,11 +428,14 @@ def analyze_macro_calendar(
         "economic_calendar": [event.get("economic_calendar") for event in events],
         "economic_release_data": [event.get("economic_release_data") for event in events],
         "event_calendar_data_status": calendar_status,
+        "verified_event_coverage": verified_event_coverage,
+        "last_success_at": current.isoformat() if verified_event_coverage else None,
         "event_risk_state": risk_state,
         "event_gate_result": gate_result,
         "future_event_gate": {
             "status": risk_state,
             "calendar_status": calendar_status,
+            "verified_event_coverage": verified_event_coverage,
             "gate_result": gate_result,
             "high_impact_events": high_7d,
         },

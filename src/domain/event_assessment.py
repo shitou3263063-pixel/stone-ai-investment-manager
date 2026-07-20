@@ -12,23 +12,33 @@ EVENT_STATUSES = {
 
 
 def build_event_assessment(macro_result: dict[str, Any]) -> dict[str, Any]:
-    has_valid_success_record = bool(
-    last_success_at
-    and last_success_at not in {"无成功记录", "NONE", "NULL"}
-)
+    calendar_status = str(macro_result.get("event_calendar_data_status") or "").upper()
+    events = list(macro_result.get("events", []) or [])
+    calendar_missing_items = list(macro_result.get("calendar_missing_items", []) or [])
+    future_event_gate = macro_result.get("future_event_gate", {}) or {}
+    explicit_verified_coverage = (
+        macro_result.get("verified_event_coverage")
+        if "verified_event_coverage" in macro_result
+        else future_event_gate.get("verified_event_coverage")
+    )
+    verified_event_coverage = (
+        bool(explicit_verified_coverage)
+        if explicit_verified_coverage is not None
+        else calendar_status == "VALID" and not calendar_missing_items
+    )
 
-if macro_result.get("error") or calendar_status == "ERROR":
-    status = "SOURCE_ERROR"
-elif (
-    calendar_status in {"UNAVAILABLE", "PARTIAL", ""}
-    or calendar_missing_items
-    or not has_valid_success_record
-):
-    status = "DATA_INSUFFICIENT"
-elif macro_result.get("has_high_event_next_7_days"):
-    status = "VALID_EVENTS_FOUND"
-else:
-    status = "VALID_NO_HIGH_IMPACT_EVENT"
+    if macro_result.get("error") or calendar_status == "ERROR":
+        status = "SOURCE_ERROR"
+    elif (
+        calendar_status in {"UNAVAILABLE", "PARTIAL", ""}
+        or calendar_missing_items
+        or not verified_event_coverage
+    ):
+        status = "DATA_INSUFFICIENT"
+    elif macro_result.get("has_high_event_next_7_days"):
+        status = "VALID_EVENTS_FOUND"
+    else:
+        status = "VALID_NO_HIGH_IMPACT_EVENT"
     if status not in EVENT_STATUSES:
         raise ValueError(f"Invalid event assessment status: {status}")
     gate_passed, reasons = event_gate_for_status(status)
