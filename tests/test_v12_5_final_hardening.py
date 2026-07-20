@@ -157,11 +157,16 @@ def test_hard_validation_detects_live_grid_budget_in_simulation() -> None:
     assert any("模拟网格" in error for error in result["errors"])
 
 
-def test_workflow_has_single_entry_and_concurrency() -> None:
-    workflow = Path(".github/workflows/daily.yml").read_text(encoding="utf-8")
-    assert workflow.count("python main.py 2>&1 | tee logs/main.log") == 1
-    assert "concurrency:" in workflow
-    assert 'cron: "30 8 * * *"' in workflow
-    assert 'timezone: "Asia/Shanghai"' in workflow
-    assert 'cron: "30 8 * * 0-6"' in workflow
-    assert 'timezone: "America/New_York"' in workflow
+def test_workflows_have_single_entry_and_independent_concurrency() -> None:
+    cn = Path(".github/workflows/daily.yml").read_text(encoding="utf-8")
+    us = Path(".github/workflows/daily-us.yml").read_text(encoding="utf-8")
+
+    assert cn.count("python main.py 2>&1 | tee logs/main.log") == 1
+    assert us.count("python main.py 2>&1 | tee logs/main.log") == 1
+    assert "group: stone-ai-cn-preopen-${{ github.ref }}" in cn
+    assert "group: stone-ai-us-preopen-${{ github.ref }}" in us
+    assert 'cron: "35 0 * * 1-5"' in cn
+    assert 'cron: "40 12 * * 1-5"' in us
+    assert 'cron: "40 13 * * 1-5"' in us
+    assert "timezone:" not in cn
+    assert "timezone:" not in us

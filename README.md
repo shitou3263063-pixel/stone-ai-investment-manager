@@ -32,30 +32,30 @@ python main.py
 
 目标配置冻结为：美股30%、港股12%、A股10%、债券25%、黄金15%、现金8%。修改持仓时只维护`portfolio_master.yaml`，不要在Python代码中改数字。
 
-## 每天自动运行
+## 开盘前自动运行
 
-GitHub Actions 文件：
+GitHub Actions 使用两条完全独立的工作流：
 
 ```text
-.github/workflows/daily.yml
+.github/workflows/daily.yml     # 北京时间报表
+.github/workflows/daily-us.yml  # 美东时间报表
 ```
 
 运行规则：
 
-- 每天北京时间 8:30 自动运行。
-- cron：`30 0 * * *`。
-- 支持手动运行 `workflow_dispatch`。
-- 使用 Python 3.11。
-- 安装 `requirements.txt`。
-- 运行服务健康检查、自动测试和 `python main.py`。
-- 上传 `reports/` 和 `logs/` 为 artifact。
-- 报告生成成功后发送 Gmail，邮件失败不影响报告保存。
+- 北京时间工作日上午 08:35 运行；UTC cron 为 `35 0 * * 1-5`。
+- 美东时间工作日上午 08:40 运行；分别使用 EDT 的 `40 12 * * 1-5` 与 EST 的 `40 13 * * 1-5`，由运行时 DST 门控确保每天只生成一次。
+- 两条工作流使用不同的并发组、报告标签、实例 ID 和 artifact 名称，不会互相取消或覆盖。
+- 两条工作流都支持手动运行 `workflow_dispatch`。
+- 使用 Python 3.11，安装 `requirements.txt`，运行自动测试和唯一生产入口 `python main.py`。
+- 分别上传 `reports/`、`logs/` 和 `outputs/` 为独立 artifact。
+- 报告生成成功后发送 Gmail；邮件主题会标记“北京时间 08:35”或“美东时间 08:40”。
 
 ## 手动运行 GitHub Actions
 
 1. 打开 GitHub 仓库。
 2. 点击 `Actions`。
-3. 选择 `Daily Stone AI Investment Report`。
+3. 选择 `Stone AI CN Pre-open Report` 或 `Stone AI US Pre-open Report`。
 4. 点击 `Run workflow`。
 5. 分支选择 `main`。
 6. 运行完成后查看 `Artifacts`。

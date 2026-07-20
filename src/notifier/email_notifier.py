@@ -461,7 +461,8 @@ def send_workflow_failure_notification(
         write_log(message, filename="email_notifier.log")
         return {"sent": False, "skipped": True, "message": message, "error": ""}
 
-    subject = "[失败] Stone AI 日报生产未完成"
+    run_label = os.getenv("REPORT_RUN_LABEL", "").strip()
+    subject = f"[失败] Stone AI 日报生产未完成 | {run_label}" if run_label else "[失败] Stone AI 日报生产未完成"
     body_lines = [
         "Stone AI Investment Manager 的日报生产流程执行失败。",
         f"失败阶段：{failed_stage}",
