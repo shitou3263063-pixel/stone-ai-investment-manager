@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Any
@@ -84,6 +85,8 @@ def run(*, send_email: bool = True, snapshot: dict[str, Any] | None = None) -> s
         "bundle_hash": bundle["bundle_hash"], "validation": validation,
         "email": {"sent": False, "skipped": not send_email, "message": "pending" if send_email else "email skipped"},
         "report_date": (bundle.get("report_metadata", {}) or {}).get("report_business_date"),
+        "report_identity": os.getenv("REPORT_RUN_LABEL", "").strip() or "未标记运行",
+        "report_instance_id": os.getenv("REPORT_INSTANCE_ID", "").strip() or "LOCAL",
         "data_cutoff_time": bundle.get("data_cutoff_at"),
         "investable_cash": bundle["portfolio_snapshot"].get("investable_cash", 0),
         "dqs": {name: result["total"] for name, result in bundle["dqs_results"].items()},

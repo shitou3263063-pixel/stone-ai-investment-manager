@@ -1,18 +1,14 @@
-name: Daily Stone AI Investment Report
+name: Stone AI CN Pre-open Report
 
 on:
   schedule:
-    # 中国资产与亚洲市场晨间复核：北京时间每天08:30。
-    - cron: "30 8 * * *"
-      timezone: "Asia/Shanghai"
-    # 美股市场晨间复核：纽约时间每天08:30；自动适配EST/EDT夏令时。
-    # 使用等价但不同的星期表达式，以便邮件主题识别触发来源。
-    - cron: "30 8 * * 0-6"
-      timezone: "America/New_York"
+    # GitHub cron uses UTC. 00:35 UTC = 08:35 Asia/Shanghai year-round.
+    - cron: "35 0 * * 1-5"
   workflow_dispatch:
 
 concurrency:
-  group: stone-ai-daily-${{ github.ref }}
+  # CN and US reports use different concurrency groups and never cancel each other.
+  group: stone-ai-cn-preopen-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -22,6 +18,8 @@ jobs:
 
     env:
       PYTHONIOENCODING: utf-8
+      REPORT_RUN_LABEL: ${{ github.event_name == 'schedule' && '北京时间 08:35' || '手动运行｜北京时间报表' }}
+      REPORT_INSTANCE_ID: CN_PREOPEN
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -53,9 +51,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Service health check
-        run: python scripts/check_all_services.py
-
       - name: Run tests
         id: tests
         continue-on-error: true
@@ -70,8 +65,6 @@ jobs:
         if: always()
         continue-on-error: true
         shell: bash
-        env:
-          REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
         run: |
           mkdir -p logs
           set -o pipefail
@@ -82,11 +75,11 @@ jobs:
         continue-on-error: true
         run: python scripts/send_workflow_failure_email.py
 
-      - name: Upload reports and logs artifact
+      - name: Upload CN reports and logs artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stone-ai-investment-reports-${{ github.run_id }}
+          name: stone-ai-cn-preopen-reports-${{ github.run_id }}
           path: |
             reports/
             logs/
@@ -102,13 +95,13 @@ jobs:
           production_outcome="${{ steps.production.outcome }}"
 
           if [[ "$production_outcome" != "success" ]]; then
-            echo "::error::python main.py failed; failure notification and complete logs were processed."
+            echo "::error::CN pre-open python main.py failed; failure notification and complete logs were processed."
             exit 1
           fi
 
           if [[ "$test_outcome" != "success" ]]; then
-            echo "::error::pytest failed; the daily report still ran and was sent."
+            echo "::error::pytest failed; the CN pre-open report still ran and was sent."
             exit 1
           fi
 
-          echo "Tests and daily report production both succeeded."
+          echo "Tests and CN pre-open report production both succeeded."

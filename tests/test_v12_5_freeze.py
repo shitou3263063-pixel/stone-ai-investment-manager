@@ -125,9 +125,12 @@ def test_single_production_entrypoint() -> None:
     ]
     assert production_main_files == [PROJECT_ROOT / "main.py"]
     assert "from src.pipeline.unified_pipeline import main" in (PROJECT_ROOT / "main.py").read_text(encoding="utf-8")
-    workflow = (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
-    assert "python main.py 2>&1 | tee logs/main.log" in workflow
-    assert "python src/main.py" not in workflow
+    workflows = [
+        (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8"),
+        (PROJECT_ROOT / ".github" / "workflows" / "daily-us.yml").read_text(encoding="utf-8"),
+    ]
+    assert all("python main.py 2>&1 | tee logs/main.log" in workflow for workflow in workflows)
+    assert all("python src/main.py" not in workflow for workflow in workflows)
 
 
 def test_report_required_sections() -> None:

@@ -1,0 +1,142 @@
+name: Stone AI US Pre-open Report
+
+on:
+  schedule:
+    # GitHub cron uses UTC. The two triggers cover New York daylight and standard time.
+    # A DST gate below permits exactly one trigger to produce a report each weekday.
+    - cron: "40 12 * * 1-5" # 08:40 EDT (UTC-4)
+    - cron: "40 13 * * 1-5" # 08:40 EST (UTC-5)
+  workflow_dispatch:
+
+concurrency:
+  # US and CN reports use different concurrency groups and never cancel each other.
+  group: stone-ai-us-preopen-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      PYTHONIOENCODING: utf-8
+      REPORT_RUN_LABEL: ${{ github.event_name == 'schedule' && '美东时间 08:40' || '手动运行｜美东报表' }}
+      REPORT_INSTANCE_ID: US_PREOPEN
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_ENABLED: ${{ secrets.OPENAI_ENABLED }}
+      OPENAI_MAX_RETRIES: ${{ secrets.OPENAI_MAX_RETRIES }}
+      OPENAI_TIMEOUT_SECONDS: ${{ secrets.OPENAI_TIMEOUT_SECONDS }}
+      MAX_LLM_RETRIES: ${{ secrets.MAX_LLM_RETRIES }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+
+    steps:
+      - name: Select active New York DST schedule
+        id: schedule_gate
+        shell: bash
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != "schedule" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual US report run accepted."
+            exit 0
+          fi
+
+          ny_offset="$(TZ=America/New_York date +%z)"
+          if [[ "$EVENT_SCHEDULE" == "40 12 * * 1-5" && "$ny_offset" == "-0400" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Active EDT trigger accepted."
+          elif [[ "$EVENT_SCHEDULE" == "40 13 * * 1-5" && "$ny_offset" == "-0500" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Active EST trigger accepted."
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Inactive seasonal trigger skipped without producing or emailing a report."
+          fi
+
+      - name: Checkout repository
+        if: steps.schedule_gate.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.schedule_gate.outputs.should_run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.schedule_gate.outputs.should_run == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        id: tests
+        if: steps.schedule_gate.outputs.should_run == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          pytest 2>&1 | tee logs/pytest.log
+
+      - name: Run Stone AI Investment Manager Pro V12.7.1 Final Freeze
+        id: production
+        if: steps.schedule_gate.outputs.should_run == 'true' && always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          python main.py 2>&1 | tee logs/main.log
+
+      - name: Send main.py failure notification email
+        if: always() && steps.schedule_gate.outputs.should_run == 'true' && steps.production.outcome == 'failure'
+        continue-on-error: true
+        run: python scripts/send_workflow_failure_email.py
+
+      - name: Upload US reports and logs artifact
+        if: always() && steps.schedule_gate.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stone-ai-us-preopen-reports-${{ github.run_id }}
+          path: |
+            reports/
+            logs/
+            outputs/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Finalize workflow status
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.schedule_gate.outputs.should_run }}" != "true" ]]; then
+            echo "Inactive US seasonal cron completed without running the report."
+            exit 0
+          fi
+
+          test_outcome="${{ steps.tests.outcome }}"
+          production_outcome="${{ steps.production.outcome }}"
+
+          if [[ "$production_outcome" != "success" ]]; then
+            echo "::error::US pre-open python main.py failed; failure notification and complete logs were processed."
+            exit 1
+          fi
+
+          if [[ "$test_outcome" != "success" ]]; then
+            echo "::error::pytest failed; the US pre-open report still ran and was sent."
+            exit 1
+          fi
+
+          echo "Tests and US pre-open report production both succeeded."

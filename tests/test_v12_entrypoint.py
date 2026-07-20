@@ -21,11 +21,12 @@ class EntrypointTest(unittest.TestCase):
         self.assertIn("禁止生产运行", (legacy / "src_main_deprecated.py").read_text(encoding="utf-8"))
         self.assertIn("禁止生产运行", (legacy / "run_deprecated.py").read_text(encoding="utf-8"))
 
-    def test_workflow_uses_root_main_and_pytest(self) -> None:
-        workflow = (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
-        self.assertIn("python main.py", workflow)
-        self.assertIn("pytest", workflow)
-        self.assertNotIn("python src/main.py", workflow)
+    def test_workflows_use_root_main_and_pytest(self) -> None:
+        for filename in ("daily.yml", "daily-us.yml"):
+            workflow = (PROJECT_ROOT / ".github" / "workflows" / filename).read_text(encoding="utf-8")
+            self.assertIn("python main.py", workflow)
+            self.assertIn("pytest", workflow)
+            self.assertNotIn("python src/main.py", workflow)
 
 
 if __name__ == "__main__":

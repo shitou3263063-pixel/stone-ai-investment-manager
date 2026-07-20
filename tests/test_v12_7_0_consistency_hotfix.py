@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from src.decision.v12_1_decision import (
     build_report_metadata,
     build_trade_permission_gates,
@@ -49,18 +51,21 @@ def _snapshot(trade):
 
 
 def test_manual_reconciliation_uses_run_date_not_trade_date() -> None:
-    metadata = build_report_metadata(
-        generated_at="2026-07-16T21:06:00+08:00",
-        decision_cutoff_at="2026-07-16T21:05:00+08:00",
-        transactions=[_trade()],
-        run_label="手动运行",
-        explicit_run_mode="MANUAL_RECONCILIATION",
-    )
+    with patch.dict("os.environ", {"REPORT_INSTANCE_ID": "US_PREOPEN"}, clear=False):
+        metadata = build_report_metadata(
+            generated_at="2026-07-16T21:06:00+08:00",
+            decision_cutoff_at="2026-07-16T21:05:00+08:00",
+            transactions=[_trade()],
+            run_label="手动运行｜美东报表",
+            explicit_run_mode="MANUAL_RECONCILIATION",
+        )
     assert metadata["report_business_date"] == "2026-07-16"
     assert metadata["report_generated_at"] == "2026-07-16T21:06:00+08:00"
     assert metadata["decision_cutoff_at"] == "2026-07-16T21:05:00+08:00"
     assert metadata["actual_trade_date"] == "2026-07-15"
     assert metadata["report_run_mode"] == "MANUAL_RECONCILIATION"
+    assert metadata["report_run_label"] == "手动运行｜美东报表"
+    assert metadata["report_instance_id"] == "US_PREOPEN"
 
 
 def test_dqs_gate_is_separate_from_final_trade_permission() -> None:

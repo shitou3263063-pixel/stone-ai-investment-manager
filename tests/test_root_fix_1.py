@@ -155,6 +155,7 @@ def test_version_entrypoint_and_cash_policy_remain_frozen() -> None:
     root = project_root()
     assert "Stone AI Investment Manager Pro V12.7.1 Final Freeze" in (root / "src/decision/v12_1_decision.py").read_text(encoding="utf-8")
     assert "python main.py" in (root / ".github/workflows/daily.yml").read_text(encoding="utf-8")
+    assert "python main.py" in (root / ".github/workflows/daily-us.yml").read_text(encoding="utf-8")
     assert "from src.pipeline.unified_pipeline import main" in (root / "main.py").read_text(encoding="utf-8")
     strategy = load_config(root / "config/strategy.yaml")
     assert strategy["patch_level"] == "root_fix_1"

@@ -93,13 +93,21 @@ def test_dual_timezone_email_subject_identifies_us_market_run() -> None:
         assert "运行时段：美东时间 08:30" in sender.call_args.args[2]
 
 
-def test_github_daily_workflow_has_beijing_and_new_york_0830() -> None:
-    workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
-    assert 'cron: "30 8 * * *"' in workflow
-    assert 'timezone: "Asia/Shanghai"' in workflow
-    assert 'cron: "30 8 * * 0-6"' in workflow
-    assert 'timezone: "America/New_York"' in workflow
-    assert "Run Stone AI Investment Manager Pro V12.7.1 Final Freeze" in workflow
+def test_github_has_independent_cn_and_us_preopen_workflows() -> None:
+    root = Path(__file__).resolve().parents[1] / ".github" / "workflows"
+    cn = (root / "daily.yml").read_text(encoding="utf-8")
+    us = (root / "daily-us.yml").read_text(encoding="utf-8")
+
+    assert 'cron: "35 0 * * 1-5"' in cn
+    assert "北京时间 08:35" in cn
+    assert "REPORT_INSTANCE_ID: CN_PREOPEN" in cn
+    assert 'cron: "40 12 * * 1-5"' in us
+    assert 'cron: "40 13 * * 1-5"' in us
+    assert "美东时间 08:40" in us
+    assert "REPORT_INSTANCE_ID: US_PREOPEN" in us
+    assert "Select active New York DST schedule" in us
+    assert "Run Stone AI Investment Manager Pro V12.7.1 Final Freeze" in cn
+    assert "Run Stone AI Investment Manager Pro V12.7.1 Final Freeze" in us
 
 
 def test_user_facing_repository_version_is_v12_7_1_final_freeze() -> None:

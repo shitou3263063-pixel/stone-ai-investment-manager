@@ -194,6 +194,8 @@ def build_report_metadata(
         "actual_trade_date": actual_trade_dates[-1] if actual_trade_dates else None,
         "actual_trade_dates": actual_trade_dates,
         "report_run_mode": run_mode,
+        "report_run_label": label or None,
+        "report_instance_id": str(os.getenv("REPORT_INSTANCE_ID") or "").strip() or None,
         "report_run_mode_label": {
             "SCHEDULED": "自动定时运行",
             "MANUAL_RECONCILIATION": "手动补运行",
