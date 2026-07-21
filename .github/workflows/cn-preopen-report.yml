@@ -1,0 +1,119 @@
+name: A Share Pre-open Report
+
+on:
+  schedule:
+    - cron: "35 8 * * 1-5"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+
+concurrency:
+  group: stone-ai-cn-preopen-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cn-preopen-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONIOENCODING: utf-8
+      STONE_REPORT_SESSION: CN_PREOPEN
+      STONE_REPORT_TIMEZONE: Asia/Shanghai
+      STONE_REPORT_LABEL: A股开盘前
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_ENABLED: ${{ secrets.OPENAI_ENABLED }}
+      OPENAI_MAX_RETRIES: ${{ secrets.OPENAI_MAX_RETRIES }}
+      OPENAI_TIMEOUT_SECONDS: ${{ secrets.OPENAI_TIMEOUT_SECONDS }}
+      MAX_LLM_RETRIES: ${{ secrets.MAX_LLM_RETRIES }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore CN mail dedup state
+        uses: actions/cache/restore@v4
+        with:
+          path: outputs/.mail_state/cn_preopen
+          key: stone-ai-mail-cn-preopen-${{ github.run_id }}
+          restore-keys: stone-ai-mail-cn-preopen-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Service health check
+        run: python scripts/check_all_services.py
+
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p logs/cn_preopen
+          set -o pipefail
+          pytest 2>&1 | tee logs/cn_preopen/pytest.log
+
+      - name: Run Stone AI Investment Manager Pro V12.7.1 Final Freeze
+        id: production
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p logs/cn_preopen
+          set -o pipefail
+          python main.py 2>&1 | tee logs/cn_preopen/main.log
+
+      - name: Send main.py failure notification email
+        if: always() && steps.production.outcome == 'failure'
+        continue-on-error: true
+        run: python scripts/send_workflow_failure_email.py
+
+      - name: Upload reports and logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stone-ai-cn-preopen-${{ github.run_id }}
+          path: |
+            outputs/
+            logs/cn_preopen/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Save CN mail dedup state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: outputs/.mail_state/cn_preopen
+          key: stone-ai-mail-cn-preopen-${{ github.run_id }}
+
+      - name: Finalize workflow status
+        if: always()
+        shell: bash
+        run: |
+          test_outcome="${{ steps.tests.outcome }}"
+          production_outcome="${{ steps.production.outcome }}"
+          if [[ "$production_outcome" != "success" ]]; then
+            echo "::error::python main.py failed or mail_sent was not true."
+            exit 1
+          fi
+          if [[ "$test_outcome" != "success" ]]; then
+            echo "::error::pytest failed; the production report still ran."
+            exit 1
+          fi
+          echo "Tests, report production, and mail delivery succeeded."
