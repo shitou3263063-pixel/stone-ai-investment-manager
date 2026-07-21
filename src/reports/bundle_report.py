@@ -450,6 +450,16 @@ def render_daily_report(bundle: dict[str, Any]) -> str:
     portfolio = bundle["portfolio_snapshot"]
     metadata = bundle.get("report_metadata", {}) or {}
     issues = bundle["issues"]
+    session_notice: list[str] = []
+    if metadata.get("report_variant") == "MARKET_CLOSED":
+        session_notice = [
+            "## 休市版日报",
+            "",
+            f"- 市场休市：{metadata.get('market_holiday') or '交易所休市'}",
+            f"- 下一交易日：{metadata.get('next_trading_day') or '待确认'}",
+            "- 本报告仅更新数据与风险状态，不生成交易建议。",
+            "",
+        ]
     lines = [
         f"# {bundle['product_version']} 投资日报",
         "",
@@ -459,6 +469,7 @@ def render_daily_report(bundle: dict[str, Any]) -> str:
         f"- 历史成交日期：{metadata.get('actual_trade_date') or '无'}",
         f"- FinalDecisionBundle：`{bundle['bundle_hash']}`",
         "",
+        *session_notice,
         "## 今日总决策",
         "",
         *_today_summary(bundle),

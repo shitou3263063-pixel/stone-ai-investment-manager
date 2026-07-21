@@ -6,7 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.notifier.email_notifier import _build_message, send_daily_reports
-from src.decision.v12_1_decision import _is_dca_execution_day, load_strategy
+from src.decision.v12_1_decision import is_dca_execution_day, load_strategy
+from src.domain.final_decision_bundle import validate_final_decision_bundle
 from src.pipeline import unified_pipeline
 from src.report_session import get_report_session_context
 from src.reports.bundle_report import render_daily_report
@@ -35,6 +36,38 @@ def _mail_fixture(root: Path, session: str) -> Path:
         encoding="utf-8",
     )
     return reports
+
+
+def test_unset_session_defaults_to_regular_and_preserves_report_directory(tmp_path: Path) -> None:
+    context = get_report_session_context(
+        now=datetime.fromisoformat("2026-07-20T08:30:00+08:00"), environ={}
+    )
+    assert context.report_session == "REGULAR"
+    assert context.output_dir(tmp_path) == tmp_path / "reports"
+    assert context.report_filename("daily_report", ".md") == "daily_report.md"
+
+
+def test_regular_cn_and_us_report_artifacts_do_not_overlap(tmp_path: Path) -> None:
+    bundle = _fixture_bundle()
+    validation = validate_final_decision_bundle(bundle)
+    contexts = {
+        "regular": get_report_session_context(
+            now=datetime.fromisoformat("2026-07-20T08:30:00+08:00"), environ={}
+        ),
+        "cn": _context("CN_PREOPEN", "2026-07-20T08:35:00+08:00"),
+        "us": _context("US_PREOPEN", "2026-07-20T08:40:00-04:00"),
+    }
+    for context in contexts.values():
+        target = context.output_dir(tmp_path)
+        assert unified_pipeline.write_report_artifacts(
+            bundle, validation, reports=target, session_context=context
+        ) is True
+
+    assert (tmp_path / "reports" / "daily_report.md").exists()
+    assert (tmp_path / "outputs" / "2026-07-20" / "cn_preopen" / "daily_report_CN_PREOPEN.md").exists()
+    assert (tmp_path / "outputs" / "2026-07-20" / "us_preopen" / "daily_report_US_PREOPEN.md").exists()
+    assert not (tmp_path / "reports" / "daily_report_CN_PREOPEN.md").exists()
+    assert not (tmp_path / "reports" / "daily_report_US_PREOPEN.md").exists()
 
 
 def test_beijing_monday_is_not_skipped_while_new_york_is_still_sunday() -> None:
@@ -136,7 +169,7 @@ def test_weekday_market_holiday_renders_closed_report_instead_of_silence() -> No
 
 def test_existing_holiday_policy_moves_scheduled_dca_to_next_open_day() -> None:
     strategy = load_strategy()
-    assert _is_dca_execution_day(
+    assert is_dca_execution_day(
         datetime.fromisoformat("2026-10-08T08:35:00+08:00").date(),
         strategy,
         "CN_PREOPEN",

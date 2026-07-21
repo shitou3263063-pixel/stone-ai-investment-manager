@@ -19,6 +19,7 @@ from src.portfolio_snapshot import (
     build_portfolio_snapshot,
     trade_reconciliation_missing_fields,
 )
+from src.report_session import get_report_session_context, is_market_trading_day, next_market_trading_day
 from utils.data_loader import load_config, project_root
 from utils.logger import write_log
 
@@ -1734,12 +1735,54 @@ def _scheduled_weeks(strategy: dict[str, Any]) -> list[int]:
     return weeks or [1, 3]
 
 
-def _next_dca_date(day: date, strategy: dict[str, Any]) -> date:
-    weekday = int(strategy["dca"].get("scheduled_weekday", 2))
+def is_dca_execution_day(
+    day: date,
+    strategy: dict[str, Any],
+    report_session: str = "REGULAR",
+) -> bool:
+    """Return whether ``day`` is the configured DCA day for one report session."""
+    dca = strategy["dca"]
+    if not dca.get("enabled", True):
+        return False
+
+    weekday = int(dca.get("scheduled_weekday", 2))
     weeks = _scheduled_weeks(strategy)
+    scheduled_today = day.weekday() == weekday and _week_of_month(day) in weeks
+    session = str(report_session or "REGULAR").strip().upper()
+
+    # REGULAR preserves the historical weekday/week-of-month behavior exactly.
+    if session == "REGULAR" or dca.get("holiday_policy") != "next_valid_trading_day":
+        return scheduled_today
+    if scheduled_today and is_market_trading_day(session, day):
+        return True
+    if not is_market_trading_day(session, day):
+        return False
+
+    # A closed scheduled day moves to the first open market day. Scanning the
+    # preceding two weeks also covers long holiday closures and month boundaries.
+    for offset in range(1, 15):
+        scheduled = day - timedelta(days=offset)
+        if scheduled.weekday() != weekday or _week_of_month(scheduled) not in weeks:
+            continue
+        if is_market_trading_day(session, scheduled):
+            continue
+        if next_market_trading_day(session, scheduled) == day:
+            return True
+    return False
+
+
+# Compatibility for the pre-open baseline introduced before the public name.
+_is_dca_execution_day = is_dca_execution_day
+
+
+def _next_dca_date(
+    day: date,
+    strategy: dict[str, Any],
+    report_session: str = "REGULAR",
+) -> date:
     for offset in range(0, 45):
         candidate = day + timedelta(days=offset)
-        if candidate.weekday() == weekday and _week_of_month(candidate) in weeks:
+        if is_dca_execution_day(candidate, strategy, report_session):
             return candidate
     return day
 
@@ -1773,9 +1816,10 @@ def build_budget_plan(
         snapshot.get("investable_cash"),
         max(0.0, cash_yuan - cash_floor_yuan - live_grid_cash_yuan - reserved_cash_yuan),
     )
-    today = date.today()
-    is_dca_day = strategy["dca"].get("enabled", True) and today.weekday() == int(strategy["dca"].get("scheduled_weekday", 2)) and _week_of_month(today) in _scheduled_weeks(strategy)
-    next_dca = _next_dca_date(today + timedelta(days=1), strategy)
+    report_context = get_report_session_context()
+    today = report_context.local_report_date
+    is_dca_day = is_dca_execution_day(today, strategy, report_context.report_session)
+    next_dca = _next_dca_date(today + timedelta(days=1), strategy, report_context.report_session)
     bond_excess = max(0.0, bond_yuan - bond_target_yuan)
     bond_month_cap = min(float(strategy["budget"]["bond_to_equity_monthly_cap_yuan"]), bond_excess)
 

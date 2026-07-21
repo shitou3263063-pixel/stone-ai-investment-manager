@@ -12,6 +12,7 @@ import ssl
 import time
 from typing import Any
 
+from src.report_session import ReportSessionContext
 from utils.logger import write_log
 
 
@@ -253,6 +254,7 @@ def _build_message(
     body: str,
     attachments: list[Path],
     html_body: str | None,
+    report_session: str = "REGULAR",
 ) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -266,11 +268,15 @@ def _build_message(
         if not path.exists():
             continue
         is_json = path.suffix.lower() == ".json"
+        session = str(report_session or "REGULAR").strip().upper()
+        filename = path.name
+        if session != "REGULAR" and not path.stem.endswith(f"_{session}"):
+            filename = f"{path.stem}_{session}{path.suffix}"
         msg.add_attachment(
             path.read_bytes(),
             maintype="application" if is_json else "text",
             subtype="json" if is_json else "markdown",
-            filename=path.name,
+            filename=filename,
         )
     return msg
 
@@ -281,6 +287,7 @@ def _send_email(
     body: str,
     attachments: list[Path],
     html_body: str | None = None,
+    report_session: str = "REGULAR",
 ) -> None:
     config = dict(config)
     port = _bounded_int(config.get("SMTP_PORT", ""), int(DEFAULT_SMTP_PORT), minimum=1, maximum=65535)
@@ -290,7 +297,7 @@ def _send_email(
     config.setdefault("SMTP_CONNECT_TIMEOUT_SECONDS", str(DEFAULT_CONNECT_TIMEOUT_SECONDS))
     config.setdefault("SMTP_SEND_TIMEOUT_SECONDS", str(DEFAULT_SEND_TIMEOUT_SECONDS))
     config.setdefault("SMTP_MAX_RETRIES", str(DEFAULT_MAX_RETRIES))
-    msg = _build_message(config, subject, body, attachments, html_body)
+    msg = _build_message(config, subject, body, attachments, html_body, report_session)
     retries = _bounded_int(config["SMTP_MAX_RETRIES"], DEFAULT_MAX_RETRIES, minimum=0, maximum=2)
 
     for attempt in range(retries + 1):
@@ -489,24 +496,32 @@ def send_daily_reports(
     reports_dir: Path | None = None,
     subject_date: date | None = None,
     env_path: Path | None = None,
+    *,
+    session_context: ReportSessionContext | None = None,
+    dedupe_marker: Path | None = None,
 ) -> dict[str, Any]:
     config = _get_email_config(env_path)
     if not config:
         message = "邮件未配置，跳过发送"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message, "error": ""}
+        return {"sent": False, "skipped": True, "attempted": False, "deduplicated": False, "message": message, "error": ""}
 
     reports_path = reports_dir or PROJECT_ROOT / "reports"
-    today_action_path = reports_path / "today_action.md"
-    daily_path = reports_path / "daily_report.md"
-    weekly_path = reports_path / "weekly_report.md"
+    if session_context is None:
+        attachments = [
+            reports_path / "today_action.md",
+            reports_path / "daily_report.md",
+            reports_path / "weekly_report.md",
+            reports_path / "run_status.json",
+        ]
+    else:
+        attachments = session_context.email_attachment_paths(reports_path)
     run_status_path = reports_path / "run_status.json"
-    attachments = [today_action_path, daily_path, weekly_path, run_status_path]
     missing = [path.name for path in attachments if not path.exists()]
     if missing:
         message = f"固定邮件附件缺失，跳过发送：{', '.join(missing)}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message, "error": message}
+        return {"sent": False, "skipped": True, "attempted": False, "deduplicated": False, "message": message, "error": message}
 
     try:
         run_status = json.loads(run_status_path.read_text(encoding="utf-8"))
@@ -514,12 +529,35 @@ def send_daily_reports(
         safe = EmailDeliveryError("UNKNOWN_ERROR", "attachment_read", f"run_status.json无法读取（{type(exc).__name__}）。")
         message = f"run_status.json 无法读取，跳过发送：{safe}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": False, "skipped": True, "message": message, "error": str(safe)}
+        return {"sent": False, "skipped": True, "attempted": False, "deduplicated": False, "message": message, "error": str(safe)}
 
     action = run_status.get("today_action", {}) or {}
     has_issue = bool(run_status.get("warnings") or run_status.get("errors"))
     run_label = os.getenv("REPORT_RUN_LABEL", "").strip()
-    email_subject = f"{DAILY_EMAIL_SUBJECT} | {run_label}" if run_label else DAILY_EMAIL_SUBJECT
+    session = session_context.report_session if session_context is not None else "REGULAR"
+    if session_context is not None and session != "REGULAR":
+        email_subject = f"{DAILY_EMAIL_SUBJECT} | {session_context.report_label} | {(subject_date or session_context.local_report_date).isoformat()}"
+        run_label = session_context.report_label
+    else:
+        email_subject = f"{DAILY_EMAIL_SUBJECT} | {run_label}" if run_label else DAILY_EMAIL_SUBJECT
+
+    if dedupe_marker is not None and session != "REGULAR" and dedupe_marker.exists():
+        try:
+            prior = json.loads(dedupe_marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            prior = {}
+        if prior.get("dedupe_key") == session_context.dedupe_key and prior.get("sent") is True:
+            message = f"邮件已在当前报告时段发送，跳过重复发送：{email_subject}"
+            write_log(message, filename="email_notifier.log")
+            return {
+                "sent": True,
+                "skipped": True,
+                "attempted": False,
+                "deduplicated": True,
+                "subject": email_subject,
+                "message": message,
+                "error": "",
+            }
     plain_body = "\n".join(
         [
             f"运行时段：{run_label or '本地或未标记运行'}",
@@ -535,9 +573,39 @@ def send_daily_reports(
     )
 
     try:
-        _send_email(config, email_subject, plain_body, attachments, _html_body(email_subject, plain_body))
+        _send_email(
+            config,
+            email_subject,
+            plain_body,
+            attachments,
+            _html_body(email_subject, plain_body),
+            session,
+        )
+        if dedupe_marker is not None and session_context is not None and session != "REGULAR":
+            try:
+                dedupe_marker.parent.mkdir(parents=True, exist_ok=True)
+                dedupe_marker.write_text(
+                    json.dumps(
+                        {"dedupe_key": session_context.dedupe_key, "sent": True, "subject": email_subject},
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+            except OSError as exc:
+                write_log(f"邮件已发送，但去重状态写入失败：{type(exc).__name__}", filename="email_notifier.log")
         message = f"邮件已发送到 {_mask_email(config['EMAIL_TO'])}"
         write_log(message, filename="email_notifier.log")
-        return {"sent": True, "skipped": False, "message": message, "error": ""}
+        return {
+            "sent": True,
+            "skipped": False,
+            "attempted": True,
+            "deduplicated": False,
+            "subject": email_subject,
+            "message": message,
+            "error": "",
+        }
     except Exception as exc:  # noqa: BLE001
-        return _failure_result("邮件发送失败，已记录错误", exc)
+        result = _failure_result("邮件发送失败，已记录错误", exc)
+        result.update(attempted=True, deduplicated=False, subject=email_subject)
+        return result

@@ -10,6 +10,12 @@ from zoneinfo import ZoneInfo
 
 
 SESSION_SPECS = {
+    "REGULAR": {
+        "timezone": "Asia/Shanghai",
+        "label": "",
+        "slug": "regular",
+        "market": "CN",
+    },
     "CN_PREOPEN": {
         "timezone": "Asia/Shanghai",
         "label": "A股开盘前",
@@ -157,7 +163,25 @@ class ReportSessionContext:
         return next_market_trading_day(self.report_session, self.local_report_date)
 
     def output_dir(self, project_root: Path) -> Path:
+        if self.report_session == "REGULAR":
+            return project_root / "reports"
         return project_root / "outputs" / self.local_report_date.isoformat() / self.output_slug
+
+    def report_filename(self, stem: str, suffix: str) -> str:
+        if self.report_session == "REGULAR":
+            return f"{stem}{suffix}"
+        return f"{stem}_{self.report_session}{suffix}"
+
+    def report_path(self, reports_dir: Path, stem: str, suffix: str) -> Path:
+        return reports_dir / self.report_filename(stem, suffix)
+
+    def email_attachment_paths(self, reports_dir: Path) -> list[Path]:
+        return [
+            self.report_path(reports_dir, "today_action", ".md"),
+            self.report_path(reports_dir, "daily_report", ".md"),
+            self.report_path(reports_dir, "weekly_report", ".md"),
+            reports_dir / "run_status.json",
+        ]
 
     def delivery_marker(self, project_root: Path) -> Path:
         return (
@@ -188,7 +212,7 @@ def get_report_session_context(
     environ: Mapping[str, str] | None = None,
 ) -> ReportSessionContext:
     env = environ if environ is not None else os.environ
-    session = str(env.get("STONE_REPORT_SESSION") or "CN_PREOPEN").strip().upper()
+    session = str(env.get("STONE_REPORT_SESSION") or "REGULAR").strip().upper()
     if session not in SESSION_SPECS:
         raise ValueError(f"Unsupported STONE_REPORT_SESSION: {session}")
     spec = SESSION_SPECS[session]
