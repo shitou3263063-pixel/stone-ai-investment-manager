@@ -64,28 +64,20 @@ def test_manual_reconciliation_uses_run_date_not_trade_date() -> None:
 
 
 def test_dqs_gate_is_separate_from_final_trade_permission() -> None:
-    dqs = {
-        "use_cases": {
-            "scheduled_dca": {
-                "score": 75,
-                "threshold": 65,
-                "allowed": True,
-                "inputs": {"核心价格": True, "预算状态": True, "事件状态": True},
-            }
-        }
-    }
+    dqs = {"use_cases": {"scheduled_dca": {"score": 75, "threshold": 65, "normal_execution_dqs": 75}}}
     gates = build_trade_permission_gates(
         dqs,
         {"is_dca_day": False, "confirmed_cash_available_yuan": 21000},
         {"score": 45},
-        {"has_high_event_next_7_days": False},
+        {"status": "VALID_NO_HIGH_IMPACT_EVENT", "event_gate_passed": True, "reasons": []},
     )
-    assert gates["dqs_gate_passed"] is True
-    assert gates["schedule_gate_passed"] is False
-    assert gates["cash_gate_passed"] is True
-    assert gates["risk_gate_passed"] is True
+    scheduled = gates["contexts"]["scheduled_dca"]
+    assert scheduled["dqs_gate_passed"] is True
+    assert scheduled["schedule_gate_passed"] is False
+    assert scheduled["cash_gate_passed"] is True
+    assert scheduled["risk_gate_passed"] is True
     assert gates["final_trade_permission"] is False
-    assert "计划定投窗口" in gates["denial_reason"]
+    assert scheduled["rejection_reasons"]
 
 
 def test_market_risk_weights_sum_to_100_and_missing_breadth_is_neutral() -> None:
@@ -137,37 +129,17 @@ def test_three_comparability_scopes_share_one_non_comparable_count() -> None:
 
 
 def test_missing_trade_fields_remain_warn_without_estimation() -> None:
-    summary = build_trade_reconciliation_summary(
-        _snapshot(_trade()),
-        {"items": {"VOO": {"current_price": 700}}},
-    )
+    summary = build_trade_reconciliation_summary(_snapshot(_trade()), {"items": {"VOO": {"current_price": 700}}})
     assert summary["status"] == "WARN"
-    assert set(summary["missing_fields"]) == {
-        "trade_datetime",
-        "quantity",
-        "actual_fx_rate_cny_per_usd",
-        "fee",
-    }
+    assert set(summary["missing_fields"]) == {"trade_datetime", "quantity", "actual_fx_rate_cny_per_usd", "fee"}
     assert summary["auto_recalculated"] is False
-    assert summary["voo_total_quantity"] is None
-    assert summary["voo_latest_market_value_cny"] is None
+    assert summary["transactions"][0]["position_total_quantity"] is None
 
 
-def test_completed_trade_fields_trigger_automatic_recalculation() -> None:
-    trade = _trade(
-        trade_datetime="2026-07-15T10:30:00-04:00",
-        quantity=2,
-        actual_fx_rate_cny_per_usd=7.2,
-        fee=5,
-    )
-    summary = build_trade_reconciliation_summary(
-        _snapshot(trade),
-        {"items": {"VOO": {"current_price": 700}}},
-    )
+def test_completed_trade_fields_are_reconciled_without_report_recalculation() -> None:
+    trade = _trade(trade_datetime="2026-07-15T10:30:00-04:00", quantity=2, actual_fx_rate_cny_per_usd=7.2, fee=5)
+    summary = build_trade_reconciliation_summary(_snapshot(trade), {"items": {"VOO": {"current_price": 700}}})
     assert summary["status"] == "PASS"
     assert summary["transaction_reconciliation_quality"] == 100
-    assert summary["auto_recalculated"] is True
-    assert summary["voo_total_quantity"] == 30
-    assert summary["voo_latest_market_value_cny"] == 151200
-    assert summary["us_stock_total_market_value_cny"] == 351200
-    assert sum(summary["asset_allocation_ratios"].values()) == 1.0
+    assert summary["auto_recalculated"] is False
+    assert summary["transactions"][0]["actual_fx_rate_cny_per_usd"] == 7.2

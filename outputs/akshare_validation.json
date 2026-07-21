@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T02:31:34+08:00",
+  "generated_at": "2026-07-21T01:55:28+08:00",
   "akshare_status": "partial",
   "akshare_version": "1.18.64",
   "akshare_trade_calendar_status": "ok",
@@ -7,7 +7,7 @@
   "akshare_002558_fundamental_status": "ok",
   "akshare_csi300_valuation_status": "ok",
   "akshare_source_conflicts": [],
-  "akshare_last_success_at": "2026-07-19T02:31:34+08:00",
+  "akshare_last_success_at": "2026-07-21T01:55:28+08:00",
   "circuit_state": {
     "interfaces": {
       "trade_calendar": 0,
@@ -16,7 +16,7 @@
       "002558_fundamental": 0,
       "002558_cashflow": 3,
       "csi300_valuation": 0,
-      "002558_history": 3,
+      "002558_history": 0,
       "510300_history": 3,
       "513060_history": 3,
       "513090_history": 3,
@@ -25,7 +25,7 @@
     },
     "underlying_providers": {
       "sina_finance": 0,
-      "eastmoney": 15,
+      "eastmoney": 9,
       "csindex_official": 0
     },
     "failure_threshold": 3

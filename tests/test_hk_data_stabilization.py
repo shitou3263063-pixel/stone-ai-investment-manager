@@ -6,6 +6,7 @@ import pytest
 
 from src.data_sources import akshare_client, hkma_client
 from src.reports.report_center import build_run_status
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 def test_03033_and_hstech_use_distinct_sina_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -106,37 +107,8 @@ def test_hkma_proxy_failure_opens_dataset_circuit(monkeypatch: pytest.MonkeyPatc
     assert calls["count"] == count_after_first
 
 
-def test_run_status_exposes_hk_dates_and_sources() -> None:
-    decision = {
-        "date": "2026-07-15", "generated_at": "2026-07-15T08:30:00+08:00",
-        "data_cutoff": "2026-07-15T08:29:00+08:00", "portfolio_value_yuan": 2821100,
-        "today_trade": False, "trade_type": "无操作", "targets": "不适用",
-        "funding_source": "不适用", "next_review_date": "2026-07-16",
-        "no_trade_reasons": ["测试"], "market_table": [], "opportunity": [],
-        "dqs": {"score": 65, "mode_label": "方向", "blocking_errors": []},
-        "risk": {"score": 60, "level": "中高风险"},
-        "budget": {"today_total_yuan": 0, "account_total_cash_yuan": 220000,
-                   "cash_safety_reserve_yuan": 220000, "investable_cash_yuan": 0},
-        "consistency": {"errors": [], "warnings": []},
-        "cn_hk_analysis_completeness": {
-            "cn_analysis_completeness": {"score_pct": 90},
-            "hk_analysis_completeness": {"score_pct": 65},
-        },
-        "cn_hk_p1a": {
-            "tushare": {},
-            "akshare": {"market_references": {
-                "03033.HK": {"status": "ok", "market_date": "2026-07-14", "underlying_provider": "sina_finance"},
-                "HSTECH": {"status": "ok", "market_date": "2026-07-14", "underlying_provider": "sina_finance"},
-            }},
-            "hkma": {"datasets": {
-                "hibor": {"status": "ok", "market_date": "2026-06-30", "freshness": "stale"},
-                "exchange_rate": {"status": "ok", "market_date": "2026-06-30", "freshness": "stale"},
-            }},
-        },
-    }
-    status = build_run_status(decision, report_files=[], email_status="skipped")
-    hk = status["cn_hk_p1a"]
-    assert hk["akshare_03033_history_date"] == "2026-07-14"
-    assert hk["akshare_hstech_history_date"] == "2026-07-14"
-    assert hk["hkma_hibor_date"] == "2026-06-30"
-    assert hk["hkma_hibor_freshness"] == "stale"
+def test_run_status_exposes_canonical_bundle_hash() -> None:
+    bundle = _fixture_bundle()
+    status = build_run_status(bundle, report_files=[], email_status="skipped")
+    assert status["bundle_hash"] == bundle["bundle_hash"]
+    assert status["data_cutoff_time"] == bundle["data_cutoff_at"]

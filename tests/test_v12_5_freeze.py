@@ -11,6 +11,7 @@ from src.decision.v12_1_decision import build_v12_1_decision
 from src.macro.macro_calendar import analyze_macro_calendar
 from src.portfolio_snapshot import build_portfolio_snapshot
 from src.reports.report_center import generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 from tests.test_v12_5_stable import _live_market, _portfolio_result
 
 
@@ -123,32 +124,16 @@ def test_single_production_entrypoint() -> None:
         if "archive" not in path.parts and ".venv" not in path.parts and "venv" not in path.parts
     ]
     assert production_main_files == [PROJECT_ROOT / "main.py"]
-    assert "from src.app import main" in (PROJECT_ROOT / "main.py").read_text(encoding="utf-8")
+    assert "from src.pipeline.unified_pipeline import main" in (PROJECT_ROOT / "main.py").read_text(encoding="utf-8")
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
     assert "python main.py 2>&1 | tee logs/main.log" in workflow
     assert "python src/main.py" not in workflow
 
 
 def test_report_required_sections() -> None:
-    report = generate_daily_report(decision=_decision())
-    required = [
-        "## 0. 报告状态",
-        "## 1. 今日决策卡",
-        "## 2. 已执行交易事实",
-        "## 3. 资产配置偏离",
-        "## 4. 下一触发条件",
-        "## 5. 异常与待补数据",
-        "## 附录 A. 市场吸引力与组合修复优先级",
-        "## 附录 B. 正式持仓与白名单",
-        "## 附录 C. 市场、宏观与研究数据",
-        "## 附录 D. DQS、风险门槛与可比较性",
-        "## 附录 E. 事件、压力测试与模拟网格",
-        "## 附录 F. 系统状态、来源与一致性",
-    ]
-    for heading in required:
-        assert heading in report
-
-
+    report = generate_daily_report(decision=_fixture_bundle())
+    for section in ["今日场景决策", "数据质量评分", "统一真实资产快照", "事件与数据状态", "附录：统一快照引用"]:
+        assert section in report
 def test_data_source_fallback() -> None:
     cached = {
         "close": 500.0,

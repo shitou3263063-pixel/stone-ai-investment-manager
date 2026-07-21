@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
 from typing import Any
 
-from src.macro.macro_calendar import get_upcoming_high_risk_events
+from src.decision.scenario_dependencies import scenario_dependency
 
 from .models import GridSignal, GridSymbolState, RiskReview
 from .position_manager import estimate_tech_exposure_yuan
-
-
-def _event_within_48h(events: list[dict[str, Any]], as_of: date | datetime | None = None) -> bool:
-    """Grid uses the same authoritative selector as risk and reporting."""
-    return bool(get_upcoming_high_risk_events(as_of or date.today(), hours=48, events=events))
 
 
 def review_grid_signal(
@@ -19,7 +13,7 @@ def review_grid_signal(
     signal: GridSignal,
     state: GridSymbolState,
     decision: dict[str, Any],
-    portfolio_result: dict[str, Any],
+    portfolio_snapshot: dict[str, Any],
     grid_budget: dict[str, Any],
     config: dict[str, Any],
     symbol_cfg: dict[str, Any],
@@ -46,13 +40,14 @@ def review_grid_signal(
         reasons.append("现金低于或接近安全线，禁止新增买入。")
     if grid_budget.get("live_available_yuan", 0) <= 0 and signal.action == "BUY" and not paper_mode:
         reasons.append("实盘网格预算不足。")
-    decision_as_of: date | datetime
-    try:
-        decision_as_of = datetime.fromisoformat(str(decision.get("generated_at")).replace("Z", "+00:00")) if decision.get("generated_at") else date.fromisoformat(str(decision.get("date")))
-    except (TypeError, ValueError):
-        decision_as_of = date.today()
-    if _event_within_48h(decision.get("events", []), decision_as_of):
-        reasons.append("未来48小时内存在高等级宏观事件，进入谨慎模式。")
+    event_assessment = decision["event_assessment"]
+    event_policy = scenario_dependency("grid")
+    if (
+        not paper_mode
+        and event_policy.get("requires_event_data_for_live")
+        and not event_assessment["event_gate_passed"]
+    ):
+        reasons.extend(str(reason) for reason in event_assessment.get("reasons", []) or [])
     if signal.action == "BUY" and state.month_trade_count >= int(risk_cfg.get("max_monthly_trades_per_symbol", 8)):
         reasons.append("本月该标的网格交易次数已达上限。")
     if signal.action in {"BUY", "SELL"} and state.day_trade_count >= int(symbol_cfg.get("max_daily_trades", 1)):
@@ -72,7 +67,7 @@ def review_grid_signal(
             or decision.get("portfolio_value_yuan", 0)
             or 0
         )
-        exposure = estimate_tech_exposure_yuan(portfolio_result)
+        exposure = estimate_tech_exposure_yuan(portfolio_snapshot)
         limit_pct = float(symbol_cfg.get("tech_concentration_limit_pct", 18) or 18)
         if total_assets and exposure / total_assets * 100 >= limit_pct:
             reasons.append(f"科技风险暴露约{exposure / total_assets * 100:.1f}%，达到QQQ网格限制。")

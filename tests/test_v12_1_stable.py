@@ -14,6 +14,7 @@ from src.decision.v12_1_decision import (
     load_strategy,
 )
 from src.reports.report_center import generate_daily_report
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 def _portfolio() -> dict:
@@ -188,16 +189,11 @@ class V121StableTest(unittest.TestCase):
         self.assertIn("Stone AI Investment Manager Pro V12.7.1 Final Freeze", encoded)
 
     def test_report_fields_complete(self) -> None:
-        decision = build_v12_1_decision(
-            portfolio_result=_portfolio(),
-            live_market_result=self.live,
-            macro_result={"has_high_event_next_7_days": False, "upcoming_events": []},
-            ai_advice_result={"ai_status": "rule_only", "fallback_reason": "test", "summary": "规则模式"},
-        )
-        report = generate_daily_report(decision=decision)
-        self.assertIn("## 附录 F. 系统状态、来源与一致性", report)
-        self.assertNotIn("|  |", report)
-
+        bundle = _fixture_bundle()
+        report = generate_daily_report(decision=bundle)
+        for field in ["今日场景决策", "数据质量评分", "统一真实资产快照", "FinalDecisionBundle"]:
+            self.assertIn(field, report)
+        self.assertIn(bundle["bundle_hash"], report)
     def test_suggestion_does_not_violate_dqs(self) -> None:
         decision = build_v12_1_decision(
             portfolio_result=_portfolio(),

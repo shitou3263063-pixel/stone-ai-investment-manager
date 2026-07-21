@@ -1,20 +1,21 @@
-# Stone CIO 今日执行单
+# 今日决策卡
+Bundle: `8d531f9dfcc94fedcfa283255a4af7e058fe7e0430eb2a6c132e3e17182ac8fd`
 
-- 报告日期：2026-07-19
-- 数据截止时间：2026-07-19T02:32:02+08:00
-- 今日是否执行：否
+- 今日是否操作：不执行真实交易
+- 是否定投：否
+- 是否主动加仓：否
+- 是否调仓：只进行资产偏离评估，不执行调仓
+- 是否暂停：否；继续监控与评估
+- 最主要的三条原因：
+  1. 当前不在计划执行窗口
+  2. opportunity_dqs=65低于门槛85
+  3. 风险分数53高于场景上限50
 
-- 操作类型：历史实盘交易（交易日2026-07-15，本报告仅补运行/对账）
-- 标的：不适用
-- 金额或金额区间：0元
-- 资金来源：真实可执行资金口径；2026-07-15到期债券资金；不占用固定现金安全储备
-- 交易前账户现金：不适用
-- 执行后账户现金余额：241,000元
-- 固定现金安全储备：220,000元
-- DQS用途拆分：core_dqs=75（Scheduled DCA/持仓/风险）；opportunity_dqs=55（Opportunity Add/跨资产）；execution_dqs=100（成交/现金/汇率/持仓对账）
-- Risk Score：56（中高风险）
-- Opportunity Score：沪深300ETF 72分（等待条件，今日不交易）
-- 下一复核日期：2026-07-20T08:30:00+08:00
-- 不执行的核心原因：今日不是基础定投执行日；opportunity_dqs=55，仅限制Opportunity Add，不影响Scheduled DCA独立判断
-
-- 数据异常或资产基线冲突：无
+| 场景 | 使用DQS | 得分/门槛 | 风险门槛 | 数据状态 | 最终权限 | 硬阻断原因 | 软警告 | 下一步动作 |
+|---|---|---:|---:|---|---|---|---|---|
+| Scheduled DCA | core_dqs | 100/65 | 53/70 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | DENY | 当前不在计划执行窗口 | 无 | 满足硬阻断条件后重新评估 |
+| Opportunity Add | opportunity_dqs | 65/85 | 53/50 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | DENY | opportunity_dqs=65低于门槛85；风险分数53高于场景上限50 | 无 | 满足硬阻断条件后重新评估 |
+| Strategic Rebalance | rebalance_dqs | 94/75 | 53/70 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | ALLOW_EVALUATION_ONLY | 无 | 仅输出资产偏离与修复方向，不生成即时成交指令 | 输出偏离与修复优先级，不生成成交指令 |
+| Grid Trading | grid_dqs | 0/85 | 53/50 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=BLOCK | DENY | grid_dqs=0低于模拟信号门槛85；grid_snapshot_comparability=DATA_NOT_COMPARABLE；实盘限制：实盘网格现金为0；风险分数53高于实盘上限50 | Smart Grid固定为SIMULATION_ONLY，模拟资金与实盘隔离 | 满足硬阻断条件后重新评估 |
+| Risk Monitoring | core_dqs | 100/1 | 53/100 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | ACTIVE | 无 | 无 | 持续监控并更新风险明细 |
+| Transaction Reconciliation | execution_dqs | 100/100 | 53/100 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | PASS | 无 | 无 | 对账通过，无需事件数据复核 |

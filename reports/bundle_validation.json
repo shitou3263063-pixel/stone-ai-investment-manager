@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "status": "PASS",
+  "errors": [],
+  "checks": {
+    "dqs_total_equals_breakdown": true,
+    "positions_unique_by_security_id": true,
+    "asset_totals_reconcile": true,
+    "valuation_totals_and_coverage_reconcile": true,
+    "investable_portfolio_totals_reconcile": true,
+    "cost_records_excluded_from_market_value": true,
+    "deny_requires_rejection_reason": true,
+    "allowed_has_no_failed_gate": true,
+    "event_insufficient_cannot_pass": true,
+    "event_insufficient_has_audit_details": true,
+    "scenario_event_gates_use_dependency_policy": true,
+    "all_permission_surfaces_share_scenario_decision": true,
+    "main_and_appendix_share_bundle_hash": true,
+    "simulation_excluded_from_real_portfolio": true,
+    "market_freshness_comparability_are_independent": true,
+    "warning_counts_have_distinct_semantics": true,
+    "risk_score_equals_component_contributions": true,
+    "dqs_insufficient_has_missing_details": true,
+    "incomplete_valuation_cannot_get_full_rebalance_timeliness": true,
+    "bundle_hash_valid": true
+  }
+}

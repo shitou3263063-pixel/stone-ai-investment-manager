@@ -6,10 +6,11 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from src.app import write_weekly_report_if_due
+from src.reports.bundle_report import render_period_report
 from src.notifier.email_notifier import DAILY_EMAIL_SUBJECT, _send_email, send_daily_reports
 from src.reports.report_center import build_run_status, generate_today_action
 from tests.test_v12_5_freeze import _decision
+from tests.test_final_decision_bundle import _fixture_bundle
 
 
 FIXED_REPORTS = [
@@ -26,7 +27,7 @@ def _write_email_fixture(root: Path) -> Path:
     (reports / "today_action.md").write_text("# action", encoding="utf-8")
     (reports / "daily_report.md").write_text("# daily", encoding="utf-8")
     (reports / "weekly_report.md").write_text("# weekly", encoding="utf-8")
-    status = build_run_status(_decision(), report_files=FIXED_REPORTS, email_status="sent")
+    status = build_run_status(_fixture_bundle(), report_files=FIXED_REPORTS, email_status="sent")
     (reports / "run_status.json").write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
     (root / ".env").write_text(
         "SMTP_HOST=smtp.example.com\nSMTP_PORT=465\nSMTP_USER=test@example.com\n"
@@ -36,79 +37,28 @@ def _write_email_fixture(root: Path) -> Path:
     return reports
 
 
-def test_today_action_is_compact_and_has_only_required_fields() -> None:
-    text = generate_today_action(_decision())
-    required = [
-        "报告日期",
-        "数据截止时间",
-        "今日是否执行",
-        "操作类型",
-        "标的",
-        "金额或金额区间",
-        "资金来源",
-        "执行后账户现金余额",
-        "固定现金安全储备",
-        "core_dqs",
-        "opportunity_dqs",
-        "execution_dqs",
-        "Risk Score",
-        "Opportunity Score",
-        "下一复核日期",
-        "不执行的核心原因",
-        "数据异常或资产基线冲突",
-    ]
-    for field in required:
-        assert field in text
-    assert len(text.splitlines()) <= 20
-    assert "最大风险" not in text
-    assert "下一触发条件" not in text
+def test_today_action_reads_final_bundle_only() -> None:
+    bundle = _fixture_bundle()
+    text = generate_today_action(bundle)
+    assert bundle["bundle_hash"] in text
+    for row in bundle["scenario_decisions"]:
+        assert row["scenario_name"] in text
+        assert row["final_permission"] in text
 
 
-def test_run_status_contains_fixed_contract_and_baseline_separation() -> None:
-    status = build_run_status(_decision(), report_files=FIXED_REPORTS, email_status="sent")
-    required = {
-        "run_time",
-        "data_cutoff_time",
-        "report_date",
-        "status",
-        "dqs",
-        "risk_score",
-        "total_assets",
-        "total_cash",
-        "cash_safety_reserve",
-        "investable_cash",
-        "today_action",
-        "report_files",
-        "email_status",
-        "warnings",
-        "errors",
-    }
+def test_run_status_contains_fixed_contract_and_bundle_hash() -> None:
+    bundle = _fixture_bundle()
+    status = build_run_status(bundle, report_files=FIXED_REPORTS, email_status="sent")
+    required = {"run_time", "data_cutoff_time", "report_date", "status", "bundle_hash", "dqs", "risk_score", "total_assets", "total_cash", "cash_safety_reserve", "investable_cash", "today_action", "report_files", "email_status", "warnings", "errors"}
     assert required <= status.keys()
-    assert status["total_assets"] == 2_821_100
-    assert status["total_cash"] == 241_000
-    assert status["cash_safety_reserve"] == 220_000
-    assert status["investable_cash"] == 21_000
-    assert status["fund_classification"]["unsettled_bond_cash"] == 0
-    assert status["fund_classification"]["actual_arrived_bond_cash"] == 30_000
-    assert status["fund_classification"]["remaining_bond_to_equity_cash"] == 21_000
-    assert status["fund_classification"]["simulated_grid_cash"] == 0
-    assert status["fund_classification"]["real_executable_today"] == 0
+    assert status["bundle_hash"] == bundle["bundle_hash"]
+    assert status["total_assets"] == bundle["portfolio_snapshot"]["total_valued_assets"]
     assert status["report_files"] == FIXED_REPORTS
 
 
-def test_weekly_report_only_refreshes_on_sunday() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        reports = Path(tmp)
-        weekly = reports / "weekly_report.md"
-        weekly.write_text("existing weekly report", encoding="utf-8")
-        monday = write_weekly_report_if_due(reports, _decision(), date(2026, 7, 13))
-        assert monday["updated"] is False
-        assert weekly.read_text(encoding="utf-8") == "existing weekly report"
-
-        sunday = write_weekly_report_if_due(reports, _decision(), date(2026, 7, 19))
-        assert sunday["updated"] is True
-        assert "报告所属周" in weekly.read_text(encoding="utf-8")
-
+def test_weekly_report_uses_final_bundle() -> None:
+    bundle = {"bundle_type": "FinalDecisionBundle", "bundle_hash": "abc", "scenario_decisions": []}
+    assert "FinalDecisionBundle: `abc`" in render_period_report(bundle, "Weekly")
 
 def test_email_subject_body_and_attachments_are_fixed() -> None:
     with tempfile.TemporaryDirectory() as tmp:

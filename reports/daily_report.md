@@ -1,469 +1,247 @@
-# Stone AI Investment Manager Pro V12.7.1 Final Freeze 日报（重新运行）
-
-## 0. 报告状态
-
-- 业务日期：2026-07-19
-- 运行模式：RERUN（重新运行）
-- 生成时间：2026-07-19T02:32:02+08:00
-- 数据截止时间：2026-07-19T02:32:02+08:00
-- core_dqs=75：用于Scheduled DCA、持仓判断和风险监控
-- opportunity_dqs=55：用于Opportunity Add、跨资产比较和机会加仓
-- execution_dqs=100：用于成交、现金、汇率和持仓对账
-- rebalance_dqs=100：仅用于Strategic Rebalance
-- grid_dqs=0：仅用于Grid Trading（SIMULATION_ONLY）
-- 是否存在暂估数据：是
-- 全局最终交易权限：DENY（来源场景：Scheduled DCA）
-- 历史实盘交易日期：2026-07-15
-- 所有真实交易均须用户人工确认；系统不自动交易。
-
-> **成交事实对账已独立判断；仍存在待估值成本时，总资产、美股市值和资产占比不作为精确再平衡依据。9,000元成本不冒充实时市值。**
-
-| 操作类型 | 固定DQS | 当前值 | 要求DQS | DQS | 计划 | 现金 | 风险 | 事件 | 可比较 | 最终权限 | 主要拒绝原因 |
-| -- | -- | --: | --: | -- | -- | -- | -- | -- | -- | -- | -- |
-| Scheduled DCA | core_dqs | 75 | 65 | 是 | 否 | 是 | 是 | 是 | 是 | DENY | 当前不是计划定投日（计划定投窗口未开启） |
-| Opportunity Add | opportunity_dqs | 55 | 85 | 否 | 是 | 是 | 否 | 是 | 否 | DENY | DQS 55低于门槛85；Market Risk Score为56，高于Opportunity Add允许上限50；市场风险数据置信度不足，严格场景采用保守阻断；cross_asset_comparability=DATA_NOT_COMPARABLE |
-| Strategic Rebalance | rebalance_dqs | 100 | 75 | 是 | 是 | 是 | 是 | 是 | 是 | ALLOW_EVALUATION_ONLY | 仅允许评估；不得自动生成交易，执行前必须人工确认 |
-| Grid Trading | grid_dqs | 0 | 85 | 否 | 否 | 否 | 否 | 是 | 否 | DENY | DQS 0低于门槛85；Smart Grid为SIMULATION_ONLY，实盘未启用；实盘网格专用现金为0；Market Risk Score为56，高于Grid Trading允许上限50；市场风险数据置信度不足，严格场景采用保守阻断；grid_snapshot_comparability=DATA_NOT_COMPARABLE |
-| Risk Monitoring | core_dqs | 75 | 1 | 是 | 是 | 是 | 是 | 是 | 是 | ALLOW_MONITORING | 无 |
-| Transaction Reconciliation | execution_dqs | 100 | 100 | 是 | 是 | 是 | 是 | 是 | 是 | ALLOW_RECONCILIATION | 无 |
-
-## 1. 今日决策卡
-
-- 今日是否操作：否
-- 操作类型：历史实盘交易（交易日2026-07-15，本报告仅补运行/对账）
-- 标的：不适用
-- 建议金额：0元
-- 资金来源：2026-07-15到期债券资金；不占用固定现金安全储备
-- 可投资现金：21,000元
-- core/opportunity/execution/rebalance/grid DQS：75 / 55 / 100 / 100 / 0；Market Risk Score：56
-- 最大风险：美国10年期收益率最新官方值为4.57%，观察日期2026-07-16；属于官方滞后日度数据，不代表报告生成时的实时收益率；风险评分已降低时效性置信度。
-- 下一复核时间：2026-07-20T08:30:00+08:00
-- 警告：scheduled_dca:事件状态=DATA_INSUFFICIENT；opportunity_add:Put/Call Ratio=NOT_CONNECTED；opportunity_add:市场宽度=NOT_CONNECTED；opportunity_add:ETF资金流=NOT_CONNECTED；opportunity_add:AAII情绪=NOT_CONNECTED；存在pending_valuation_assets；成本记录已从精确估值、资产占比和再平衡偏离中排除。；风险判断使用按发布频率正常滞后的宏观数据：CPIAUCSL；市场风险置信度为low。；cross_asset_comparability=DATA_NOT_COMPARABLE；grid_snapshot_comparability=DATA_NOT_COMPARABLE
-- 错误：无
-
-## 2. 已执行交易事实
-
-| 交易日期 | 成交时间 | 标的 | 数量 | 成交价 | 交易/资金币种 | 美元成交额 | 人民币等值记录 | 成交汇率 | 估值汇率 | fx_status | 对账状态 |
-| -- | -- | -- | --: | -- | -- | --: | --: | -- | -- | -- | -- |
-| 2026-07-15 | 2026-07-15T10:24:00-04:00 | VOO | 2.166 | 692.5 USD | USD / USD | 1499.955 | 9,000元 | NOT_APPLICABLE | DATA_INSUFFICIENT | NOT_APPLICABLE_USD_CASH | PASS |
-
-- VOO交易事实对账：PASS；execution_dqs=100；待补成交字段：无
-- VOO总股数：30.166；VOO最新人民币市值：待最新价格和独立估值汇率齐备
-- 人民币9,000元仅为资金等值/成本记录，不作为实时市值。
-
-- 历史已执行交易：以上记录仅按真实交易日期归档，不冒充今日建议。
-- 今日建议：由第1节和场景权限表单独给出。
-- 条件性计划：仅为未来触发条件，不是当前交易指令。
-- Smart Grid：保持SIMULATION_ONLY，模拟信号不进入实盘资产、现金或建议。
-
-## 3. 资产配置偏离
-
-| 资产类别 | 当前金额 | 当前占比 | 目标金额 | 目标占比 | 偏离金额 | 偏离 | 状态 | 优先级 |
-| -- | -: | -: | -: | -: | -: | -: | -- | -- |
-| 美股 | 330,000元 | 11.74% | 843,630元 | 30.00% | -513,630元 | -18.26% | 严重低配 | 高 |
-| 债券 | 1,155,000元 | 41.07% | 703,025元 | 25.00% | 451,975元 | 16.07% | 严重超配 | 高 |
-| 黄金 | 547,000元 | 19.45% | 421,815元 | 15.00% | 125,185元 | 4.45% | 接近目标 | 低 |
-| 港股 | 272,600元 | 9.69% | 337,452元 | 12.00% | -64,852元 | -2.31% | 接近目标 | 低 |
-| 现金 | 241,000元 | 8.57% | 224,968元 | 8.00% | 16,032元 | 0.57% | 接近目标 | 低 |
-| A股 | 266,500元 | 9.48% | 281,210元 | 10.00% | -14,710元 | -0.52% | 接近目标 | 低 |
-
-- 精确再平衡资产基数：2,812,100元；待估值成本9,000元已排除。
-- 包含成本记录的总资产（非精确估值口径）：2,821,100元。
-
-## 4. 下一触发条件
-
-- 下一个基础定投复核日：2026-08-05；core_dqs<65禁止，65–74仅减额复核，>=75进入正常定投评估。
-- 本月债券资金已到账，剩余专项现金21,000元可分批评估，但不代表必须立即或一次性投入。
-- 若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。
-- 若DQS低于60或关键价格缺失，继续禁止新增仓位建议。
-
-## 5. 异常与待补数据
-
-### 5.1 影响Scheduled DCA的数据缺失
-
-- 事件状态：DATA_INSUFFICIENT；影响Scheduled DCA核心判断。
-
-### 5.2 仅影响Opportunity Add的数据缺失
-
-- Put/Call Ratio：NOT_CONNECTED；仅限制Opportunity Add；不单独阻止Scheduled DCA。
-- 市场宽度：NOT_CONNECTED；仅限制Opportunity Add；不单独阻止Scheduled DCA。
-- ETF资金流：NOT_CONNECTED；仅限制Opportunity Add；不单独阻止Scheduled DCA。
-- AAII情绪：NOT_CONNECTED；仅限制Opportunity Add；不单独阻止Scheduled DCA。
-
-### 5.3 仅影响跨资产排名的数据缺失
-
-- 无（VALID 或 NOT_APPLICABLE）
-
-### 5.4 仅影响成交对账的数据缺失
-
-- 无（VALID 或 NOT_APPLICABLE）
-
-### 5.5 其他一致性警告（非数据缺失分类）
-
-- 不可比较项目17项：cross_asset:002558.SZ、cross_asset:03033.HK、cross_asset:510300.SS、cross_asset:513060.SS、cross_asset:513090.SS、cross_asset:CPIAUCSL、cross_asset:DGS10、cross_asset:DX-Y.NYB、cross_asset:GDP、cross_asset:GLD、cross_asset:QQQ、cross_asset:TLT、cross_asset:UNRATE、cross_asset:VOO、cross_asset:^VIX、grid_snapshot:QQQ、grid_snapshot:VOO
-- scheduled_dca:事件状态=DATA_INSUFFICIENT
-- opportunity_add:Put/Call Ratio=NOT_CONNECTED
-- opportunity_add:市场宽度=NOT_CONNECTED
-- opportunity_add:ETF资金流=NOT_CONNECTED
-- opportunity_add:AAII情绪=NOT_CONNECTED
-- 存在pending_valuation_assets；成本记录已从精确估值、资产占比和再平衡偏离中排除。
-- 风险判断使用按发布频率正常滞后的宏观数据：CPIAUCSL
-- 市场风险置信度为low。
-- cross_asset_comparability=DATA_NOT_COMPARABLE
-- grid_snapshot_comparability=DATA_NOT_COMPARABLE
-
-# 附录
-
-## 附录 A. 市场吸引力与组合修复优先级
-
-- Market Attractiveness Score只评价标的自身；Portfolio Repair Priority单独评价组合偏离与长期资金方向。
-- cross_asset_comparability=DATA_NOT_COMPARABLE；不可比时不生成跨资产统一第一名。
-- 当前组合修复结论：美股宽基是长期第一优先方向；A股标的仅在A股市场内部排名。
-
-| 资产类别 | 当前占比 | 目标占比 | 偏离 | 偏离金额 | 修复方向 | Portfolio Repair Priority | 优先宽基 | 今日权限 |
-| -- | --: | --: | --: | --: | -- | --: | -- | -- |
-| 美股 | 11.74% | 30.00% | -18.3% | -513,630元 | ADD_WITH_NEW_MONEY | 91 | VOO | 否 |
-| 债券 | 41.07% | 25.00% | +16.1% | 451,975元 | REDUCE_OR_PAUSE_NEW_MONEY | 56 | 不适用 | 否 |
-| 黄金 | 19.45% | 15.00% | +4.5% | 125,185元 | REDUCE_OR_PAUSE_NEW_MONEY | 16 | 不适用 | 否 |
-| 港股 | 9.69% | 12.00% | -2.3% | -64,852元 | MAINTAIN | 7 | 南方东英恒生科技指数ETF | 否 |
-| 现金 | 8.57% | 8.00% | +0.6% | 16,032元 | MAINTAIN | 2 | 不适用 | 否 |
-| A股 | 9.48% | 10.00% | -0.5% | -14,710元 | MAINTAIN | 2 | 沪深300ETF | 否 |
-
-| 市场内分组 | 标的 | Market Attractiveness Score | Portfolio Repair Priority | 今日交易权限 | 当前持仓动作 | 可信度 | 最终动作 | 当前持仓 | 主要原因 |
-| -- | -- | ---: | ---: | -- | -- | -- | -- | ---: | -- |
-| A股 | 沪深300ETF | 72 | 3 | 否 | 继续持有 | 可用 | 等待条件，今日不交易 | 206,000元 | A股核心宽基ETF；标的自身原始分67，同市场调整+8，数据调整-3。组合偏离不计入Market Attractiveness Score。 当前仅代表长期配置优先方向，不代表今日买入机会。 |
-| 美股 | VOO | 67 | 91 | 否 | 继续持有 | 可用 | 等待条件，今日不交易 | 130,000元 | 核心宽基ETF，优先用于长期修复美股低配；标的自身原始分62，同市场调整+8，数据调整-3。组合偏离不计入Market Attractiveness Score。 当前仅代表长期配置优先方向，不代表今日买入机会。 |
-| 港股 | 南方东英恒生科技指数ETF | 67 | 12 | 否 | 继续持有 | 可用 | 等待条件，今日不交易 | 140,400元 | 真实持仓03033.HK；3033.HK仅为供应商代码格式，不使用代理ETF；标的自身原始分62，同市场调整+8，数据调整-3。组合偏离不计入Market Attractiveness Score。 当前仅代表长期配置优先方向，不代表今日买入机会。 |
-| 美股 | QQQ | 63 | 91 | 否 | 不适用 | 可用 | 等待条件，今日不交易 | 0元 | 成长宽基ETF，需兼顾估值、波动与科技重叠；标的自身原始分61，同市场调整+5，数据调整-3。组合偏离不计入Market Attractiveness Score。 当前仅代表长期配置优先方向，不代表今日买入机会。 |
-| 美股 | XLF | 56 | 91 | 否 | 继续持有 | 可用 | 暂停新增 | 42,000元 | 行业ETF，不因美股低配获得宽基同等优先级；标的自身原始分56，同市场调整+3，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| A股 | 巨人网络 | 53 | 3 | 否 | 继续持有 | 可用 | 继续持有 | 41,000元 | A股个股，需公司数据和集中度复核；标的自身原始分56，同市场调整+0，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 美股 | GOOG | 50 | 91 | 否 | 继续持有 | 可用 | 继续持有 | 22,000元 | 大型科技个股，需财报、估值与集中度共同确认；标的自身原始分53，同市场调整+0，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 港股 | 香港证券ETF | 50 | 12 | 否 | 继续持有 | 可用 | 暂停新增 | 33,200元 | 高弹性主题ETF，不作为优先补仓资产；标的自身原始分53，同市场调整+0，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 美股 | IBKR | 47 | 91 | 否 | 继续持有 | 可用 | 观察 | 40,000元 | 券商周期个股，需盈利和估值数据确认；标的自身原始分53，同市场调整-3，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 美股 | NVDA | 44 | 91 | 否 | 继续持有 | 可用 | 观察 | 68,000元 | 科技单股，不因美股低配自动加仓；标的自身原始分52，同市场调整-5，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 美股 | BABA | 40 | 91 | 否 | 继续持有 | 可用 | 观察 | 28,000元 | 中概个股，与港股风险存在重叠；标的自身原始分51，同市场调整-8，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 港股 | 恒生医疗ETF | 40 | 12 | 否 | 继续持有 | 可用 | 暂停新增 | 99,000元 | 主题ETF，受行业周期和集中度约束；标的自身原始分51，同市场调整-8，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| A股 | *ST闻泰 | 8 | 3 | 否 | 继续持有 | 低 | 风险复核或回避 | 19,500元 | 高风险ST持仓，永久禁止自动新增；标的自身原始分16，同市场调整-8，数据调整+0。组合偏离不计入Market Attractiveness Score。 |
-| 债券 | TLT | 61 | 0 | 否 | 继续持有 | 可用 | 暂停新增 | 55,000元 | 美国长期国债ETF，承受高久期利率风险；标的自身原始分56，同市场调整+8，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 现金 | 现金 | 60 | 0 | 否 | 继续持有 | 低 | 维持现金安全垫 | 241,000元 | 用于安全储备与流动性，不等于可投资现金；标的自身原始分60，同市场调整+0，数据调整+0。组合偏离不计入Market Attractiveness Score。 |
-| 债券 | 中国债券 | 52 | 0 | 否 | 继续持有 | 低 | 暂停新增 | 967,800元 | 防守资产，当前债券超配时暂停新增；标的自身原始分52，同市场调整+0，数据调整+0。组合偏离不计入Market Attractiveness Score。 |
-| 黄金 | 黄金 | 52 | 0 | 否 | 继续持有 | 可用 | 暂停新增 | 547,000元 | 实物金和黄金ETF合并看待，超配时暂停新增；标的自身原始分55，同市场调整+0，数据调整-3。组合偏离不计入Market Attractiveness Score。 |
-| 债券 | 10年地债 | 44 | 0 | 否 | 继续持有 | 低 | 暂停新增 | 132,200元 | 已包含在中国债券总额中，不重复计算；标的自身原始分52，同市场调整-8，数据调整+0。组合偏离不计入Market Attractiveness Score。 |
-
-## 附录 B. 正式持仓与白名单
-
-- 白名单状态：PASS；未经确认持仓数量：0
-- *ST闻泰来源：data/portfolio_master.yaml（user_confirmed_category_reconciled）；仅允许人工风险复核，永久禁止自动新增。
-
-| 持仓 | 市值 | 占比 | 基本面 | 趋势 | 风险点 | 重叠度 | 建议 | 加仓条件 | 减仓条件 |
-| -- | -: | -: | -- | -- | -- | -- | -- | -- | -- |
-| VOO 标普500ETF | 130,000元 | 4.62% | 核心宽基，重点复核估值、趋势与指数覆盖质量 | 行情可用 | 指数估值、趋势和组合配置偏离风险 | 与组合权益Beta重叠 | 继续持有 | 到计划定投日，且DQS、现金、预算和事件风控均通过 | 资产类别严重超配、风险预算触发或长期目标变化 |
-| VOO 2026-07-15新增投入成本（待独立估值汇率） | 9,000元 | 0.32% | 长期逻辑未单独异常；需结合最新财报复核 | 暂无可靠行情 | 组合层面风险可控 | 与权益Beta相关 | 继续持有 | DQS>=85且资产仍低配，或到计划定投日 | 基本面恶化、仓位过度集中、或组合风控触发 |
-| NVDA 英伟达 | 68,000元 | 2.42% | 普通个股，需结合最新财报、估值和公司风险人工复核 | 行情可用 | 公司特有风险、财报风险和单股集中度 | 计入所在行业及权益集中度 | 继续持有，暂停追高 | DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量 | 基本面恶化、估值风险过高、集中度超限或公司事件触发 |
-| GOOG 谷歌-C | 22,000元 | 0.78% | 普通个股，需结合最新财报、估值和公司风险人工复核 | 行情可用 | 公司特有风险、财报风险和单股集中度 | 计入所在行业及权益集中度 | 继续持有 | DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量 | 基本面恶化、估值风险过高、集中度超限或公司事件触发 |
-| TLT 美国长期国债ETF | 55,000元 | 1.96% | 防守或流动性资产 | 行情可用 | 美国长期国债ETF，高久期利率资产；受美国长端利率、通胀、期限溢价和美元影响 | 与中国债券同属利率/债券风险暴露，组合债券已明显超配 | 继续持有，暂停新增，关注久期风险 | 债券总仓位下降且出现明确战术利率配置理由 | 美国长端利率继续上行、期限溢价抬升或债券仓位需要压降 |
-| IBKR 盈透证券 | 40,000元 | 1.42% | 普通个股，需结合最新财报、估值和公司风险人工复核 | 行情可用 | 公司特有风险、财报风险和单股集中度 | 计入所在行业及权益集中度 | 继续持有 | DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量 | 基本面恶化、估值风险过高、集中度超限或公司事件触发 |
-| XLF 美国金融ETF | 42,000元 | 1.49% | 行业/主题工具，需复核行业周期与集中度 | 行情可用 | 行业集中度和高波动风险 | 与同类权益和主题持仓存在重叠 | 继续持有 | 行业逻辑、估值和仓位上限均通过人工复核 | 行业逻辑恶化、主题仓位超限或流动性下降 |
-| BABA 阿里巴巴 | 28,000元 | 1.00% | 普通个股，需结合最新财报、估值和公司风险人工复核 | 行情可用 | 公司特有风险、财报风险和单股集中度 | 计入所在行业及权益集中度 | 继续持有 | DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量 | 基本面恶化、估值风险过高、集中度超限或公司事件触发 |
-| 南方东英恒生科技指数ETF | 140,400元 | 4.99% | 核心宽基，重点复核估值、趋势与指数覆盖质量 | 行情可用 | 指数估值、趋势和组合配置偏离风险 | 与组合权益Beta重叠 | 继续持有 | 到计划定投日，且DQS、现金、预算和事件风控均通过 | 资产类别严重超配、风险预算触发或长期目标变化 |
-| 恒生医疗ETF | 99,000元 | 3.52% | 行业/主题工具，需复核行业周期与集中度 | 行情可用 | 行业集中度和高波动风险 | 与同类权益和主题持仓存在重叠 | 继续持有 | 行业逻辑、估值和仓位上限均通过人工复核 | 行业逻辑恶化、主题仓位超限或流动性下降 |
-| 香港证券ETF | 33,200元 | 1.18% | 行业/主题工具，需复核行业周期与集中度 | 行情可用 | 行业集中度和高波动风险 | 与同类权益和主题持仓存在重叠 | 继续持有 | 行业逻辑、估值和仓位上限均通过人工复核 | 行业逻辑恶化、主题仓位超限或流动性下降 |
-| 沪深300ETF | 206,000元 | 7.33% | 核心宽基，重点复核估值、趋势与指数覆盖质量 | 行情可用 | 指数估值、趋势和组合配置偏离风险 | 与组合权益Beta重叠 | 继续持有 | 到计划定投日，且DQS、现金、预算和事件风控均通过 | 资产类别严重超配、风险预算触发或长期目标变化 |
-| 巨人网络 | 41,000元 | 1.46% | 普通个股，需结合最新财报、估值和公司风险人工复核 | 行情可用 | 公司特有风险、财报风险和单股集中度 | 计入所在行业及权益集中度 | 继续持有 | DQS>=85，财报和估值可验证，且单股与行业风险预算均有余量 | 基本面恶化、估值风险过高、集中度超限或公司事件触发 |
-| *ST闻泰 | 19,500元 | 0.69% | ST或高风险股票；退市、财务、监管和流动性风险待人工核查 | 行情可用 | ST或高风险个股，禁止进入自动定投、机会加仓和网格候选 | 与权益Beta相关 | 高风险人工复核，永久禁止自动新增 | 系统不提供自动加仓条件；仅可记录用户明确人工批准的条件性计划 | 退市、财务、监管或流动性风险恶化时优先人工复核 |
-| 中国债券组合（不含10年地债） | 967,800元 | 34.42% | 防守或流动性资产 | 暂无可靠行情 | 债券总仓位超配，新增资金优先修复权益低配 | 与权益相关性较低 | 继续持有，暂停新增 | 债券总仓位回到目标附近后再评估 | 债券到期或赎回到账后，按路线图分批转权益ETF |
-| 10年地债 | 132,200元 | 4.70% | 防守或流动性资产 | 暂无可靠行情 | 债券总仓位超配，新增资金优先修复权益低配 | 与权益相关性较低 | 继续持有，暂停新增 | 债券总仓位回到目标附近后再评估 | 债券到期或赎回到账后，按路线图分批转权益ETF |
-| 实物金条 | 512,000元 | 18.21% | 实物黄金；关注保管、买卖价差和变现成本 | 暂无可靠行情 | 流动性较弱、保管与变现成本；组合黄金已超配 | 组合防守资产，与权益相关性较低 | 继续持有，暂停新增 | 仅当黄金回落至目标附近且组合需要防守时再评估 | 黄金显著超配且避险趋势转弱时，优先评估黄金ETF而非金条 |
-| 黄金ETF | 35,000元 | 1.24% | 黄金ETF；流动性优于实物金条，但统一计入黄金仓位 | 暂无可靠行情 | 黄金价格与跟踪误差风险；组合黄金已超配 | 组合防守资产，与权益相关性较低 | 继续持有，暂停新增 | 仅当黄金回落至目标附近且组合需要防守时再评估 | 黄金显著超配且避险趋势转弱时，优先评估黄金ETF而非金条 |
-| 账户总现金 | 241,000元 | 8.57% | 流动性资产，不适用股票基本面模板 | 不适用 | 固定安全储备220000元完整；专项可投资现金21000元不得与模拟网格资金混用 | 不适用；用于安全储备和流动性管理 | 保留固定安全储备；专项现金分批待复核 | 专项资金已到账；仅在市场、DQS和风险条件通过后分批评估 | 仅可使用安全储备以上且未被其他预算占用的现金 |
-
-## 附录 C. 市场、宏观与研究数据
-
-| 指标 | 当前值 | 前值 | 涨跌幅 | market_date | price_stage | quote_timestamp | retrieved_at | data_age_hours | 数据依据 | 可比较 | 来源 | 状态 |
-| -- | --: | --: | --: | -- | -- | -- | -- | --: | -- | -- | -- | -- |
-| VOO | 683.17 | 690.14 | -1.01% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:36+00:00 | 22.5小时 | 上一交易日官方收盘 | 是 | yfinance | VALID |
-| QQQ | 695.33 | 705.94 | -1.50% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:36+00:00 | 22.5小时 | 上一交易日官方收盘 | 是 | yfinance | VALID |
-| TLT | 84.52 | 84.21 | 0.37% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:40+00:00 | 22.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| GLD | 368.41 | 364.96 | 0.95% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:40+00:00 | 22.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| ^VIX | 18.77 | 16.73 | 12.19% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:42+00:00 | 22.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| DX-Y.NYB | 100.75 | 100.73 | 0.02% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T20:00:00+00:00 | 2026-07-18T18:29:41+00:00 | 22.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| 03033.HK | 4.53 | 4.75 | -4.51% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T08:00:00+00:00 | 2026-07-18T18:29:38+00:00 | 34.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| 510300.SS | 4.59 | 4.75 | -3.45% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T07:00:00+00:00 | 2026-07-18T18:29:39+00:00 | 35.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| 002558.SZ | 29.12 | 30.28 | -3.83% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T07:00:00+00:00 | 2026-07-18T18:29:39+00:00 | 35.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| 513060.SS | 0.52 | 0.55 | -5.30% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T07:00:00+00:00 | 2026-07-18T18:29:39+00:00 | 35.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| 513090.SS | 1.80 | 1.85 | -2.75% | 2026-07-17 | PREVIOUS_OFFICIAL_CLOSE | 2026-07-17T07:00:00+00:00 | 2026-07-18T18:29:40+00:00 | 35.5小时 | 上一交易日官方收盘 | 否 | yfinance | VALID |
-| DGS10 | 4.57 | 4.55 | 暂无数据 | 2026-07-16 | OFFICIAL_LAGGED_MACRO | None | 2026-07-18T18:31:50.118571+00:00 | 暂无 | 官方滞后宏观数据 | 否 | fred | VALID |
-| CPIAUCSL | 332.57 | 333.98 | 暂无数据 | 2026-06-01 | OFFICIAL_LAGGED_MACRO | None | 2026-07-18T18:31:56.337294+00:00 | 暂无 | 官方滞后宏观数据 | 否 | fred | VALID_LAGGED_BY_DESIGN |
-| UNRATE | 4.20 | 4.30 | 暂无数据 | 2026-06-01 | OFFICIAL_LAGGED_MACRO | None | 2026-07-18T18:32:00.938933+00:00 | 暂无 | 官方滞后宏观数据 | 否 | fred | DATA_INSUFFICIENT |
-| GDP | 31865.72 | 31422.53 | 暂无数据 | 2026-01-01 | OFFICIAL_LAGGED_MACRO | None | 2026-07-18T18:32:02.576244+00:00 | 暂无 | 官方滞后宏观数据 | 否 | fred | DATA_INSUFFICIENT |
-
-### A股/港股行情字段覆盖率
-
-| 市场 | 行情字段覆盖率 | 评分可信度 | 是否限制决策 | 缺失字段 |
-| -- | --: | -- | -- | -- |
-| A股 | 100.0% | usable | 否 | 无 |
-| 港股及港股主题基金 | 100.0% | usable | 否 | 无 |
-
-| 标的 | 正式名称 | 代码 | 交易所 | 市场 | 币种 | 时区 | 市场日期 | 来源 | 数据状态 |
-| -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
-| 510300.SS | 沪深300ETF | 510300.SS | SSE | CN | CNY | Asia/Shanghai | 2026-07-17 | yfinance | VALID |
-| 002558.SZ | 巨人网络 | 002558.SZ | SZSE | CN | CNY | Asia/Shanghai | 2026-07-17 | yfinance | VALID |
-| 03033.HK | 南方东英恒生科技指数ETF | 03033.HK | HKEX | HK | HKD | Asia/Hong_Kong | 2026-07-17 | yfinance | VALID |
-| 513060.SS | 恒生医疗ETF | 513060.SS | SSE | CN | CNY | Asia/Shanghai | 2026-07-17 | yfinance | VALID |
-| 513090.SS | 香港证券ETF | 513090.SS | SSE | CN | CNY | Asia/Shanghai | 2026-07-17 | yfinance | VALID |
-
-### A股研究数据完整度 / 港股研究数据完整度
-
-| P1A项目 | 状态/完整度 | 来源 | 是否进入评分 | 缺失或限制 |
-| -- | -- | -- | -- | -- |
-| A股整体分析 | 85.0%（usable） | 多源汇总 | 是 | 002558个股估值、A股官方公告 |
-| 港股整体分析 | 65.0%（usable） | 多源汇总 | 是 | HKMA HIBOR、HKMA 港元汇率、港交所官方公告 |
-| A股交易日历 | failed | Tushare Pro | 否，仅用于日期校验 | PERMISSION_DENIED：Tushare 接口权限不足：抱歉，您没有接口(trade_cal)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。 |
-| 002558估值 | failed | Tushare Pro | 是（成功时） | Tushare 接口权限不足：抱歉，您没有接口(daily_basic)访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。 |
-| 002558财务 | failed | Tushare Pro | 是（成功时） | 仅用于002558个股基本面；ETF不得继承本模型。 |
-| 港元流动性/HIBOR/汇率 | partial | HKMA官方 | 是（成功时） | 无 |
-| A股官方公告 | failed | 巨潮资讯 | 否，仅作风险解释 | <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)> |
-| 港股官方公告 | framework_ready | HKEX | 否，仅作风险解释 | HKEX标题检索需要稳定的证券内部ID映射；P1A仅建立官方读取框架，不伪造公告记录。 |
-| AKShare A股交易日历 | ok | AKShare（底层：sina_finance） | 是 | 无 |
-| AKShare 002558估值 | ok | AKShare（底层：eastmoney） | 通过校验且被选中时 | 市场日期未明确或未通过评分校验，仅展示 |
-| AKShare 002558财务 | ok | AKShare（底层：eastmoney） | 是 | 无 |
-| AKShare 沪深300估值 | ok | AKShare（底层：csindex_official） | 是 | 无 |
-| AKShare基础行情核验 | partial | AKShare受监控备用 | 否，仅展示/冲突核验 | 成功：002558.SZ(eastmoney)、510300.SS(eastmoney)、03033.HK(sina_finance)、HSTECH(sina_finance) |
-| 03033.HK历史行情 | ok（2026-07-17） | AKShare（底层：sina_finance） | 否，仅展示/同日核验 | 无 |
-| 恒生科技指数历史行情 | ok（2026-07-17） | AKShare（底层：sina_finance） | 否，仅展示/同日核验 | 无 |
-| HKMA HIBOR | ok（2026-06-30；stale） | HKMA官方（底层：hkma_open_api） | 否，过期或失败仅展示 | 无 |
-| HKMA港元汇率 | ok（2026-06-30；stale） | HKMA官方（底层：hkma_open_api） | 否，过期或失败仅展示 | 无 |
-
-- ETF财务规则：510300、513060、513090及03033均不套用002558个股财务评分。
-
-### 市场宽度、资金流与情绪数据状态
-
-| 数据项 | 当前值 | 前值 | 时间 | 来源 | 等级 | 状态 | 双源验证 | 说明 |
-| -- | --: | --: | -- | -- | --: | -- | -- | -- |
-| VIX | 18.77 | 16.73 | 2026-07-17T20:00:00+00:00 | yfinance | 3 | VALID | 是 | Cboe优先，其他行情源仅用于交叉验证。 |
-| Put/Call Ratio | 暂无可靠数据 | 暂无可靠数据 | 暂无 | unavailable | 99 | NOT_CONNECTED | 否 | 未找到当前流程可稳定复用的官方接口，本版不接入。 |
-| 市场宽度 | 暂无可靠数据 | 暂无可靠数据 | 暂无 | unavailable | 99 | NOT_CONNECTED | 否 | 上涨/下跌家数与新高/新低未接入；不得以指数涨跌替代。 |
-| ETF资金流 | 暂无可靠数据 | 暂无可靠数据 | 暂无 | unavailable | 99 | NOT_CONNECTED | 否 | 未接入可靠许可数据；不得以价格或成交量替代净申赎。 |
-| AAII情绪 | 暂无可靠数据 | 暂无可靠数据 | 暂无 | unavailable | 99 | NOT_CONNECTED | 否 | 未接入稳定自动数据源，仅保留状态说明。 |
-| 美国10年国债收益率 | 4.57 | 4.55 | 暂无 | fred | 1 | VALID | 否 | FRED一级来源；属于官方滞后数据。 |
-| 美国2年国债收益率 | 4.16 | 4.13 | 暂无 | fred | 1 | VALID | 否 | FRED一级来源；属于官方滞后数据。 |
-| 美国10年减2年利差 | 0.37 | 0.41 | 暂无 | fred | 1 | VALID | 否 | FRED一级来源；属于官方滞后数据。 |
-| 美国高收益债利差 | 2.71 | 2.71 | 暂无 | fred | 1 | VALID | 否 | FRED一级来源；属于官方滞后数据。 |
-
-## 附录 D. DQS、风险门槛与可比较性
-
-- core_decision_comparability=COMPARABLE
-- cross_asset_comparability=DATA_NOT_COMPARABLE
-- grid_snapshot_comparability=DATA_NOT_COMPARABLE
-- non_comparable_items_count=17
-
-| 风险维度 | 分数 | 等级/含义 |
-| -- | --: | -- |
-| Market Risk Score | 56 | 中高风险；市场条件 |
-| Portfolio Risk Score | 33 | 中低风险；组合暴露与压力测试 |
-| Data Confidence Score (DQS) | 75 | core_dqs（Scheduled DCA/持仓/风险监控）；仅代表数据质量 |
-| Execution Risk Score | 20 | 低风险；执行条件与人工确认 |
-
-- 市场风险权重合计：100%
-- 市场风险置信度：low
-
-| 市场风险项目 | 分数 | 权重 | 主要依据 |
-| ----- | -: | -: | ---- |
-| 估值 | 10 | 20 | 估值数据不完整时按中性偏高风险处理。 |
-| 波动率 | 5 | 15 | VIX=18.77；最大高风险/单股占比约2.4%。 |
-| 利率 | 13 | 15 | 美国10年期收益率最新官方值为4.57%，观察日期2026-07-16；属于官方滞后日度数据，不代表报告生成时的实时收益率；风险评分已降低时效性置信度。 |
-| 宏观事件 | 5 | 15 | 未来7天暂无高等级事件。 |
-| 趋势 | 8 | 10 | VOO与QQQ在2026-07-17口径一致，当日变化合计约-2.51%。 |
-| 政策与地缘 | 7 | 10 | 按中性偏谨慎处理；黄金占比19.5%，超配提高组合对避险行情反转的敏感度。 |
-| 市场宽度与资金流 | 8 | 15 | 市场宽度与ETF资金流缺少可核验风险值，按中性风险处理并降低置信度；15%权重仍完整保留。 |
-
-- Scheduled DCA：risk_threshold=70，current_risk_score=56，主要贡献=利率 13分、估值 10分，risk_blocking_factors=无，event_blocking_factors=无，阻断依据=NONE。
-- Opportunity Add：risk_threshold=50，current_risk_score=56，主要贡献=利率 13分、估值 10分，risk_blocking_factors=Market Risk Score为56，高于Opportunity Add允许上限50；市场风险数据置信度不足，严格场景采用保守阻断，event_blocking_factors=无，阻断依据=DATA_CONFIDENCE_CONSERVATIVE_BLOCK。
-- Strategic Rebalance：risk_threshold=70，current_risk_score=56，主要贡献=利率 13分、估值 10分，risk_blocking_factors=无，event_blocking_factors=无，阻断依据=NONE。
-- Grid Trading：risk_threshold=50，current_risk_score=56，主要贡献=利率 13分、估值 10分，risk_blocking_factors=Market Risk Score为56，高于Grid Trading允许上限50；市场风险数据置信度不足，严格场景采用保守阻断，event_blocking_factors=无，阻断依据=DATA_CONFIDENCE_CONSERVATIVE_BLOCK。
-- Risk Monitoring：risk_threshold=100，current_risk_score=56，主要贡献=无，risk_blocking_factors=无，event_blocking_factors=无，阻断依据=NOT_APPLICABLE_MONITORING_OR_RECONCILIATION。
-- Transaction Reconciliation：risk_threshold=100，current_risk_score=56，主要贡献=无，risk_blocking_factors=无，event_blocking_factors=无，阻断依据=NOT_APPLICABLE_MONITORING_OR_RECONCILIATION。
-
-| 明确用途 | 得分 | 对应场景 |
-| -- | -: | -- |
-| core_dqs | 75 | Scheduled DCA、持仓判断和风险监控 |
-| opportunity_dqs | 55 | Opportunity Add、跨资产比较和机会加仓 |
-| execution_dqs | 100 | 成交、现金、汇率和持仓对账 |
-| rebalance_dqs | 100 | Strategic Rebalance |
-| grid_dqs | 0 | Grid Trading（SIMULATION_ONLY） |
-
-| DQS项目 | 得分 | 满分 | 原因 |
-| ----- | -: | -: | -- |
-| field_completeness | 20 | 20 | 核心行情与宏观可用15/15 |
-| timeliness | 15 | 15 | 新鲜且非STALE数据15/15 |
-| source_quality | 4 | 15 | 一级来源4/15 |
-| dual_source_validation | 1 | 15 | 双源验证1/15 |
-| valuation_readiness | 5 | 15 | 存在待估值持仓或持仓市值滞后 |
-| transaction_reconciliation_quality | 10 | 10 | 1/1笔实盘交易已完成对账 |
-| consistency | 10 | 10 | 无异常0值或严重冲突 |
-
-| 使用场景 | 得分 | 门槛 | DQS门槛通过 | 计划门槛通过 | 现金门槛通过 | 风险门槛通过 | 事件门槛通过 | 最终权限 | 拒绝原因 |
-| -- | -: | -: | -- | -- | -- | -- | -- | -- | -- |
-| Scheduled DCA（core_dqs） | 75 | 65 | 是 | 否 | 是 | 是 | 是 | DENY | 无 |
-| Opportunity Add（opportunity_dqs） | 55 | 85 | 否 | 是 | 是 | 否 | 是 | DENY | 无 |
-| Strategic Rebalance（rebalance_dqs） | 100 | 75 | 是 | 是 | 是 | 是 | 是 | ALLOW_EVALUATION_ONLY | 无 |
-| Grid Trading（grid_dqs） | 0 | 85 | 否 | 否 | 否 | 否 | 是 | DENY | 无 |
-| Risk Monitoring（core_dqs） | 75 | 1 | 是 | 是 | 是 | 是 | 是 | ALLOW_MONITORING | 无 |
-| Transaction Reconciliation（execution_dqs） | 100 | 100 | 是 | 是 | 是 | 是 | 是 | ALLOW_RECONCILIATION | 无 |
-
-## 附录 E. 事件、压力测试与模拟网格
-
-- 未来7天暂无已核验待发布事件。
-
-### 组合情景压力测试
-
-| 情景 | 组合收益/损失率 | 组合收益/损失金额 | 最大正贡献/负贡献资产 | 超过25% | 超过35% | 是否需调整长期配置 |
-| -- | --: | --: | -- | -- | -- | -- |
-| 情景A：权益牛市 | 3.97% | +111,520元 | 美股 +66,000元 | 否 | 否 | 否 |
-| 情景B：震荡市场 | 1.45% | +40,905元 | 美股 +16,500元 | 否 | 否 | 否 |
-| 情景C：风险冲击 | -5.79% | -162,880元 | 美股 -82,500元 | 否 | 否 | 否 |
-| 情景D：股债双杀 | -13.48% | -378,985元 | 美股 -99,000元 | 否 | 否 | 否 |
-| 情景E：通胀重新上行 | -9.34% | -262,615元 | 普通债券 -66,000元 | 否 | 否 | 否 |
-| 情景F：流动性冲击 | -11.55% | -324,752元 | 美股 -92,400元 | 否 | 否 | 否 |
-| 情景G：2008式金融危机 | -16.87% | -474,475元 | 美股 -148,500元 | 否 | 否 | 否 |
-| 情景H：2022式股债双杀 | -13.21% | -371,430元 | 普通债券 -110,000元 | 否 | 否 | 否 |
-| 情景I：利率再上升200个基点 | -14.14% | -397,615元 | 普通债券 -132,000元 | 否 | 否 | 否 |
-| 情景J：港股科技再下跌40% | -5.15% | -144,960元 | 港股 -109,040元 | 否 | 否 | 否 |
-| 情景K：全球流动性危机 | -29.81% | -838,385元 | 普通债券 -242,000元 | 是 | 否 | 是 |
-
-- 说明：以上均为静态假设测算，不是预测，不直接形成自动交易指令。
-
-## 附录 E. Stone Smart Grid（SIMULATION_ONLY）
-
-SIMULATION_ONLY = true
-
-### 1. 今日网格结论
-
-- VOO是否触发：否
-- QQQ是否触发：否
-- 是否建议执行：否
-- 今日总建议金额：0元
-- 总风控是否批准：否
-- 一句话结论：模拟模式：仅监控和记录候选信号，不生成真实执行建议。
-- 决策快照状态：DATA_NOT_COMPARABLE；VOO缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。；QQQ缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。
-
-### VOO状态
-
-| 项目 | 内容 |
-| -- | -- |
-| 当前价格 | 683.17 |
-| 数据时间 | 2026-07-17T20:00:00+00:00 |
-| 决策快照 | 不可比：DATA_NOT_COMPARABLE |
-| 市场状态 | uptrend |
-| 网格锚点 | 693.86 |
-| 动态买入间距 | 2.85% |
-| 动态卖出间距 | 4.73% |
-| 下一买入价 | 暂不计算（历史参数仅供参考） |
-| 距离下一买入价 | 暂不计算 |
-| 下一卖出价 | 暂不计算（历史参数仅供参考） |
-| 距离下一卖出价 | 暂不计算 |
-| 模拟核心仓 | 21.0 股 |
-| 模拟网格仓 | 7.0 股 |
-| 模拟网格现金 | 42,316元 |
-| 今日信号 | DATA_NOT_COMPARABLE |
-| 总风控结论 | 继续监控，不执行。 |
-
-### QQQ状态
-
-| 项目 | 内容 |
-| -- | -- |
-| 当前价格 | 695.33 |
-| 数据时间 | 2026-07-17T20:00:00+00:00 |
-| 决策快照 | 不可比：DATA_NOT_COMPARABLE |
-| 市场状态 | uptrend |
-| 网格锚点 | 725.51 |
-| 动态买入间距 | 6.17% |
-| 动态卖出间距 | 8.78% |
-| 下一买入价 | 暂不计算（历史参数仅供参考） |
-| 距离下一买入价 | 暂不计算 |
-| 下一卖出价 | 暂不计算（历史参数仅供参考） |
-| 距离下一卖出价 | 暂不计算 |
-| 模拟核心仓 | 0.0 股 |
-| 模拟网格仓 | 0.0 股 |
-| 模拟网格现金 | 42,182元 |
-| 今日信号 | DATA_NOT_COMPARABLE |
-| 总风控结论 | 继续监控，不执行。 |
-
-### 4. 今日候选操作
-
-| 标的 | 原始信号 | 建议金额 | 资金来源 | 风控结论 | 是否执行 |
-| -- | ---- | ---: | ---- | ---- | ---- |
-| VOO | DATA_NOT_COMPARABLE | 0元 | 网格专用预算/模拟资金池 | 继续监控，不执行。 | 否 |
-| QQQ | DATA_NOT_COMPARABLE | 0元 | 网格专用预算/模拟资金池 | 继续监控，不执行。 | 否 |
-
-### 5. 未触发原因
-
-- VOO：VOO缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。；QQQ缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。；DQS=0，低于网格金额建议门槛85。；DQS模式不是 exact，禁止精确网格金额建议。；当前为模拟模式，禁止生成真实执行金额建议。
-- QQQ：VOO缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。；QQQ缺少截至决策时间可用的正式收盘、带时区且新鲜的行情，或DQS未达网格门槛。；DQS=0，低于网格金额建议门槛85。；DQS模式不是 exact，禁止精确网格金额建议。；当前为模拟模式，禁止生成真实执行金额建议。
-
-### 6. 网格账户状态
-
-- 网格总资金：112,484元
-- 模拟现金储备：28,121元
-- 可用模拟现金：84,363元
-- 标的模拟分配：VOO模拟分配42,316元；QQQ模拟分配42,182元
-- 可用实盘现金：0元
-- 计算关系：网格总资金 = 模拟现金储备 + 可用模拟现金；标的分配合计与可用模拟现金的差额仅允许为整数四舍五入。以上均为SIMULATION，不计入真实资产或可投资现金。
-- 累计已实现收益：0元
-- 未实现收益：0元
-- 本月交易次数：0
-- 本月资金使用率：模拟运行阶段仅记录，不占用真实资金。
-- 最大回撤：等待至少20个交易日模拟记录后统计。
-
-### 7. 后续网格触发价
-
-- VOO：当前决策快照不可比，暂不计算新的精确触发价或距离；历史买入参数674.09、历史卖出参数726.68仅供追溯。
-- QQQ：当前决策快照不可比，暂不计算新的精确触发价或距离；历史买入参数680.75、历史卖出参数789.21仅供追溯。
-- 即使价格触发，只要 DQS 不足、现金低于安全线、重大事件临近、预算冲突或总风控否决，也不会生成真实执行建议。
-
-### 8. 风险提示
-
-- 单边上涨可能导致网格仓过早卖出，跑输买入持有。
-- 单边下跌可能连续触发买入，占用资金并扩大浮亏。
-- 参数可能失效，尤其在高波动、政策冲击或流动性异常时。
-- 数据延迟、汇率、税务、滑点和交易成本会影响实际结果。
-- 网格建议不得覆盖长期资产配置、基础定投和机会加仓纪律。
-- 系统不自动交易，不承诺收益，所有操作必须人工确认。
-
-## 附录 F. 系统状态、来源与一致性
-
-- OpenAI状态：disabled；分析来源：Stone CIO规则引擎；仅作解释，不覆盖规则。
-
-- VOO：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- QQQ：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- TLT：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- GLD：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- ^VIX：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- DX-Y.NYB：yfinance，时间：2026-07-17T20:00:00+00:00，等级：3
-- 03033.HK：yfinance，时间：2026-07-17T08:00:00+00:00，等级：3
-- 510300.SS：yfinance，时间：2026-07-17T07:00:00+00:00，等级：3
-- 002558.SZ：yfinance，时间：2026-07-17T07:00:00+00:00，等级：3
-- 513060.SS：yfinance，时间：2026-07-17T07:00:00+00:00，等级：3
-- 513090.SS：yfinance，时间：2026-07-17T07:00:00+00:00，等级：3
-- DGS10：fred，时间：2026-07-16T00:00:00-04:00，等级：1
-- CPIAUCSL：fred，时间：2026-06-01T00:00:00-04:00，等级：1
-- UNRATE：fred，时间：2026-06-01T00:00:00-04:00，等级：1
-- GDP：fred，时间：2026-01-01T00:00:00-05:00，等级：1
-
-- 一致性结果：PASS；错误0项；警告0项。
-| 检查项 | 状态 | 说明 |
-| -- | -- | -- |
-| 阻断级统一口径 | PASS | 口径一致。 |
-| 事件一致性 | PASS | 口径一致。 |
-| DQS一致性 | PASS | 口径一致。 |
-| 市场风险权重 | PASS | 口径一致。 |
-| 三类数据可比较性 | PASS | 口径一致。 |
-| A股与港股数据门槛 | PASS | 口径一致。 |
-| 现金预算一致性 | PASS | 口径一致。 |
-| 用户确认交易完整性 | PASS | 口径一致。 |
-| 行情时点一致性 | PASS | 口径一致。 |
-| 模拟与实盘隔离 | PASS | 口径一致。 |
-| OpenAI状态一致性 | PASS | 口径一致。 |
-| 迁移路线一致性 | PASS | 口径一致。 |
-
-仅供投资辅助，不构成投资建议；系统不自动交易，不接券商下单权限，不承诺收益。
+# Stone AI Investment Manager Pro V12.7.1 Final Freeze 投资日报
+
+- 报告业务日期：2026-07-21
+- 运行模式：重新运行
+- 决策截止时间：2026-07-21T01:55:57+08:00
+- 历史成交日期：2026-07-15
+- FinalDecisionBundle：`8d531f9dfcc94fedcfa283255a4af7e058fe7e0430eb2a6c132e3e17182ac8fd`
+
+## 今日总决策
+
+- 今日是否操作：不执行真实交易
+- 是否定投：否
+- 是否主动加仓：否
+- 是否调仓：只进行资产偏离评估，不执行调仓
+- 是否暂停：否；继续监控与评估
+- 最主要的三条原因：
+  1. 当前不在计划执行窗口
+  2. opportunity_dqs=65低于门槛85
+  3. 风险分数53高于场景上限50
+
+## 今日场景决策
+
+| 场景 | 使用DQS | 得分/门槛 | 风险门槛 | 数据状态 | 最终权限 | 硬阻断原因 | 软警告 | 下一步动作 |
+|---|---|---:|---:|---|---|---|---|---|
+| Scheduled DCA | core_dqs | 100/65 | 53/70 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | DENY | 当前不在计划执行窗口 | 无 | 满足硬阻断条件后重新评估 |
+| Opportunity Add | opportunity_dqs | 65/85 | 53/50 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | DENY | opportunity_dqs=65低于门槛85；风险分数53高于场景上限50 | 无 | 满足硬阻断条件后重新评估 |
+| Strategic Rebalance | rebalance_dqs | 94/75 | 53/70 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | ALLOW_EVALUATION_ONLY | 无 | 仅输出资产偏离与修复方向，不生成即时成交指令 | 输出偏离与修复优先级，不生成成交指令 |
+| Grid Trading | grid_dqs | 0/85 | 53/50 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=BLOCK | DENY | grid_dqs=0低于模拟信号门槛85；grid_snapshot_comparability=DATA_NOT_COMPARABLE；实盘限制：实盘网格现金为0；风险分数53高于实盘上限50 | Smart Grid固定为SIMULATION_ONLY，模拟资金与实盘隔离 | 满足硬阻断条件后重新评估 |
+| Risk Monitoring | core_dqs | 100/1 | 53/100 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | ACTIVE | 无 | 无 | 持续监控并更新风险明细 |
+| Transaction Reconciliation | execution_dqs | 100/100 | 53/100 | event=VALID_NO_HIGH_IMPACT_EVENT; comparability=PASS | PASS | 无 | 无 | 对账通过，无需事件数据复核 |
+
+## 资产偏离表
+
+| 资产类别 | 当前金额 | 当前占比 | 目标占比 | 偏离百分点 | 偏离等级 | 修复优先级 | 修复方式 |
+|---|---:|---:|---:|---:|---|---:|---|
+| 债券 | 1,155,000.00 | 44.81% | 25.00% | +19.81 | 严重超配 | 69 | 暂停新增，通过新增权益资金逐步稀释，不默认强制卖出 |
+| 美股 | 330,000.00 | 12.80% | 30.00% | -17.20 | 严重低配 | 86 | 新增资金优先修复，优先宽基ETF，不强制一次性完成 |
+| 现金 | 21,000.00 | 0.81% | 8.00% | -7.19 | 低配 | 36 | 优先使用新增资金 |
+| 黄金 | 547,000.00 | 21.22% | 15.00% | +6.22 | 超配 | 22 | 暂停新增，观察后续偏离 |
+| 港股 | 263,048.00 | 10.21% | 12.00% | -1.79 | 接近目标 | 5 | 维持现有配置 |
+| A股 | 261,338.00 | 10.14% | 10.00% | +0.14 | 接近目标 | 0 | 维持现有配置 |
+
+## 风险分解
+
+| 风险因子 | 依据 | 风险得分 | 该项最高分 | 对总风险贡献 | 缺失处理 |
+|---|---|---:|---:|---:|---|
+| 估值 | 估值数据不完整时按中性偏高风险处理。 | 10 | 20 | 10点 | 数据缺失，按中性风险计分并降低置信度。 |
+| 波动率 | VIX=18.15；最大高风险/单股占比约2.6%。 | 5 | 15 | 5点 | 数据有效，按现有值计分。 |
+| 利率 | 美国10年期收益率最新官方值为4.57%，观察日期2026-07-16；属于官方滞后日度数据，不代表报告生成时的实时收益率；风险评分已降低时效性置信度。 | 13 | 15 | 13点 | 数据有效，按现有值计分。 |
+| 宏观事件 | 未来7天暂无高等级事件。 | 5 | 15 | 5点 | 数据有效，按现有值计分。 |
+| 趋势 | VOO（宽基）0.19%×70% + QQQ（成长风格）0.75%×30% = 加权趋势0.36%；高度相关ETF只计入一次市场趋势。 | 5 | 10 | 5点 | 数据有效，按现有值计分。 |
+| 政策与地缘 | 按中性偏谨慎处理；黄金占比21.2%，超配提高组合对避险行情反转的敏感度。 | 7 | 10 | 7点 | 数据有效，按现有值计分。 |
+| 市场宽度与资金流 | 市场宽度与ETF资金流缺少可核验风险值，按中性风险处理并降低置信度；15%权重仍完整保留。 | 8 | 15 | 8点 | 数据缺失，按中性风险计分并降低置信度。 |
+| **合计** | 置信度：low | **53** | **100** | **53点** | - |
+
+## 数据质量评分
+
+- core_dqs: **100**
+- execution_dqs: **100**
+- grid_dqs: **0**
+- opportunity_dqs: **65**
+- rebalance_dqs: **94**
+
+### core_dqs
+
+| 维度 | 得分 | 满分 | 扣分原因 | 缺失数据 | 数据源 | 最后成功时间 | 降分项 |
+|---|---:|---:|---|---|---|---|---:|
+| 核心价格 | 25 | 25 | 可用 | 无 | yfinance | 2026-07-20T17:53:25+00:00 | 0 |
+| 现金口径 | 25 | 25 | 可用 | 无 | user_confirmed | 2026-07-15 | 0 |
+| 预算状态 | 25 | 25 | 可用 | 无 | execution_state | 2026-07-15 | 0 |
+| 事件状态 | 25 | 25 | 可用 | 无 | EconomicCalendar | 无成功记录 | 0 |
+
+最终求和：25 + 25 + 25 + 25 = **100**
+
+### execution_dqs
+
+| 维度 | 得分 | 满分 | 扣分原因 | 缺失数据 | 数据源 | 最后成功时间 | 降分项 |
+|---|---:|---:|---|---|---|---|---:|
+| 成交、现金、汇率与持仓对账 | 100 | 100 | 由已确认交易标准字段现场计算。 | 无 | 不适用 | 不适用 | 0 |
+
+最终求和：100 = **100**
+
+### grid_dqs
+
+| 维度 | 得分 | 满分 | 扣分原因 | 缺失数据 | 数据源 | 最后成功时间 | 降分项 |
+|---|---:|---:|---|---|---|---|---:|
+| VOO finalized close snapshot | 0 | 50 | Official or previous official close; freshness is assessed independently. | 无 | 不适用 | 不适用 | -50 |
+| QQQ finalized close snapshot | 0 | 50 | Official or previous official close; freshness is assessed independently. | 无 | 不适用 | 不适用 | -50 |
+
+最终求和：0 + 0 = **0**
+
+### opportunity_dqs
+
+| 维度 | 得分 | 满分 | 扣分原因 | 缺失数据 | 数据源 | 最后成功时间 | 降分项 |
+|---|---:|---:|---|---|---|---|---:|
+| field_completeness | 20 | 20 | 核心行情与宏观可用15/15 | 无 | MarketSnapshot | 2026-07-20T17:55:57.025191+00:00 | 0 |
+| timeliness | 12 | 15 | 新鲜且非STALE数据12/15 | DGS10；UNRATE；GDP | MarketSnapshot | 2026-07-20T17:55:57.025191+00:00 | -3 |
+| source_quality | 4 | 15 | 一级来源4/15 | 无 | 不适用 | 不适用 | -11 |
+| dual_source_validation | 1 | 15 | 双源验证1/15 | 无 | 不适用 | 不适用 | -14 |
+| valuation_readiness | 12 | 15 | 精确估值覆盖率79.02%，按覆盖率计分 | None；VOO:fx_rate；NVDA:fx_rate；GOOG:fx_rate；TLT:fx_rate；IBKR:fx_rate；XLF:fx_rate；BABA:fx_rate；HK_03033:fx_rate；CN_ST_WENTAI:price；GOLD_518880:price | PortfolioSnapshot.valuation_audit | 2026-07-21T01:55:57+08:00 | -3 |
+| transaction_reconciliation_quality | 10 | 10 | 1/1笔实盘交易已完成对账 | 无 | 不适用 | 不适用 | 0 |
+| consistency | 10 | 10 | 无异常0值或严重冲突 | 无 | 不适用 | 不适用 | 0 |
+
+普通评分小计：20 + 12 + 4 + 1 + 12 + 10 + 10 = **69**
+
+#### 审计扣分项
+
+| 审计项 | 扣分 | 满分 | 审计原因 |
+|---|---:|---:|---|
+| released_macro_event_data_quality | -4 | 0 | 已发布宏观数据的抓取失败或非核心字段不完整，仅影响发布数据质量，不污染未来事件门控。 |
+
+最终得分：普通评分小计 69 + 审计扣分 -4 = **65**
+
+### rebalance_dqs
+
+| 维度 | 得分 | 满分 | 扣分原因 | 缺失数据 | 数据源 | 最后成功时间 | 降分项 |
+|---|---:|---:|---|---|---|---|---:|
+| 目标配置完整性 | 40 | 40 | 目标权重合计必须为100% | 无 | 不适用 | 不适用 | 0 |
+| 持仓时效 | 24 | 30 | 按精确估值市值覆盖率79.02%计分 | VOO:fx_rate；NVDA:fx_rate；GOOG:fx_rate；TLT:fx_rate；IBKR:fx_rate；XLF:fx_rate；BABA:fx_rate；HK_03033:fx_rate；CN_ST_WENTAI:price；GOLD_518880:price | PortfolioSnapshot.valuation_audit | 2026-07-21T01:55:57+08:00 | -6 |
+| 核心市场覆盖 | 30 | 30 | 核心行情可用11/11 | 无 | 不适用 | 不适用 | 0 |
+
+最终求和：40 + 24 + 30 = **94**
+
+## 统一真实资产快照
+
+- household_total_assets_estimated：2,806,385.90 元
+- investable_assets_estimated：2,586,385.90 元
+- household_safety_reserve：220,000.00 元（不进入可投资组合分母）
+- portfolio_cash：21,000.00 元
+- precise_valued_assets：2,217,485.90 元
+- stale_valued_assets：579,900.00 元
+- unvalued_cost_records：9,000.00 元
+- valuation_coverage_ratio：79.02%
+- 精确估值资产：2,217,485.90 元
+- 待估值成本记录：9,000.00 元（不进入精确市值和配置占比）
+- 包含待估值成本记录的非精确总额：2,806,385.90 元
+- 估算总额说明：存在非精确估值时，以上总资产仅为 estimated total，不称为全部精确估值。
+- 账户现金：241,000.00 元
+- 固定安全储备：220,000.00 元
+- 专项可投资现金：21,000.00 元
+
+### 最终持仓（每个 security_id 仅一行）
+
+| security_id | 数量 | price | currency | fx_rate | price_as_of | source | valuation_status | precise valuation | 市值（CNY） | 资产分类 |
+|---|---:|---:|---|---:|---|---|---|---|---:|---|
+| VOO | 30.166 | 684.4901 | USD | - | 2026-07-20T17:53:25+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 130,000.00 | 美股 |
+| NVDA | 51.0 | 204.58 | USD | - | 2026-07-20T17:53:26+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 68,000.00 | 美股 |
+| GOOG | 9.0 | 353.255 | USD | - | 2026-07-20T17:53:26+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 22,000.00 | 美股 |
+| TLT | 95.0 | 83.8601 | USD | - | 2026-07-20T17:53:30+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 55,000.00 | 债券 |
+| IBKR | 64.0 | 92.46 | USD | - | 2026-07-20T17:53:27+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 40,000.00 | 美股 |
+| XLF | 112.0 | 56.115 | USD | - | 2026-07-20T17:53:27+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 42,000.00 | 美股 |
+| BABA | 44.0 | 121.66 | USD | - | 2026-07-20T17:53:26+00:00 | yfinance | STALE_USER_CONFIRMED_VALUE | 否 | 28,000.00 | 美股 |
+| HK_03033 | 35200.0 | 4.65 | HKD | - | 2026-07-20T08:00:00+00:00 | akshare:sina_finance | STALE_USER_CONFIRMED_VALUE | 否 | 140,400.00 | 港股 |
+| HK_513060 | 177600.0 | 0.518 | CNY | 1.0 | 2026-07-17T07:00:00+00:00 | yfinance | VALUED_PREVIOUS_CLOSE | 是 | 91,996.80 | 港股 |
+| HK_513090 | 17000.0 | 1.803 | CNY | 1.0 | 2026-07-17T07:00:00+00:00 | yfinance | VALUED_PREVIOUS_CLOSE | 是 | 30,651.00 | 港股 |
+| CN_510300 | 42900.0 | 4.589 | CNY | 1.0 | 2026-07-17T07:00:00+00:00 | yfinance | VALUED_PREVIOUS_CLOSE | 是 | 196,868.10 | A股 |
+| CN_002558 | 1500.0 | 29.98 | CNY | 1.0 | 2026-07-20T07:00:00+00:00 | akshare:eastmoney | VALUED_PREVIOUS_CLOSE | 是 | 44,970.00 | A股 |
+| CN_ST_WENTAI | 500.0 | - | CNY | 1.0 | 2026-07-11 | user_confirmed_category_reconciled | STALE_USER_CONFIRMED_VALUE | 否 | 19,500.00 | A股 |
+| CN_BOND_CORE | - | - | CNY | 1.0 | 2026-07-15 | user_confirmed | MANUAL_FIXED_VALUE | 是 | 967,800.00 | 债券 |
+| CN_LOCAL_BOND_10Y | 1100.0 | - | CNY | 1.0 | 2026-07-11 | user_confirmed | MANUAL_FIXED_VALUE | 是 | 132,200.00 | 债券 |
+| GOLD_BAR_565G | 565.0 | - | CNY | 1.0 | 2026-07-11 | user_confirmed_manual_override | MANUAL_FIXED_VALUE | 是 | 512,000.00 | 黄金 |
+| GOLD_518880 | 4000.0 | - | CNY | 1.0 | 2026-07-11 | user_confirmed | STALE_USER_CONFIRMED_VALUE | 否 | 35,000.00 | 黄金 |
+| CASH_CNY | - | - | CNY | 1.0 | 2026-07-15 | user_confirmed | MANUAL_FIXED_VALUE | 是 | 241,000.00 | 现金 |
+
+## 事件与数据状态
+
+- 事件状态：VALID_NO_HIGH_IMPACT_EVENT
+- 事件覆盖结论：事件覆盖有效，未来7天未发现高等级事件。
+- 场景解释：由各场景依赖矩阵独立解释，不作为全局总开关。
+
+- position_level_event_risk：HIGH_RISK_EVENT_FOUND
+- portfolio_level_event_risk：CLEAR
+- future_event_gate：PASS（仅评估未来事件）
+- released_data_quality：PARTIAL_DATA（仅影响DQS与置信度）
+- 持仓事件：IBKR｜IBKR 2026年第二季度业绩｜2026-07-21T16:00:00-04:00（America/New_York）｜NOT_RELEASED
+
+| 已发布事件 | 状态 | actual | previous | consensus | revision | 发布数据源 | as_of |
+|---|---|---:|---:|---:|---:|---|---|
+| CPI | PARTIAL_DATA | 332.568 | 333.979 | - | - | fred | 2026-07-20T17:55:51.523159+00:00 |
+| PPI | PARTIAL_DATA | 286.827 | 290.489 | - | - | fred | 2026-07-20T17:55:52.922713+00:00 |
+
+| 缺失项 | 具体缺失字段 | 数据源 | 最后成功时间 | 降分项 |
+|---|---|---|---|---|
+| CPI | consensus_value；revision | fred | 2026-07-20T17:55:51.523159+00:00 | opportunity_dqs.released_macro_event_data_quality |
+| PPI | consensus_value；revision | fred | 2026-07-20T17:55:52.922713+00:00 | opportunity_dqs.released_macro_event_data_quality |
+
+## 成交对账审计
+
+- execution_dqs：**100**
+- 成交对账总状态：**PASS**
+
+| 交易日期 | 标的 | 交易前数量 | 成交数量 | 交易后数量 | 成交金额 | 费用 | 汇率 | 现金变化 | 对账状态 |
+|---|---|---:|---:|---:|---:|---:|---|---:|---|
+| 2026-07-15 | VOO | 28 | 2.166 | 30.166 | 1,499.955 USD（人民币等值记录9,000元） | 0 USD | 不适用（美元账户现金） | -1,499.955 USD | PASS |
+
+## 警告明细
+
+警告总数：**9**
+
+| warning_id | severity | scope | message | affected_scenarios | is_hard_block | recommended_action |
+|---|---|---|---|---|---|---|
+| ISSUE-143E221AE3 | WARN | opportunity_add | Put/Call Ratio: NOT_CONNECTED | opportunity_add | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-14FE53A5F5 | WARN | opportunity_add | 市场宽度: NOT_CONNECTED | opportunity_add | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-1ECD2A4C09 | WARN | SYSTEM | 存在过期数据：DGS10, UNRATE, GDP。 | SYSTEM | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-366337498C | WARN | opportunity_add | AAII情绪: NOT_CONNECTED | opportunity_add | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-366BD4E7F2 | WARN | opportunity_add | ETF资金流: NOT_CONNECTED | opportunity_add | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-87DDEC42EA | WARN | strategic_rebalance | 仅输出资产偏离与修复方向，不生成即时成交指令 | strategic_rebalance | 否 | 按场景下一步动作复核，不自动交易 |
+| ISSUE-96FA3FCD16 | WARN | risk_monitoring | 市场风险置信度为low | risk_monitoring | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-9DD95FD872 | WARN | SYSTEM | 关键行情或宏观数据存在过期项。 | SYSTEM | 否 | 等待下一次数据刷新并复核 |
+| ISSUE-A45700B061 | WARN | grid | Smart Grid固定为SIMULATION_ONLY，模拟资金与实盘隔离 | grid | 否 | 按场景下一步动作复核，不自动交易 |
+
+## 阻断明细
+
+阻断总数：**9**
+
+| warning_id | severity | scope | message | affected_scenarios | is_hard_block | recommended_action |
+|---|---|---|---|---|---|---|
+| ISSUE-18A3FB433E | WARN | grid | 风险分数53高于实盘上限50 | grid:live | 是 | 保持模拟与实盘隔离；满足实盘条件后再人工复核 |
+| ISSUE-5297D769E9 | WARN | scheduled_dca | 当前不在计划执行窗口 | scheduled_dca | 是 | 满足该场景硬门槛后重新评估 |
+| ISSUE-690CE941BD | WARN | grid | grid_dqs=0低于模拟信号门槛85 | grid | 是 | 满足该场景硬门槛后重新评估 |
+| ISSUE-6A8EB12F95 | WARN | strategic_rebalance | VOO待估值：PENDING_VALUATION | strategic_rebalance | 是 | 取得有效收盘价与独立估值汇率后自动重算 |
+| ISSUE-86CF7F92BB | WARN | grid | grid_snapshot_comparability=DATA_NOT_COMPARABLE | grid | 是 | 满足该场景硬门槛后重新评估 |
+| ISSUE-AA9EA0BADE | WARN | grid_snapshot_comparability | grid_snapshot_comparability=DATA_NOT_COMPARABLE | grid | 是 | 等待下一次数据刷新并复核 |
+| ISSUE-C7501EAF80 | WARN | grid | 实盘网格现金为0 | grid:live | 是 | 保持模拟与实盘隔离；满足实盘条件后再人工复核 |
+| ISSUE-D407CC5F81 | WARN | opportunity_add | opportunity_dqs=65低于门槛85 | opportunity_add | 是 | 满足该场景硬门槛后重新评估 |
+| ISSUE-E02C8B17A9 | WARN | opportunity_add | 风险分数53高于场景上限50 | opportunity_add | 是 | 满足该场景硬门槛后重新评估 |
+
+一致性警告总数：**2**
+
+## 下一执行窗口
+
+- DCA cadence：每月两次（每月第1、3个周三；节假日顺延至下一有效交易日）
+- 周度规则说明：同一自然周最多执行一次是频率上限，不代表每周定投。
+- 上一次执行日期：2026-07-15
+- 下一次理论执行日期：2026-08-05
+- 跳过中间日期的原因：第2、4、5周的周三不属于当前每月第1、3周执行计划，因此不是漏执行。
+- 下一次需要复核的数据：核心行情、持仓、现金、风险与事件数据
+- 可执行条件：下一个基础定投复核日：2026-08-05；core_dqs<65禁止，65–74仅减额复核，>=75进入正常定投评估。；本月债券资金已到账，剩余专项现金21,000元可分批评估，但不代表必须立即或一次性投入。；若主要指数回撤约5%且DQS>=85，优先评估VOO/QQQ和沪深300ETF小额分批。；若DQS低于60或关键价格缺失，继续禁止新增仓位建议。
+- 预计档位：待下一窗口按当时事件与风险状态复核正常或减额档位
+- 本报告不预测具体市场涨跌点位。
+
+## 附录：统一快照引用
+
+主报告快照哈希：`8d531f9dfcc94fedcfa283255a4af7e058fe7e0430eb2a6c132e3e17182ac8fd`
+附录快照哈希：`8d531f9dfcc94fedcfa283255a4af7e058fe7e0430eb2a6c132e3e17182ac8fd`
+
+Smart Grid 为 SIMULATION_ONLY；模拟资金、持仓和盈亏不进入真实资产与正式交易建议。系统不自动交易，所有执行均需人工确认。

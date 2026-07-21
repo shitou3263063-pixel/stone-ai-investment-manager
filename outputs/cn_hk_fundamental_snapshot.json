@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T02:29:42+08:00",
+  "generated_at": "2026-07-21T01:53:33+08:00",
   "items": {
     "002558.SZ": {
       "interface": "002558_fundamental",
@@ -9,7 +9,7 @@
       "source_level": 3,
       "source_type": "monitored_aggregator_fallback",
       "underlying_provider": "eastmoney",
-      "fetched_at": "2026-07-19T02:30:08+08:00",
+      "fetched_at": "2026-07-21T01:54:04+08:00",
       "market_date": null,
       "reporting_period": "2026-03-31",
       "currency": "CNY",
@@ -33,7 +33,7 @@
           "source_level": 3,
           "source_type": "monitored_aggregator_fallback",
           "underlying_provider": "eastmoney",
-          "fetched_at": "2026-07-19T02:30:08+08:00",
+          "fetched_at": "2026-07-21T01:54:04+08:00",
           "market_date": null,
           "reporting_period": "2026-03-31",
           "currency": "CNY",
