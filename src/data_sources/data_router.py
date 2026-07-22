@@ -432,6 +432,9 @@ def _try_provider(
     fn: Callable[[str], dict[str, Any]],
     symbol: str,
     errors: list[str],
+    *,
+    write_through_cache: bool = True,
+    log_events: bool = True,
 ) -> dict[str, Any] | None:
     try:
         provider_symbol = provider_symbol_for(symbol, provider_name)
@@ -442,13 +445,16 @@ def _try_provider(
             "symbol_alias_normalization": provider_symbol != symbol,
             "proxy_used": False,
         }
-        write_cache("quote", symbol, data, provider_name)
-        write_log(f"{symbol} 行情获取成功：{provider_name}（供应商代码 {provider_symbol}）", filename="data_router.log")
+        if write_through_cache:
+            write_cache("quote", symbol, data, provider_name)
+        if log_events:
+            write_log(f"{symbol} 行情获取成功：{provider_name}（供应商代码 {provider_symbol}）", filename="data_router.log")
         return _with_symbol(symbol, data)
     except Exception as exc:  # noqa: BLE001 - any source failure should degrade
         message = f"{symbol} {provider_name} 获取失败：{exc}"
         errors.append(message)
-        write_log(message, filename="data_router.log")
+        if log_events:
+            write_log(message, filename="data_router.log")
         return None
 
 
@@ -647,7 +653,13 @@ def write_cn_hk_p0_validation(items: dict[str, dict[str, Any]], completeness: di
     )
 
 
-def get_market_quote(symbol: str) -> dict[str, Any]:
+def get_market_quote(
+    symbol: str,
+    *,
+    allow_cache: bool = True,
+    write_through_cache: bool = True,
+    log_events: bool = True,
+) -> dict[str, Any]:
     errors: list[str] = []
     candidates: list[dict[str, Any]] = []
 
@@ -674,7 +686,14 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
         if fn is None:
             continue
         attempted.append(provider_name)
-        data = _try_provider(provider_name, fn, symbol, errors)
+        data = _try_provider(
+            provider_name,
+            fn,
+            symbol,
+            errors,
+            write_through_cache=write_through_cache,
+            log_events=log_events,
+        )
         if data:
             candidates.append(data)
 
@@ -699,9 +718,10 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
             "provider_errors": errors,
         })
 
-    cached = read_cache("quote", symbol)
+    cached = read_cache("quote", symbol) if allow_cache else None
     if cached:
-        write_log(f"{symbol} 使用缓存行情：{cached.get('source')}", filename="data_router.log")
+        if log_events:
+            write_log(f"{symbol} 使用缓存行情：{cached.get('source')}", filename="data_router.log")
         return validate_market_item(
             symbol,
             _normalize_point(_with_symbol(symbol, {
@@ -716,7 +736,8 @@ def get_market_quote(symbol: str) -> dict[str, Any]:
             })),
         )
 
-    write_log(f"{symbol} 行情全部失败，数据缺失，不做激进判断", filename="data_router.log")
+    if log_events:
+        write_log(f"{symbol} 行情全部失败，数据缺失，不做激进判断", filename="data_router.log")
     return validate_market_item(symbol, _normalize_point(_with_symbol(symbol, _failed_item(symbol, errors))))
 
 
