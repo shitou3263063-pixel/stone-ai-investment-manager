@@ -29,11 +29,17 @@ freshness:
 
 source_routing:
   source_priority:
-    US: [finnhub, alpha_vantage, yfinance]
-    HK: [finnhub, yfinance]
+    US: [futu, finnhub, alpha_vantage, yfinance]
+    HK: [futu, finnhub, yfinance]
     CN: [finnhub, yfinance]
   source_conflict_threshold: 1.0
   allow_delayed_quotes: true
+
+futu:
+  host: 127.0.0.1
+  port: 11111
+  realtime_max_age_seconds: 90
+  delayed_max_age_seconds: 1200
 
 intervals:
   trading_interval_seconds: 60

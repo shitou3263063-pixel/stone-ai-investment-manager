@@ -1,5 +1,6 @@
 openai>=1.0.0,<3.0.0
 PyYAML>=6.0,<7.0
 yfinance>=0.2.40,<2.0.0
+futu-api==10.9.6908
 akshare==1.18.64
 pytest>=8.0.0,<10.0.0

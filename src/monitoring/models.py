@@ -24,6 +24,7 @@ class AlertSeverity(str, Enum):
 class SourceQuoteStatus(str, Enum):
     REALTIME_VALID = "REALTIME_VALID"
     DELAYED_VALID = "DELAYED_VALID"
+    CLOSED_VALID = "CLOSED_VALID"
     DAILY_ONLY = "DAILY_ONLY"
     UNAVAILABLE = "UNAVAILABLE"
     RATE_LIMITED = "RATE_LIMITED"

@@ -314,6 +314,8 @@ class IntradayMonitor:
         return results
 
     def close(self) -> None:
+        if self.quote_router is not None:
+            self.quote_router.close()
         self.state_store.close()
         self.logger.close()
 
@@ -370,6 +372,9 @@ def _normalize_snapshot(
         data_status = DataStatus.STALE if stale else DataStatus.DELAYED_VALID
     elif quote_status == SourceQuoteStatus.REALTIME_VALID.value:
         stale = stale or _timestamp_is_stale(timestamp, captured_at, market_status, freshness)
+        data_status = DataStatus.STALE if stale else DataStatus.VALID
+    elif quote_status == SourceQuoteStatus.CLOSED_VALID.value:
+        stale = stale or market_status.is_trading or timestamp is None
         data_status = DataStatus.STALE if stale else DataStatus.VALID
     elif quote_status == SourceQuoteStatus.DAILY_ONLY.value:
         stale = stale or market_status.is_trading or timestamp is None

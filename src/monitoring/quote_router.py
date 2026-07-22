@@ -11,6 +11,7 @@ from src.data_sources.data_router import provider_symbol_for
 
 from .models import SourceQuoteStatus
 from .state_store import MonitoringStateStore
+from .adapters import FutuQuoteAdapter
 
 
 Provider = Callable[[str], dict[str, Any]]
@@ -37,7 +38,11 @@ class MonitoringQuoteRouter:
         self.state_store = state_store
         routing = config.get("source_routing") or {}
         self.priority = routing.get("source_priority") or {}
+        self._futu_adapter: FutuQuoteAdapter | None = None
         self.providers = dict(providers or PROVIDERS)
+        if providers is None and any("futu" in sources for sources in self.priority.values()):
+            self._futu_adapter = FutuQuoteAdapter.from_config(config)
+            self.providers["futu"] = self._futu_adapter.get_quote
         self.conflict_threshold = float(
             routing.get("source_conflict_threshold", routing.get("source_conflict_threshold_percent", 1.0))
         )
@@ -145,6 +150,18 @@ class MonitoringQuoteRouter:
             })
             return selected
 
+        closed = [row for row in candidates if row.get("monitor_quote_status") == SourceQuoteStatus.CLOSED_VALID.value]
+        if closed:
+            selected = dict(closed[0])
+            selected.update({
+                "candidates": candidates,
+                "source_results": observations,
+                "health_recoveries": recoveries,
+                "cross_validation_status": "CLOSED_SESSION_REFERENCE",
+                "verified_by_second_source": False,
+            })
+            return selected
+
         daily = [row for row in candidates if row.get("monitor_quote_status") == SourceQuoteStatus.DAILY_ONLY.value]
         if daily:
             selected = dict(daily[0])
@@ -168,6 +185,10 @@ class MonitoringQuoteRouter:
             "provider_errors": classifications,
             "error": final_status,
         }
+
+    def close(self) -> None:
+        if self._futu_adapter is not None:
+            self._futu_adapter.close()
 
 
 def classify_quote(source: str, payload: Mapping[str, Any], *, now: datetime) -> SourceQuoteStatus:
