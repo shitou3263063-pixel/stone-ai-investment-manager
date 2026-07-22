@@ -8,6 +8,7 @@ from typing import Any
 
 class DataStatus(str, Enum):
     VALID = "VALID"
+    DELAYED_VALID = "DELAYED_VALID"
     STALE = "STALE"
     MISSING = "MISSING"
     CONFLICT = "CONFLICT"
@@ -18,6 +19,30 @@ class AlertSeverity(str, Enum):
     WATCH = "WATCH"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
+
+
+class SourceQuoteStatus(str, Enum):
+    REALTIME_VALID = "REALTIME_VALID"
+    DELAYED_VALID = "DELAYED_VALID"
+    DAILY_ONLY = "DAILY_ONLY"
+    UNAVAILABLE = "UNAVAILABLE"
+    RATE_LIMITED = "RATE_LIMITED"
+    AUTH_ERROR = "AUTH_ERROR"
+
+
+class SourceHealthStatus(str, Enum):
+    HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
+    UNAVAILABLE = "UNAVAILABLE"
+    RATE_LIMITED = "RATE_LIMITED"
+    AUTH_ERROR = "AUTH_ERROR"
+
+
+class ChangeStatus(str, Enum):
+    OK = "OK"
+    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    NO_MATCHING_SNAPSHOT = "NO_MATCHING_SNAPSHOT"
+    UNTRUSTED_CURRENT = "UNTRUSTED_CURRENT"
 
 
 @dataclass(frozen=True)
@@ -85,6 +110,41 @@ class Alert:
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["severity"] = self.severity.value
+        payload["observed_at"] = self.observed_at.isoformat()
+        return payload
+
+
+@dataclass(frozen=True)
+class ChangeResult:
+    window_minutes: int
+    status: ChangeStatus
+    change_percent: float | None
+    reference_price: float | None
+    current_price: float | None
+    reference_captured_at: datetime | None
+    current_captured_at: datetime
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["status"] = self.status.value
+        payload["reference_captured_at"] = (
+            self.reference_captured_at.isoformat() if self.reference_captured_at else None
+        )
+        payload["current_captured_at"] = self.current_captured_at.isoformat()
+        return payload
+
+
+@dataclass(frozen=True)
+class RecoveryEvent:
+    fingerprint: str
+    event_type: str
+    subject: str
+    recovered_rule: str
+    observed_at: datetime
+    message: str
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
         payload["observed_at"] = self.observed_at.isoformat()
         return payload
 
