@@ -1,0 +1,67 @@
+version: 1
+mode: observation_only
+
+symbols:
+  - {symbol: VOO, route_symbol: VOO, asset_name: Vanguard S&P 500 ETF, market: US}
+  - {symbol: NVDA, route_symbol: NVDA, asset_name: NVIDIA, market: US}
+  - {symbol: GOOG, route_symbol: GOOG, asset_name: Alphabet, market: US}
+  - {symbol: TLT, route_symbol: TLT, asset_name: iShares 20+ Year Treasury Bond ETF, market: US}
+  - {symbol: IBKR, route_symbol: IBKR, asset_name: Interactive Brokers, market: US}
+  - {symbol: XLF, route_symbol: XLF, asset_name: Financial Select Sector SPDR Fund, market: US}
+  - {symbol: BABA, route_symbol: BABA, asset_name: Alibaba ADR, market: US}
+  - {symbol: 03033.HK, route_symbol: 03033.HK, asset_name: CSOP Hang Seng TECH Index ETF, market: HK}
+  - {symbol: '513060', route_symbol: 513060.SS, asset_name: Hang Seng Healthcare ETF, market: CN}
+  - {symbol: '513090', route_symbol: 513090.SS, asset_name: Hong Kong Securities ETF, market: CN}
+  - {symbol: '510300', route_symbol: 510300.SS, asset_name: CSI 300 ETF, market: CN}
+  - {symbol: '002558', route_symbol: 002558.SZ, asset_name: Giant Network, market: CN}
+
+market_clock:
+  # Basic holiday interface. Add exchange-confirmed YYYY-MM-DD dates here.
+  holidays:
+    CN: []
+    HK: []
+    US: []
+
+freshness:
+  intraday_max_age_minutes: 15
+  future_tolerance_minutes: 2
+  closed_market_max_age_hours: 120
+
+rules:
+  price_5m:
+    enabled: true
+    threshold_percent: 1.5
+    severity: WATCH
+  price_15m:
+    enabled: true
+    threshold_percent: 2.5
+    severity: WARNING
+  daily_change:
+    enabled: true
+    threshold_percent: 4.0
+    severity: CRITICAL
+  data_stale:
+    enabled: true
+    severity: WARNING
+  source_conflict:
+    enabled: true
+    severity: CRITICAL
+  all_sources_failed:
+    enabled: true
+    severity: CRITICAL
+
+cooldowns_minutes:
+  WATCH: 60
+  WARNING: 30
+  CRITICAL: 10
+
+runtime:
+  max_workers: 4
+  snapshot_retention_hours: 24
+  reference_tolerance_minutes: 2
+
+storage:
+  sqlite_path: data/monitoring/intraday_monitor.sqlite3
+
+logging:
+  structured_log_path: logs/intraday_monitor.jsonl
