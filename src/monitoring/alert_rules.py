@@ -35,7 +35,10 @@ class AlertRuleEngine:
                 alerts.append(self._build(data_rule, snapshot, "DATA", observed_at, None))
             return alerts
 
-        if not market_status.is_trading or snapshot.data_status is not DataStatus.VALID:
+        if not market_status.is_trading or snapshot.data_status not in {
+            DataStatus.VALID,
+            DataStatus.DELAYED_VALID,
+        }:
             return alerts
 
         changes = reference_changes or {}

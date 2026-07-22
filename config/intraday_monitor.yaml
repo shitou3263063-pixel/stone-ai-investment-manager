@@ -27,6 +27,43 @@ freshness:
   future_tolerance_minutes: 2
   closed_market_max_age_hours: 120
 
+source_routing:
+  source_priority:
+    US: [futu, finnhub, alpha_vantage, yfinance]
+    HK: [futu, finnhub, yfinance]
+    CN: [finnhub, yfinance]
+  source_conflict_threshold: 1.0
+  allow_delayed_quotes: true
+
+futu:
+  host: 127.0.0.1
+  port: 11111
+  realtime_max_age_seconds: 90
+  delayed_max_age_seconds: 1200
+
+intervals:
+  trading_interval_seconds: 60
+  closed_interval_seconds: 900
+  weekend_interval_seconds: 3600
+
+retry:
+  retry_initial_seconds: 30
+  retry_max_seconds: 900
+  failure_threshold: 3
+
+change_calculation:
+  five_minute_tolerance_seconds: 120
+  fifteen_minute_tolerance_seconds: 180
+
+process_lock:
+  lock_file_path: data/monitoring/intraday_monitor.lock
+  stale_lock_timeout_seconds: 7200
+
+retention:
+  snapshot_retention_days: 7
+  alert_retention_days: 30
+  source_health_retention_days: 30
+
 rules:
   price_5m:
     enabled: true
@@ -57,8 +94,6 @@ cooldowns_minutes:
 
 runtime:
   max_workers: 4
-  snapshot_retention_hours: 24
-  reference_tolerance_minutes: 2
 
 storage:
   sqlite_path: data/monitoring/intraday_monitor.sqlite3
