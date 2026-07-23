@@ -161,6 +161,23 @@ def test_report_summary_reads_simulation_ledger_read_only(tmp_path: Path) -> Non
     assert "候选仅为模拟观察，不能描述为已成交" in report
 
 
+def test_runtime_inputs_are_persisted_and_exposed_in_summary(tmp_path: Path) -> None:
+    _decision_value, store, config = _decision(tmp_path)
+    store.record_runtime_inputs(
+        {
+            "dqs": {"value": 90, "source": "reports/run_status.json", "as_of": "2026-07-22T14:59:00+00:00", "age_minutes": 1, "validity": "VALID"},
+            "risk_score": {"value": 40, "source": "reports/run_status.json", "as_of": "2026-07-22T14:59:00+00:00", "age_minutes": 1, "validity": "VALID"},
+            "usd_cny": {"value": 7.2, "source": "data_router", "as_of": "2026-07-22T14:59:00+00:00", "age_minutes": 1, "validity": "VALID"},
+        },
+        observed_at=NOW,
+    )
+    config_path = tmp_path / "long_term_grid.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    summary = load_grid_strategy_summary(tmp_path, config_path=config_path)
+    assert summary["runtime_inputs"]["usd_cny"]["value"] == 7.2
+    assert "data_router" in render_grid_strategy_summary(summary)
+
+
 def test_daily_report_grid_section_does_not_change_bundle_or_conclusion() -> None:
     bundle = _fixture_bundle()
     original = deepcopy(bundle)

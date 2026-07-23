@@ -16,6 +16,7 @@ from src.monitoring.market_clock import MarketClock
 from .engine import LongTermGridEngine
 from .models import GridDecision, MarketInputs
 from .notifier import GridAlertNotifier
+from .risk_inputs import fetch_usd_cny
 from .state_store import LongTermGridStateStore
 
 
@@ -59,6 +60,7 @@ class GridRuntimeDataProvider:
     def collect(self, symbols: list[str], *, now: datetime) -> dict[str, MarketInputs]:
         common = self._bundle_inputs(now=now)
         vix, vix_time, vix_error, vix_metadata = self._vix(now=now)
+        fx, fx_metadata, fx_errors = self._fx_quote(now=now)
         output: dict[str, MarketInputs] = {}
         for symbol in symbols:
             anomalies: list[str] = []
@@ -73,6 +75,7 @@ class GridRuntimeDataProvider:
             anomalies.extend(str(value) for value in common.get("errors", ()))
             if vix_error:
                 anomalies.append(vix_error)
+            anomalies.extend(str(value) for value in fx_errors)
             quote_time = _parse_optional_time(quote.get("quote_timestamp"))
             delay = (
                 max(0.0, (_utc(now) - _utc(quote_time)).total_seconds())
@@ -97,12 +100,13 @@ class GridRuntimeDataProvider:
                 risk_score=common.get("risk_score"),
                 vix=vix,
                 vix_time=vix_time,
-                usd_cny=common.get("usd_cny"),
+                usd_cny=fx,
                 data_anomalies=tuple(anomalies),
                 consecutive_days_above_ma20=streak,
                 input_metadata={
                     **(common.get("metadata") or {}),
                     "vix": vix_metadata,
+                    "usd_cny": fx_metadata,
                 },
             )
         return output
@@ -124,7 +128,6 @@ class GridRuntimeDataProvider:
             return {
                 "dqs": None,
                 "risk_score": None,
-                "usd_cny": None,
                 "errors": (reason, risk_reason),
                 "metadata": {
                     "dqs": {**source_metadata, "validity": source_metadata.get("validity", "MISSING"), "reason": reason},
@@ -151,11 +154,11 @@ class GridRuntimeDataProvider:
             "dqs": {**source_metadata, "value": dqs, "validity": "VALID" if dqs is not None else "MISSING"},
             "risk_score": {**source_metadata, "value": risk, "validity": "VALID" if risk is not None else "MISSING"},
         }
-        fx_symbol = str(settings.get("fx_symbol", "USD/CNY"))
-        market = (bundle.get("market_snapshot") or {}).get("market") or {}
-        fx = market.get(fx_symbol) or {}
-        usd_cny = _float(fx.get("current_price", fx.get("close", fx.get("value"))))
-        return {"dqs": dqs, "risk_score": risk, "usd_cny": usd_cny, "errors": tuple(errors), "metadata": metadata}
+        return {"dqs": dqs, "risk_score": risk, "errors": tuple(errors), "metadata": metadata}
+
+    def _fx_quote(self, *, now: datetime) -> tuple[float | None, dict[str, Any], tuple[str, ...]]:
+        settings = self.config.get("runtime_inputs") or {}
+        return fetch_usd_cny(now=now, settings=settings)
 
     def _history_inputs(self, symbol: str) -> tuple[float | None, int, str]:
         settings = self.config.get("runtime_inputs") or {}
@@ -283,6 +286,7 @@ class LongTermGridRuntime:
         current = _utc(now or datetime.now(tz=timezone.utc))
         started = time.perf_counter()
         inputs_by_symbol = self.data_provider.collect(symbols, now=current)
+        persisted_inputs: dict[str, Any] | None = None
         decisions: list[GridDecision] = []
         current_prices: dict[str, float] = {}
         for symbol in symbols:
@@ -299,6 +303,8 @@ class LongTermGridRuntime:
                 )
                 continue
             decision = self.engine.evaluate(inputs, now=current)
+            if persisted_inputs is None:
+                persisted_inputs = inputs.input_metadata
             self.state_store.record_evaluation(decision)
             notification = self.notifier.process(decision, now=current)
             decisions.append(decision)
@@ -319,6 +325,8 @@ class LongTermGridRuntime:
                     **notification,
                 },
             )
+        if persisted_inputs:
+            self.state_store.record_runtime_inputs(persisted_inputs, observed_at=current)
         metrics = self.state_store.performance_summary(
             current_prices=current_prices,
             total_budget_cny=float(self.config["budget"]["total_cny"]),
@@ -455,7 +463,7 @@ def print_grid_table(decisions: list[GridDecision]) -> None:
             f"quote_delay_seconds={_fmt(item.quote_delay_seconds, 1)}"
         )
         input_metadata = item.metadata.get("input_metadata") or {}
-        for name in ("dqs", "risk_score", "vix"):
+        for name in ("dqs", "risk_score", "usd_cny", "vix"):
             detail = input_metadata.get(name) or {}
             print(
                 f"{item.symbol} {name}={detail.get('value', getattr(item, name, None))} "
@@ -496,6 +504,7 @@ def _unavailable_input(reason: str) -> dict[str, Any]:
         "age_minutes": None,
         "validity": "MISSING",
         "reason": reason,
+        "unavailable_reason": reason,
     }
 
 
@@ -508,6 +517,7 @@ def _formal_input_metadata(candidate: Mapping[str, Any], *, now: datetime) -> di
     else:
         as_of_text = as_of
     return {
+        "value": None,
         "source": candidate.get("source"),
         "as_of": as_of_text,
         "report_date": candidate.get("report_date"),
@@ -515,6 +525,7 @@ def _formal_input_metadata(candidate: Mapping[str, Any], *, now: datetime) -> di
         "timezone": candidate.get("timezone"),
         "age_minutes": age_minutes,
         "validity": candidate.get("validity", "MISSING"),
+        "unavailable_reason": candidate.get("unavailable_reason") or candidate.get("reason"),
     }
 
 

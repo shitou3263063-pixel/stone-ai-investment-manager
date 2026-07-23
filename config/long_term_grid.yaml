@@ -80,6 +80,9 @@ runtime_inputs:
   dqs_name: grid_dqs
   vix_symbol: ^VIX
   fx_symbol: USD/CNY
+  fx_primary_source: data_router
+  fx_fallback_source: open_er_api
+  fx_max_age_seconds: 86400
   moving_average_days: 20
   history_period: 2mo
 

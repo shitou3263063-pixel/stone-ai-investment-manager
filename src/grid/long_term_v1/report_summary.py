@@ -61,6 +61,12 @@ def load_grid_strategy_summary(
                 "SELECT * FROM equity_history ORDER BY observed_at"
             ).fetchall()
             benchmarks = connection.execute("SELECT * FROM benchmark_state").fetchall()
+            try:
+                runtime_rows = connection.execute(
+                    "SELECT * FROM runtime_inputs ORDER BY name"
+                ).fetchall()
+            except sqlite3.OperationalError:
+                runtime_rows = []
     except (sqlite3.Error, OSError, json.JSONDecodeError):
         return _unavailable_summary()
     finally:
@@ -110,12 +116,27 @@ def load_grid_strategy_summary(
         else 0.0
     )
     strategy_return = net / total_budget if total_budget else 0.0
+    runtime_inputs = {
+        str(row["name"]): {
+            "value": row["value"],
+            "source": row["source"],
+            "as_of": row["as_of"],
+            "age_minutes": row["age_minutes"],
+            "validity": row["validity"],
+            "unavailable_reason": row["unavailable_reason"],
+            "fallback_used": bool(row["fallback_used"]),
+            "fallback_source": row["fallback_source"],
+            "updated_at": row["updated_at"],
+        }
+        for row in runtime_rows
+    }
     return {
         "status": "AVAILABLE" if items else "DATA_INSUFFICIENT",
         "strategy_id": "LONG_TERM_GRID_V1",
         "simulation_only": True,
         "automatic_trading": False,
         "items": items,
+        "runtime_inputs": runtime_inputs,
         "metrics": {
             "cumulative_net_profit_cny": round(net, 2),
             "realized_profit_cny": round(realized, 2),
@@ -148,6 +169,17 @@ def render_grid_strategy_summary(summary: Mapping[str, Any]) -> str:
         "- 仓位范围：仅 GRID_POSITION；不得卖出 CORE_POSITION 或 DCA_POSITION",
     ]
     items = list(summary.get("items") or [])
+    runtime_inputs = summary.get("runtime_inputs") or {}
+    if runtime_inputs:
+        lines.extend(["", "### 当前风险输入"])
+        for name in ("dqs", "risk_score", "usd_cny"):
+            detail = runtime_inputs.get(name) or {}
+            lines.append(
+                f"- {name}: value={detail.get('value')}, source={detail.get('source') or '-'}, "
+                f"as_of={detail.get('as_of') or '-'}, age_minutes={detail.get('age_minutes')}, "
+                f"validity={detail.get('validity') or 'MISSING'}, "
+                f"unavailable_reason={detail.get('unavailable_reason') or '-'}"
+            )
     if not items:
         lines.extend(
             [
@@ -199,6 +231,7 @@ def _unavailable_summary() -> dict[str, Any]:
         "simulation_only": True,
         "automatic_trading": False,
         "items": [],
+        "runtime_inputs": {},
         "metrics": {},
         "notice": "网格数据不足",
     }
