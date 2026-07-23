@@ -364,10 +364,11 @@ class LongTermGridEngine:
             "estimated_slippage_cny": 0.0,
             "decision_inputs_hash": _inputs_hash(inputs, reference_center),
             "metadata": {
-                "reference_center_candidate_id": candidate_id,
-                "reference_center_change_requires_manual_confirmation": True,
-                "mode": MODE,
-            },
+            "reference_center_candidate_id": candidate_id,
+            "reference_center_change_requires_manual_confirmation": True,
+            "mode": MODE,
+            "input_metadata": inputs.input_metadata,
+        },
         }
 
     @staticmethod

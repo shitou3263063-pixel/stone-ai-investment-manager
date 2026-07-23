@@ -71,6 +71,12 @@ transaction_costs:
 
 runtime_inputs:
   final_bundle_path: reports/final_decision_bundle.json
+  formal_input_paths:
+    - reports/run_status.json
+    - reports/final_decision_bundle.json
+    - reports/decision.json
+  formal_max_age_minutes: 1440
+  formal_timezone: Asia/Shanghai
   dqs_name: grid_dqs
   vix_symbol: ^VIX
   fx_symbol: USD/CNY
@@ -86,6 +92,8 @@ email:
   enabled: false
   dry_run: true
   cooldown_minutes: 60
+email_alerts_enabled: false
+email_dry_run: true
 
 watch:
   interval_seconds: 60

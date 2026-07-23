@@ -42,6 +42,7 @@ class MarketInputs:
     usd_cny: float | None
     data_anomalies: tuple[str, ...] = ()
     consecutive_days_above_ma20: int = 0
+    input_metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.quote_time is not None and self.quote_time.tzinfo is None:

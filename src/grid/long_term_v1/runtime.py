@@ -6,6 +6,7 @@ from pathlib import Path
 from threading import Event
 import time
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -56,8 +57,8 @@ class GridRuntimeDataProvider:
         self.clock = MarketClock()
 
     def collect(self, symbols: list[str], *, now: datetime) -> dict[str, MarketInputs]:
-        common = self._bundle_inputs()
-        vix, vix_time, vix_error = self._vix()
+        common = self._bundle_inputs(now=now)
+        vix, vix_time, vix_error, vix_metadata = self._vix(now=now)
         output: dict[str, MarketInputs] = {}
         for symbol in symbols:
             anomalies: list[str] = []
@@ -69,6 +70,7 @@ class GridRuntimeDataProvider:
             ma20, streak, history_error = self._history_inputs(symbol)
             if history_error:
                 anomalies.append(history_error)
+            anomalies.extend(str(value) for value in common.get("errors", ()))
             if vix_error:
                 anomalies.append(vix_error)
             quote_time = _parse_optional_time(quote.get("quote_timestamp"))
@@ -98,31 +100,62 @@ class GridRuntimeDataProvider:
                 usd_cny=common.get("usd_cny"),
                 data_anomalies=tuple(anomalies),
                 consecutive_days_above_ma20=streak,
+                input_metadata={
+                    **(common.get("metadata") or {}),
+                    "vix": vix_metadata,
+                },
             )
         return output
 
     def close(self) -> None:
         self.futu.close()
 
-    def _bundle_inputs(self) -> dict[str, float | None]:
+    def _bundle_inputs(self, *, now: datetime) -> dict[str, Any]:
         settings = self.config.get("runtime_inputs") or {}
-        path = Path(
-            settings.get("final_bundle_path", "reports/final_decision_bundle.json")
-        )
-        if not path.is_absolute():
-            path = self.root / path
-        try:
-            bundle = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {"dqs": None, "risk_score": None, "usd_cny": None}
+        bundle, source = _load_latest_formal_run(self.root, settings, now=now)
+        if bundle is None or source is None:
+            source_metadata = (
+                _formal_input_metadata(source, now=now)
+                if source is not None
+                else _unavailable_input("FORMAL_RUN_NOT_FOUND")
+            )
+            reason = "DQS_INPUT_CONFLICT" if source and source.get("conflict") else "DQS_UNAVAILABLE"
+            risk_reason = "RISK_SCORE_INPUT_CONFLICT" if source and source.get("conflict") else "RISK_SCORE_UNAVAILABLE"
+            return {
+                "dqs": None,
+                "risk_score": None,
+                "usd_cny": None,
+                "errors": (reason, risk_reason),
+                "metadata": {
+                    "dqs": {**source_metadata, "validity": source_metadata.get("validity", "MISSING"), "reason": reason},
+                    "risk_score": {**source_metadata, "validity": source_metadata.get("validity", "MISSING"), "reason": risk_reason},
+                },
+            }
         dqs_name = str(settings.get("dqs_name", "grid_dqs"))
-        dqs = _float((bundle.get("dqs_results", {}).get(dqs_name) or {}).get("total"))
+        dqs_record = (bundle.get("dqs_results", {}).get(dqs_name) or {})
+        if not dqs_record:
+            dqs_record = (bundle.get("dqs", {}).get(dqs_name) or {})
+        if not dqs_record and dqs_name == "grid_dqs":
+            dqs_record = {"total": (bundle.get("dqs", {}).get("grid_dqs"))}
+        dqs = _float(dqs_record.get("total"))
         risk = _float((bundle.get("risk_snapshot") or {}).get("score"))
+        errors: list[str] = []
+        if source.get("conflict"):
+            errors.extend(("DQS_INPUT_CONFLICT", "RISK_SCORE_INPUT_CONFLICT"))
+        if dqs is None:
+            errors.append("DQS_UNAVAILABLE")
+        if risk is None:
+            errors.append("RISK_SCORE_UNAVAILABLE")
+        source_metadata = _formal_input_metadata(source, now=now)
+        metadata = {
+            "dqs": {**source_metadata, "value": dqs, "validity": "VALID" if dqs is not None else "MISSING"},
+            "risk_score": {**source_metadata, "value": risk, "validity": "VALID" if risk is not None else "MISSING"},
+        }
         fx_symbol = str(settings.get("fx_symbol", "USD/CNY"))
         market = (bundle.get("market_snapshot") or {}).get("market") or {}
         fx = market.get(fx_symbol) or {}
         usd_cny = _float(fx.get("current_price", fx.get("close", fx.get("value"))))
-        return {"dqs": dqs, "risk_score": risk, "usd_cny": usd_cny}
+        return {"dqs": dqs, "risk_score": risk, "usd_cny": usd_cny, "errors": tuple(errors), "metadata": metadata}
 
     def _history_inputs(self, symbol: str) -> tuple[float | None, int, str]:
         settings = self.config.get("runtime_inputs") or {}
@@ -150,8 +183,38 @@ class GridRuntimeDataProvider:
         except Exception as exc:  # noqa: BLE001
             return None, 0, f"MA20_FAILURE:{type(exc).__name__}"
 
-    def _vix(self) -> tuple[float | None, datetime | None, str]:
+    def _vix(self, *, now: datetime) -> tuple[float | None, datetime | None, str, dict[str, Any]]:
         settings = self.config.get("runtime_inputs") or {}
+        try:
+            from src.data_sources.data_router import _official_vix_quote
+
+            official = _official_vix_quote()
+            value = _float(official.get("close", official.get("value")))
+            timestamp = _parse_optional_time(
+                official.get("published_at")
+                or official.get("quote_timestamp")
+                or official.get("observed_at")
+            )
+            if timestamp is None and official.get("published_at"):
+                timestamp = _parse_optional_time(
+                    f"{official['published_at']}+00:00"
+                )
+            if value is not None and timestamp is not None:
+                age = max(0.0, (_utc(now) - _utc(timestamp)).total_seconds())
+                max_age = float((self.config.get("risk_gates") or {}).get("vix_max_age_seconds", 300))
+                validity = "VALID" if age <= max_age else "STALE"
+                metadata = {
+                    "value": value,
+                    "source": str(official.get("source") or "cboe_official"),
+                    "as_of": timestamp.isoformat(),
+                    "age_minutes": round(age / 60.0, 3),
+                    "validity": validity,
+                }
+                if validity == "VALID":
+                    return value, timestamp, "", metadata
+                return value, timestamp, "VIX_STALE", metadata
+        except Exception:
+            pass
         try:
             import yfinance as yf
 
@@ -161,14 +224,25 @@ class GridRuntimeDataProvider:
                 auto_adjust=False,
             )
             if history.empty:
-                return None, None, "VIX_DATA_UNAVAILABLE"
+                return None, None, "VIX_DATA_UNAVAILABLE", _unavailable_input("VIX_DATA_UNAVAILABLE")
             last = history.iloc[-1]
             timestamp = history.index[-1].to_pydatetime()
             if timestamp.tzinfo is None:
-                return None, None, "VIX_TIMESTAMP_MISSING"
-            return float(last["Close"]), timestamp, ""
+                return None, None, "VIX_TIMESTAMP_MISSING", _unavailable_input("VIX_TIMESTAMP_MISSING")
+            value = float(last["Close"])
+            age = max(0.0, (_utc(now) - _utc(timestamp)).total_seconds())
+            max_age = float((self.config.get("risk_gates") or {}).get("vix_max_age_seconds", 300))
+            validity = "VALID" if age <= max_age else "STALE"
+            metadata = {
+                "value": value,
+                "source": "yfinance",
+                "as_of": timestamp.isoformat(),
+                "age_minutes": round(age / 60.0, 3),
+                "validity": validity,
+            }
+            return value, timestamp, "" if validity == "VALID" else "VIX_STALE", metadata
         except Exception as exc:  # noqa: BLE001
-            return None, None, f"VIX_FAILURE:{type(exc).__name__}"
+            return None, None, f"VIX_FAILURE:{type(exc).__name__}", _unavailable_input(type(exc).__name__)
 
 
 class LongTermGridRuntime:
@@ -376,6 +450,19 @@ def print_grid_table(decisions: list[GridDecision]) -> None:
     for row in rows:
         print("  ".join(row[index].ljust(widths[index]) for index in range(len(headers))))
     for item in decisions:
+        print(
+            f"{item.symbol} quote_time={item.quote_time.isoformat() if item.quote_time else '-'} "
+            f"quote_delay_seconds={_fmt(item.quote_delay_seconds, 1)}"
+        )
+        input_metadata = item.metadata.get("input_metadata") or {}
+        for name in ("dqs", "risk_score", "vix"):
+            detail = input_metadata.get(name) or {}
+            print(
+                f"{item.symbol} {name}={detail.get('value', getattr(item, name, None))} "
+                f"source={detail.get('source') or '-'} as_of={detail.get('as_of') or '-'} "
+                f"age_minutes={detail.get('age_minutes') if detail.get('age_minutes') is not None else '-'} "
+                f"validity={detail.get('validity') or '-'}"
+            )
         if item.blocked_reasons:
             print(f"{item.symbol} blocked: {', '.join(item.blocked_reasons)}")
     print("SIMULATION_ONLY | NO_AUTOMATIC_TRADING | position_scope=GRID_POSITION")
@@ -396,6 +483,177 @@ def _parse_optional_time(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None else None
+
+
+def _unavailable_input(reason: str) -> dict[str, Any]:
+    return {
+        "value": None,
+        "source": None,
+        "as_of": None,
+        "report_date": None,
+        "run_time": None,
+        "timezone": None,
+        "age_minutes": None,
+        "validity": "MISSING",
+        "reason": reason,
+    }
+
+
+def _formal_input_metadata(candidate: Mapping[str, Any], *, now: datetime) -> dict[str, Any]:
+    as_of = candidate.get("as_of")
+    age_minutes = None
+    if isinstance(as_of, datetime):
+        age_minutes = round(max(0.0, (_utc(now) - _utc(as_of)).total_seconds()) / 60.0, 3)
+        as_of_text = as_of.isoformat()
+    else:
+        as_of_text = as_of
+    return {
+        "source": candidate.get("source"),
+        "as_of": as_of_text,
+        "report_date": candidate.get("report_date"),
+        "run_time": candidate.get("run_time") or as_of_text,
+        "timezone": candidate.get("timezone"),
+        "age_minutes": age_minutes,
+        "validity": candidate.get("validity", "MISSING"),
+    }
+
+
+def _load_latest_formal_run(
+    root: Path,
+    settings: Mapping[str, Any],
+    *,
+    now: datetime,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Load the newest same-day formal run without treating missing data as zero."""
+    configured = settings.get("formal_input_paths") or [
+        "reports/run_status.json",
+        "reports/final_decision_bundle.json",
+        "reports/decision.json",
+    ]
+    paths: list[Path] = []
+    for value in configured:
+        path = Path(value)
+        if not path.is_absolute():
+            path = root / path
+        paths.append(path)
+    paths.extend(sorted(root.glob("reports/run_status*.json")))
+    candidates: list[dict[str, Any]] = []
+    seen: set[Path] = set()
+    for path in paths:
+        path = path.resolve()
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        candidate = _formal_candidate(path, payload, now=now, settings=settings)
+        if candidate is not None:
+            candidates.append(candidate)
+    if not candidates:
+        return None, None
+    valid = [
+        item
+        for item in candidates
+        if item["validity"] == "VALID"
+        and _extract_dqs(item["payload"], settings) is not None
+        and _extract_risk(item["payload"]) is not None
+    ]
+    pool = valid or candidates
+    pool.sort(key=lambda item: item.get("as_of") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    selected = pool[0]
+    # Same-day formal files must agree; disagreement is a hard input conflict.
+    same_day = [
+        item for item in valid
+        if item.get("report_date") == selected.get("report_date")
+    ]
+    if len(same_day) > 1:
+        values = {
+            (
+                _extract_dqs(item["payload"], settings),
+                _extract_risk(item["payload"]),
+            )
+            for item in same_day
+        }
+        if len(values) > 1:
+            selected = {**selected, "conflict": True}
+    if selected["validity"] != "VALID":
+        return None, selected
+    return selected["payload"], selected
+
+
+def _formal_candidate(
+    path: Path,
+    payload: Mapping[str, Any],
+    *,
+    now: datetime,
+    settings: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    metadata = payload.get("report_metadata") or {}
+    timestamp_value = (
+        metadata.get("report_generated_at")
+        or metadata.get("decision_cutoff_at")
+        or payload.get("data_cutoff_at")
+        or payload.get("data_cutoff_time")
+        or payload.get("generated_at")
+        or payload.get("run_time")
+    )
+    timezone_name = (
+        metadata.get("timezone")
+        or payload.get("timezone")
+        or settings.get("formal_timezone")
+        or "Asia/Shanghai"
+    )
+    as_of = _parse_optional_time(timestamp_value)
+    if as_of is None and timestamp_value not in {None, ""}:
+        try:
+            naive = datetime.fromisoformat(str(timestamp_value).replace("Z", ""))
+            as_of = naive.replace(tzinfo=ZoneInfo(str(timezone_name)))
+        except (TypeError, ValueError, KeyError):
+            as_of = None
+    report_date = (
+        metadata.get("report_business_date")
+        or payload.get("report_date")
+        or (as_of.astimezone(ZoneInfo(str(timezone_name))).date().isoformat() if as_of else None)
+    )
+    validity = "VALID"
+    if as_of is None or report_date is None:
+        validity = "MISSING"
+    else:
+        age_minutes = (_utc(now) - _utc(as_of)).total_seconds() / 60.0
+        max_age = float(settings.get("formal_max_age_minutes", 24 * 60))
+        local_today = _utc(now).astimezone(ZoneInfo(str(timezone_name))).date().isoformat()
+        if age_minutes < -5 or age_minutes > max_age or str(report_date) != local_today:
+            validity = "STALE"
+    validation = payload.get("validation") or {}
+    if validation and validation.get("ok") is False:
+        validity = "INVALID"
+    return {
+        "source": str(path),
+        "payload": dict(payload),
+        "as_of": as_of,
+        "report_date": str(report_date) if report_date is not None else None,
+        "run_time": timestamp_value,
+        "timezone": str(timezone_name),
+        "validity": validity,
+    }
+
+
+def _extract_dqs(payload: Mapping[str, Any], settings: Mapping[str, Any]) -> float | None:
+    name = str(settings.get("dqs_name", "grid_dqs"))
+    record = (payload.get("dqs_results", {}).get(name) or {})
+    if not record:
+        record = (payload.get("dqs", {}).get(name) or {})
+    if not record and name == "grid_dqs":
+        record = {"total": (payload.get("dqs", {}).get("grid_dqs"))}
+    return _float(record.get("total"))
+
+
+def _extract_risk(payload: Mapping[str, Any]) -> float | None:
+    return _float((payload.get("risk_snapshot") or {}).get("score"))
 
 
 def _float(value: Any) -> float | None:

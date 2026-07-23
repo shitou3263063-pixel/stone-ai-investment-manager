@@ -19,8 +19,8 @@ class GridAlertNotifier:
         sender=send_grid_alert_email,
     ) -> None:
         settings = config.get("email") or {}
-        self.enabled = bool(settings.get("enabled", False))
-        self.dry_run = bool(settings.get("dry_run", True))
+        self.enabled = bool(settings.get("enabled", config.get("email_alerts_enabled", False)))
+        self.dry_run = bool(settings.get("dry_run", config.get("email_dry_run", True)))
         self.cooldown_minutes = int(settings.get("cooldown_minutes", 60))
         self.state_store = state_store
         self.sender = sender
