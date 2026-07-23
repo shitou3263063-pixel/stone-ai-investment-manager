@@ -1,0 +1,105 @@
+version: 1
+strategy_id: LONG_TERM_GRID_V1
+mode: SIMULATION_ONLY
+automatic_trading: false
+enabled: true
+
+budget:
+  total_cny: 60000
+  minimum_cash_reserve_pct: 40
+  maximum_total_usage_pct: 60
+  daily_symbol_usage_limit_pct: 20
+  rolling_three_day_symbol_usage_limit_pct: 35
+  symbols:
+    VOO: 42000
+    QQQ: 18000
+
+symbols:
+  VOO:
+    market: US
+    budget_cny: 42000
+    buy_levels:
+      - {level: 1, drop_pct: 2, budget_pct: 10}
+      - {level: 2, drop_pct: 4, budget_pct: 15}
+      - {level: 3, drop_pct: 6, budget_pct: 15}
+      - {level: 4, drop_pct: 9, budget_pct: 20}
+      - {level: 5, drop_pct: 12, budget_pct: 20}
+      - {level: 6, drop_pct: 16, budget_pct: 20}
+    take_profit_1_pct: 3
+    take_profit_2_pct: 5.5
+  QQQ:
+    market: US
+    budget_cny: 18000
+    buy_levels:
+      - {level: 1, drop_pct: 3, budget_pct: 10}
+      - {level: 2, drop_pct: 6, budget_pct: 15}
+      - {level: 3, drop_pct: 9, budget_pct: 15}
+      - {level: 4, drop_pct: 13, budget_pct: 20}
+      - {level: 5, drop_pct: 18, budget_pct: 20}
+      - {level: 6, drop_pct: 24, budget_pct: 20}
+    take_profit_1_pct: 4
+    take_profit_2_pct: 7
+
+risk_gates:
+  minimum_dqs: 85
+  maximum_risk_score: 50
+  accepted_quote_statuses: [VALID, REALTIME_VALID]
+  maximum_quote_delay_seconds: 90
+  hard_stale_seconds: 300
+  maximum_vix: 40
+  vix_max_age_seconds: 300
+  require_us_regular_session: true
+
+vix_adjustment:
+  below_15: 0.70
+  from_15_to_20: 1.00
+  from_20_to_30_shallow: 0.50
+  from_20_to_30_deep: 1.00
+  from_30_to_40_shallow: 0.00
+  from_30_to_40_deep: 1.00
+  shallow_level_count: 2
+
+reference_center:
+  monthly_adjustment_limit: 1
+  consecutive_days_above_ma20: 5
+  require_manual_confirmation: true
+  never_move_down_automatically: true
+
+transaction_costs:
+  commission_bps: 5
+  slippage_bps: 5
+
+runtime_inputs:
+  final_bundle_path: reports/final_decision_bundle.json
+  formal_input_paths:
+    - reports/run_status.json
+    - reports/final_decision_bundle.json
+    - reports/decision.json
+  formal_max_age_minutes: 1440
+  formal_timezone: Asia/Shanghai
+  dqs_name: grid_dqs
+  vix_symbol: ^VIX
+  fx_symbol: USD/CNY
+  moving_average_days: 20
+  history_period: 2mo
+
+storage:
+  sqlite_path: data/grid_strategy/long_term_grid_v1.sqlite3
+  lock_path: data/grid_strategy/long_term_grid_v1.lock
+  log_path: logs/grid_strategy/long_term_grid_v1.jsonl
+
+email:
+  enabled: false
+  dry_run: true
+  cooldown_minutes: 60
+email_alerts_enabled: false
+email_dry_run: true
+
+watch:
+  interval_seconds: 60
+
+evaluation:
+  underperformance_months: 12
+  underperformance_threshold_pct: 3
+  drawdown_excess_threshold_pct: 5
+  data_quality_failure_threshold: 5
