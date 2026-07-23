@@ -259,3 +259,23 @@ def test_router_cache_can_be_disabled_for_monitoring(monkeypatch: pytest.MonkeyP
         log_events=False,
     )
     assert item["status"] == "ok"
+
+
+def test_hk_symbol_accepts_powershell_leading_zero_alias(tmp_path: Path) -> None:
+    monitor = IntradayMonitor(
+        _monitor_config(
+            tmp_path,
+            [
+                {
+                    "symbol": "03033.HK",
+                    "route_symbol": "03033.HK",
+                    "asset_name": "CSOP HSTI ETF",
+                    "market": "HK",
+                }
+            ],
+        ),
+        quote_fetcher=lambda _: _valid_raw(),
+        root=tmp_path,
+    )
+    monitor.filter_symbols({"3033"})
+    assert [asset["symbol"] for asset in monitor.assets] == ["03033.HK"]

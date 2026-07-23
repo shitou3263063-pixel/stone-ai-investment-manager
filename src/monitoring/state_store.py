@@ -19,7 +19,7 @@ from .models import (
 )
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 TRUSTED_STATUSES = {DataStatus.VALID, DataStatus.DELAYED_VALID}
 MARKET_TIMEZONES = {"US": "America/New_York", "HK": "Asia/Hong_Kong", "CN": "Asia/Shanghai"}
 
@@ -138,6 +138,22 @@ class MonitoringStateStore:
                         recovered_rule TEXT NOT NULL,
                         observed_at TEXT NOT NULL,
                         message TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS condition_state (
+                        condition_key TEXT PRIMARY KEY,
+                        consecutive_count INTEGER NOT NULL,
+                        active INTEGER NOT NULL,
+                        last_observed_at TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS notification_state (
+                        fingerprint TEXT PRIMARY KEY,
+                        subject TEXT NOT NULL,
+                        rule_id TEXT NOT NULL,
+                        active INTEGER NOT NULL,
+                        last_attempt_at TEXT NOT NULL,
+                        last_sent_at TEXT,
+                        cooldown_until TEXT NOT NULL,
+                        last_value REAL
                     );
                     """
                 )
@@ -296,9 +312,7 @@ class MonitoringStateStore:
                 "SELECT active, occurrence_count, cooldown_until, last_alert_at FROM alert_state WHERE fingerprint = ?",
                 (alert.fingerprint,),
             ).fetchone()
-            occurrence = int(existing["occurrence_count"] or 1) if existing else 1
-            if existing and not bool(existing["active"]):
-                occurrence += 1
+            occurrence = int(existing["occurrence_count"] or 0) + 1 if existing else 1
             last_alert_at = current.isoformat() if emitted or not existing else str(existing["last_alert_at"])
             cooldown_until = (
                 (current + timedelta(minutes=minutes)).isoformat()
@@ -523,6 +537,105 @@ class MonitoringStateStore:
             row = connection.execute("SELECT * FROM source_health WHERE source = ?", (source,)).fetchone()
         return dict(row) if row else None
 
+    def observe_condition(self, key: str, *, active: bool, now: datetime) -> int:
+        """Persist consecutive runtime conditions without touching trading state."""
+        current = _as_utc(now)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT consecutive_count FROM condition_state WHERE condition_key = ?",
+                (key,),
+            ).fetchone()
+            count = int(row["consecutive_count"] or 0) + 1 if active and row else int(active)
+            connection.execute(
+                """
+                INSERT INTO condition_state(condition_key, consecutive_count, active, last_observed_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(condition_key) DO UPDATE SET
+                    consecutive_count = excluded.consecutive_count,
+                    active = excluded.active,
+                    last_observed_at = excluded.last_observed_at
+                """,
+                (key, count, int(active), current.isoformat()),
+            )
+        return count
+
+    def notification_state(self, fingerprint: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM notification_state WHERE fingerprint = ?",
+                (fingerprint,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def notification_allowed(
+        self,
+        fingerprint: str,
+        *,
+        now: datetime,
+        value: float | None = None,
+    ) -> bool:
+        row = self.notification_state(fingerprint)
+        if not row:
+            return True
+        current = _as_utc(now)
+        if bool(row["active"]):
+            previous = row.get("last_value")
+            if value is None or previous is None or abs(float(value)) <= abs(float(previous)):
+                return False
+        return current >= _parse_time(str(row["cooldown_until"]))
+
+    def record_notification(
+        self,
+        *,
+        fingerprint: str,
+        subject: str,
+        rule_id: str,
+        now: datetime,
+        cooldown_minutes: int,
+        sent: bool,
+        active: bool = True,
+        value: float | None = None,
+    ) -> None:
+        current = _as_utc(now)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO notification_state(
+                    fingerprint, subject, rule_id, active, last_attempt_at,
+                    last_sent_at, cooldown_until, last_value
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(fingerprint) DO UPDATE SET
+                    subject = excluded.subject,
+                    rule_id = excluded.rule_id,
+                    active = excluded.active,
+                    last_attempt_at = excluded.last_attempt_at,
+                    last_sent_at = COALESCE(excluded.last_sent_at, notification_state.last_sent_at),
+                    cooldown_until = excluded.cooldown_until,
+                    last_value = excluded.last_value
+                """,
+                (
+                    fingerprint,
+                    subject,
+                    rule_id,
+                    int(active),
+                    current.isoformat(),
+                    current.isoformat() if sent else None,
+                    (current + timedelta(minutes=int(cooldown_minutes))).isoformat(),
+                    value,
+                ),
+            )
+
+    def recover_notification(self, subject: str, rule_id: str) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE notification_state SET active = 0
+                WHERE subject = ? AND rule_id = ? AND active = 1
+                """,
+                (subject, rule_id),
+            )
+        return cursor.rowcount > 0
+
     def record_monitor_run(self, metrics: Mapping[str, Any]) -> None:
         with self._connect() as connection:
             connection.execute(
@@ -562,6 +675,7 @@ class MonitoringStateStore:
         allowed = {
             "snapshots", "alert_state", "alert_history", "source_health",
             "monitor_runs", "recovery_events", "monitor_snapshots",
+            "condition_state", "notification_state",
         }
         if table not in allowed:
             raise ValueError(f"unsupported table: {table}")

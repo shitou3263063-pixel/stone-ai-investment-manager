@@ -31,6 +31,7 @@ class FakeQuoteContext:
         self.subscribed: set[str] = set()
         self.closed = False
         self.unsubscribed = False
+        self.market_state_calls = 0
 
     def get_market_snapshot(self, codes: list[str]):
         code = codes[0]
@@ -39,6 +40,7 @@ class FakeQuoteContext:
         return 0, [self.rows[code]]
 
     def get_market_state(self, codes: list[str]):
+        self.market_state_calls += 1
         code = codes[0]
         return 0, [{"code": code, "market_state": self.rows[code]["market_state"]}]
 
@@ -148,6 +150,15 @@ def test_one_symbol_failure_does_not_poison_next_symbol() -> None:
     with pytest.raises(FutuQuoteError):
         adapter.get_quote("VOO")
     assert adapter.get_quote("NVDA")["current_price"] == 101.25
+
+
+def test_market_state_is_cached_per_market_to_respect_opend_limits() -> None:
+    rows = {"US.VOO": _row("US.VOO"), "US.NVDA": _row("US.NVDA")}
+    context = FakeQuoteContext(rows)
+    adapter = _adapter(context, market_state_cache_seconds=20)
+    adapter.get_quote("VOO")
+    adapter.get_quote("NVDA")
+    assert context.market_state_calls == 1
 
 
 def test_futu_failure_falls_back_to_daily_reference(tmp_path: Path) -> None:

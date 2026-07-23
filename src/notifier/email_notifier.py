@@ -492,6 +492,80 @@ def send_workflow_failure_notification(
         return _failure_result("日报生产失败通知发送失败，已记录错误", exc)
 
 
+def send_intraday_alert_email(
+    alert: dict[str, Any],
+    *,
+    dry_run: bool = True,
+    env_path: Path | None = None,
+) -> dict[str, Any]:
+    """Send one observation-only monitor alert; never expose SMTP failures upstream."""
+    symbol = str(alert.get("symbol") or alert.get("subject") or "FUTU")
+    rule_id = str(alert.get("rule_id") or "monitor_condition")
+    value = alert.get("value")
+    value_text = "" if value is None else f" | {float(value):+.2f}%"
+    local_time = str(alert.get("local_time") or alert.get("observed_at") or "")
+    subject = f"Stone AI 盘中提醒 | {symbol} | {rule_id}{value_text} | {local_time}"
+    body = "\n".join(
+        [
+            f"标的：{symbol}",
+            f"市场：{alert.get('market') or '-'}",
+            f"当前价格：{alert.get('price') if alert.get('price') is not None else '-'}",
+            f"当日涨跌：{alert.get('day_change_pct') if alert.get('day_change_pct') is not None else '-'}",
+            f"5分钟变化：{alert.get('change_5m') if alert.get('change_5m') is not None else '-'}",
+            f"15分钟变化：{alert.get('change_15m') if alert.get('change_15m') is not None else '-'}",
+            f"报价时间：{alert.get('quote_time') or '-'}",
+            f"数据延迟（秒）：{alert.get('delay_seconds') if alert.get('delay_seconds') is not None else '-'}",
+            f"数据源：{alert.get('source') or '-'}",
+            f"触发规则：{rule_id}",
+            f"风险说明：{alert.get('message') or '盘中观察条件触发，请人工复核。'}",
+            "仅供监控，不构成自动交易指令。",
+        ]
+    )
+    if dry_run:
+        print(f"[EMAIL DRY-RUN] {subject}\n{body}")
+        write_log(f"盘中提醒dry-run：{symbol} {rule_id}", filename="intraday_alert_email.log")
+        return {
+            "sent": False,
+            "skipped": True,
+            "dry_run": True,
+            "attempted": False,
+            "subject": subject,
+            "message": "dry-run：未连接SMTP",
+            "error": "",
+        }
+
+    config = _get_email_config(env_path)
+    if not config:
+        message = "盘中提醒邮件未配置，跳过发送"
+        write_log(message, filename="intraday_alert_email.log")
+        return {
+            "sent": False,
+            "skipped": True,
+            "dry_run": False,
+            "attempted": False,
+            "subject": subject,
+            "message": message,
+            "error": "",
+        }
+    try:
+        _send_email(config, subject, body, [], _html_body(subject, body))
+        message = f"盘中提醒已发送到 {_mask_email(config['EMAIL_TO'])}"
+        write_log(message, filename="intraday_alert_email.log")
+        return {
+            "sent": True,
+            "skipped": False,
+            "dry_run": False,
+            "attempted": True,
+            "subject": subject,
+            "message": message,
+            "error": "",
+        }
+    except Exception as exc:  # noqa: BLE001 - monitor must continue after email failure
+        result = _failure_result("盘中提醒发送失败，监控将继续", exc)
+        result.update(dry_run=False, attempted=True, subject=subject)
+        return result
+
+
 def send_daily_reports(
     reports_dir: Path | None = None,
     subject_date: date | None = None,

@@ -18,6 +18,7 @@ __pycache__/
 venv/
 logs/*.log
 logs/intraday_monitor.jsonl
+logs/intraday_monitor/
 data/monitoring/*.sqlite3
 data/monitoring/*.sqlite3-*
 data/monitoring/*.lock

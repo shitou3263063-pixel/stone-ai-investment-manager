@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from threading import Lock
+import time
 from typing import Any, Callable, Mapping
 from zoneinfo import ZoneInfo
 
@@ -54,6 +55,7 @@ class FutuQuoteAdapter:
         port: int = 11111,
         realtime_max_age_seconds: int = 90,
         delayed_max_age_seconds: int = 1200,
+        market_state_cache_seconds: int = 20,
         context_factory: Callable[..., Any] | None = None,
         sdk: Any | None = None,
     ) -> None:
@@ -61,10 +63,12 @@ class FutuQuoteAdapter:
         self.port = int(port)
         self.realtime_max_age_seconds = int(realtime_max_age_seconds)
         self.delayed_max_age_seconds = int(delayed_max_age_seconds)
+        self.market_state_cache_seconds = int(market_state_cache_seconds)
         self._context_factory = context_factory
         self._sdk = sdk
         self._context: Any | None = None
         self._subscribed_codes: set[str] = set()
+        self._market_state_cache: dict[str, tuple[float, str]] = {}
         self._lock = Lock()
 
     @classmethod
@@ -75,6 +79,7 @@ class FutuQuoteAdapter:
             port=int(settings.get("port", 11111)),
             realtime_max_age_seconds=int(settings.get("realtime_max_age_seconds", 90)),
             delayed_max_age_seconds=int(settings.get("delayed_max_age_seconds", 1200)),
+            market_state_cache_seconds=int(settings.get("market_state_cache_seconds", 20)),
         )
 
     def get_quote(self, symbol: str) -> dict[str, Any]:
@@ -82,7 +87,7 @@ class FutuQuoteAdapter:
         with self._lock:
             sdk, context = self._ensure_context()
             snapshot = self._request_row(context.get_market_snapshot([code]), "snapshot", sdk)
-            market = self._request_row(context.get_market_state([code]), "market state", sdk)
+            market_state = self._market_state(code, context, sdk)
             subtype = sdk.SubType.QUOTE
             if code not in self._subscribed_codes:
                 ret, payload = context.subscribe(
@@ -103,7 +108,6 @@ class FutuQuoteAdapter:
             previous_close = _optional_float(
                 quote.get("prev_close_price", snapshot.get("prev_close_price"))
             )
-            market_state = str(market.get("market_state") or "UNKNOWN").upper()
             classification = self._classify(quote_time, market_state)
 
             return {
@@ -141,7 +145,19 @@ class FutuQuoteAdapter:
                 pass
             finally:
                 self._subscribed_codes.clear()
+                self._market_state_cache.clear()
                 context.close()
+
+    def _market_state(self, code: str, context: Any, sdk: Any) -> str:
+        market_prefix = code.split(".", 1)[0]
+        cached = self._market_state_cache.get(market_prefix)
+        current = time.monotonic()
+        if cached and current - cached[0] <= self.market_state_cache_seconds:
+            return cached[1]
+        row = self._request_row(context.get_market_state([code]), "market state", sdk)
+        value = str(row.get("market_state") or "UNKNOWN").upper()
+        self._market_state_cache[market_prefix] = (current, value)
+        return value
 
     def _ensure_context(self) -> tuple[Any, Any]:
         if self._sdk is None:

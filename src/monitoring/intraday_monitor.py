@@ -16,6 +16,7 @@ from src.data_sources.data_router import get_market_quote
 from utils.data_loader import project_root
 
 from .alert_rules import AlertRuleEngine
+from .alert_notifier import IntradayAlertNotifier
 from .market_clock import MarketClock, MarketPhase, MarketStatus, StaticHolidayCalendar
 from .models import (
     Alert,
@@ -71,6 +72,7 @@ class IntradayMonitor:
         state_store: MonitoringStateStore | None = None,
         market_clock: MarketClock | None = None,
         logger: StructuredMonitorLogger | None = None,
+        alert_notifier: IntradayAlertNotifier | None = None,
         root: Path | None = None,
     ) -> None:
         self.config = dict(config)
@@ -103,14 +105,33 @@ class IntradayMonitor:
         self.fifteen_tolerance_seconds = int(calculation.get("fifteen_minute_tolerance_seconds", 180))
         self.allow_delayed = bool((self.config.get("source_routing") or {}).get("allow_delayed_quotes", True))
         self.quote_router = None if quote_fetcher else MonitoringQuoteRouter(self.config, self.state_store)
+        self.alert_notifier = alert_notifier or IntradayAlertNotifier(self.config, self.state_store)
+        self._lifetime_metrics = {
+            "rounds": 0,
+            "symbols": 0,
+            "valid": 0,
+            "stale": 0,
+            "failed": 0,
+            "alerts_triggered": 0,
+            "alerts_suppressed": 0,
+        }
+        self._closed = False
 
     def filter_symbols(self, symbols: set[str]) -> None:
         wanted = {symbol.strip().upper() for symbol in symbols if symbol.strip()}
-        known = {str(asset["symbol"]).upper() for asset in self.assets}
-        missing = wanted - known
+        aliases = {
+            alias: str(asset["symbol"]).upper()
+            for asset in self.assets
+            for alias in _symbol_aliases(str(asset["symbol"]))
+        }
+        missing = wanted - set(aliases)
         if missing:
             raise ValueError(f"unknown monitor symbols: {','.join(sorted(missing))}")
-        self.assets = tuple(asset for asset in self.assets if str(asset["symbol"]).upper() in wanted)
+        selected = {aliases[symbol] for symbol in wanted}
+        self.assets = tuple(asset for asset in self.assets if str(asset["symbol"]).upper() in selected)
+
+    def enable_email_dry_run(self) -> None:
+        self.alert_notifier.force_dry_run()
 
     def run_once(
         self,
@@ -229,10 +250,18 @@ class IntradayMonitor:
             "error_count": sum(s.data_status in {DataStatus.ERROR, DataStatus.MISSING} for s in snapshots),
             "new_alert_count": len(emitted),
             "suppressed_alert_count": len(suppressed),
+            "symbol_count": len(snapshots),
+            "valid_count": sum(s.data_status in {DataStatus.VALID, DataStatus.DELAYED_VALID} for s in snapshots),
+            "failed_count": sum(
+                s.data_status in {DataStatus.ERROR, DataStatus.MISSING, DataStatus.CONFLICT}
+                for s in snapshots
+            ),
+            "alerts_triggered": 0,
+            "alerts_suppressed": 0,
+            "futu_connection_status": str(
+                (self.state_store.source_health("futu") or {}).get("status") or "UNAVAILABLE"
+            ),
         }
-        self.state_store.record_monitor_run(metrics)
-        self.state_store.cleanup(now=started_at)
-        self.logger.write("round_completed", metrics)
         result = MonitorRunResult(
             snapshots=tuple(snapshots),
             alerts=tuple(emitted),
@@ -242,6 +271,31 @@ class IntradayMonitor:
             change_results=changes_by_symbol,
             metrics=metrics,
         )
+        try:
+            notification = self.alert_notifier.process(result, now=started_at)
+            metrics["alerts_triggered"] = int(notification["triggered"])
+            metrics["alerts_suppressed"] = int(notification["suppressed"])
+            for delivery in notification["deliveries"]:
+                self.logger.write("alert_email", {"round_id": round_key, **delivery})
+        except Exception as exc:  # noqa: BLE001 - email application layer cannot stop monitoring
+            self.logger.write(
+                "alert_email_failed",
+                {
+                    "round_id": round_key,
+                    "error_type": type(exc).__name__,
+                    "error_summary": str(exc)[:240],
+                },
+            )
+        self.state_store.record_monitor_run(metrics)
+        self.state_store.cleanup(now=started_at)
+        self.logger.write("round_completed", metrics)
+        self._lifetime_metrics["rounds"] += 1
+        self._lifetime_metrics["symbols"] += int(metrics["symbol_count"])
+        self._lifetime_metrics["valid"] += int(metrics["valid_count"])
+        self._lifetime_metrics["stale"] += int(metrics["stale_count"])
+        self._lifetime_metrics["failed"] += int(metrics["failed_count"])
+        self._lifetime_metrics["alerts_triggered"] += int(metrics["alerts_triggered"])
+        self._lifetime_metrics["alerts_suppressed"] += int(metrics["alerts_suppressed"])
         if print_table:
             print_console_table(result, show_alerts=show_alerts)
         return result
@@ -314,9 +368,19 @@ class IntradayMonitor:
         return results
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         if self.quote_router is not None:
             self.quote_router.close()
         self.state_store.close()
+        self.logger.write(
+            "monitor_closed",
+            {
+                "closed_at": datetime.now(tz=timezone.utc).isoformat(),
+                **self._lifetime_metrics,
+            },
+        )
         self.logger.close()
 
 
@@ -482,6 +546,16 @@ def _failure_payload(error: str) -> dict[str, Any]:
 def _resolve_path(root: Path, value: str | Path) -> Path:
     path = Path(value)
     return path if path.is_absolute() else root / path
+
+
+def _symbol_aliases(symbol: str) -> set[str]:
+    canonical = symbol.strip().upper()
+    aliases = {canonical}
+    if canonical.endswith(".HK"):
+        local = canonical[:-3]
+        aliases.add(local)
+        aliases.add(local.lstrip("0") or "0")
+    return aliases
 
 
 def print_console_table(result: MonitorRunResult, *, show_alerts: bool = True) -> None:
