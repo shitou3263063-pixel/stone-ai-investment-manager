@@ -444,7 +444,11 @@ def _next_window_lines(bundle: dict[str, Any]) -> list[str]:
     ]
 
 
-def render_daily_report(bundle: dict[str, Any]) -> str:
+def render_daily_report(
+    bundle: dict[str, Any],
+    *,
+    intraday_summary: dict[str, Any] | None = None,
+) -> str:
     """Pure renderer: every business result is read from one bundle."""
     _require_bundle(bundle)
     portfolio = bundle["portfolio_snapshot"]
@@ -562,6 +566,10 @@ def render_daily_report(bundle: dict[str, Any]) -> str:
             "Smart Grid 为 SIMULATION_ONLY；模拟资金、持仓和盈亏不进入真实资产与正式交易建议。系统不自动交易，所有执行均需人工确认。",
         ]
     )
+    if intraday_summary is not None:
+        from src.monitoring.report_summary import render_intraday_report_summary
+
+        lines.extend(["", render_intraday_report_summary(intraday_summary)])
     return "\n".join(lines) + "\n"
 
 

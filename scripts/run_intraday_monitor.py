@@ -31,6 +31,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="hide console alert lines while preserving SQLite and JSONL state",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="enable alert formatting but print only; never connect to SMTP",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=ROOT / "config" / "intraday_monitor.yaml",
@@ -63,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         if hasattr(signal, "SIGBREAK"):
             signal.signal(signal.SIGBREAK, _raise_keyboard_interrupt)
         monitor = IntradayMonitor(config, root=ROOT)
+        if args.dry_run:
+            monitor.enable_email_dry_run()
         if args.symbols:
             monitor.filter_symbols(set(args.symbols.split(",")))
         if args.once:

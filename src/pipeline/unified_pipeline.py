@@ -11,6 +11,7 @@ from src.decision.issue_registry import build_issue_registry
 from src.decision.v12_1_decision import VERSION_NAME
 from src.domain.final_decision_bundle import build_final_decision_bundle, validate_final_decision_bundle
 from src.domain.market_snapshot import build_market_snapshot
+from src.monitoring.report_summary import load_intraday_report_summary
 from src.notifier.email_notifier import send_daily_reports
 from src.report_session import ReportSessionContext, get_report_session_context
 from src.reports.bundle_report import render_daily_report, render_diagnostic_report, render_period_report, render_portfolio_snapshot, render_today_action
@@ -32,6 +33,28 @@ def _record_schedule_skip(context: ReportSessionContext) -> str:
     )
     write_log(message, filename="report_schedule.log")
     return message
+
+
+def _load_intraday_summary_safely() -> dict[str, Any]:
+    try:
+        return load_intraday_report_summary(project_root())
+    except Exception as exc:  # noqa: BLE001 - auxiliary monitoring must never block the report
+        write_log(
+            f"intraday report summary unavailable: {type(exc).__name__}",
+            filename="intraday_report_summary.log",
+        )
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "generated_at": "-",
+            "timezone": "Asia/Shanghai",
+            "futu_connection_status": "UNAVAILABLE",
+            "monitored_symbol_count": 0,
+            "configured_symbol_count": 8,
+            "latest_round_id": "-",
+            "round_anomaly_count": 0,
+            "items": [],
+            "notice": "盘中数据不足，本节仅作观察，不参与主动交易判断。",
+        }
 
 
 def build_bundle(
@@ -72,6 +95,7 @@ def write_report_artifacts(
     *,
     reports: Path | None = None,
     session_context: ReportSessionContext | None = None,
+    intraday_summary: dict[str, Any] | None = None,
 ) -> bool:
     """Persist one validated bundle and render every report surface from it."""
     report_context = session_context or get_report_session_context(environ={})
@@ -85,7 +109,10 @@ def write_report_artifacts(
         )
         return False
     report_context.report_path(target, "today_action", ".md").write_text(render_today_action(bundle), encoding="utf-8")
-    report_context.report_path(target, "daily_report", ".md").write_text(render_daily_report(bundle), encoding="utf-8")
+    report_context.report_path(target, "daily_report", ".md").write_text(
+        render_daily_report(bundle, intraday_summary=intraday_summary),
+        encoding="utf-8",
+    )
     report_context.report_path(target, "portfolio_snapshot", ".md").write_text(render_portfolio_snapshot(bundle), encoding="utf-8")
     report_context.report_path(target, "weekly_report", ".md").write_text(render_period_report(bundle, "Weekly"), encoding="utf-8")
     report_context.report_path(target, "monthly_report", ".md").write_text(render_period_report(bundle, "Monthly"), encoding="utf-8")
@@ -104,7 +131,18 @@ def run(
     reports = report_context.output_dir(project_root())
     reports.mkdir(parents=True, exist_ok=True)
     bundle, validation = build_bundle(snapshot, session_context=report_context)
-    if not write_report_artifacts(bundle, validation, reports=reports, session_context=report_context):
+    intraday_summary = (
+        _load_intraday_summary_safely()
+        if report_context.report_session == "REGULAR"
+        else None
+    )
+    if not write_report_artifacts(
+        bundle,
+        validation,
+        reports=reports,
+        session_context=report_context,
+        intraday_summary=intraday_summary,
+    ):
         return "FinalDecisionBundle validation failed; formal report was not generated."
     status = {
         "status": "success",

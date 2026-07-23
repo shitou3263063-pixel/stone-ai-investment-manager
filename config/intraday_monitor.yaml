@@ -40,6 +40,7 @@ futu:
   port: 11111
   realtime_max_age_seconds: 90
   delayed_max_age_seconds: 1200
+  market_state_cache_seconds: 20
 
 intervals:
   trading_interval_seconds: 60
@@ -67,15 +68,15 @@ retention:
 rules:
   price_5m:
     enabled: true
-    threshold_percent: 1.5
+    threshold_percent: 2.0
     severity: WATCH
   price_15m:
     enabled: true
-    threshold_percent: 2.5
+    threshold_percent: 3.0
     severity: WARNING
   daily_change:
     enabled: true
-    threshold_percent: 4.0
+    threshold_percent: 5.0
     severity: CRITICAL
   data_stale:
     enabled: true
@@ -89,8 +90,8 @@ rules:
 
 cooldowns_minutes:
   WATCH: 60
-  WARNING: 30
-  CRITICAL: 10
+  WARNING: 60
+  CRITICAL: 60
 
 runtime:
   max_workers: 4
@@ -99,4 +100,21 @@ storage:
   sqlite_path: data/monitoring/intraday_monitor.sqlite3
 
 logging:
-  structured_log_path: logs/intraday_monitor.jsonl
+  structured_log_path: logs/intraday_monitor/intraday_monitor.jsonl
+
+# Formal application layer. Email remains opt-in and dry-run by default.
+application:
+  enabled: true
+  symbols: [VOO, NVDA, GOOG, TLT, IBKR, XLF, BABA, '03033']
+  interval_seconds: 60
+  email_alerts_enabled: false
+  email_dry_run: true
+  alert_cooldown_minutes: 60
+  consecutive_failure_threshold: 3
+  max_quote_delay_seconds: 300
+  move_5m_threshold_pct: 2.0
+  move_15m_threshold_pct: 3.0
+  day_move_threshold_pct: 5.0
+  sqlite_path: data/monitoring/intraday_monitor.sqlite3
+  log_path: logs/intraday_monitor/intraday_monitor.jsonl
+  report_snapshot_max_age_minutes: 30
