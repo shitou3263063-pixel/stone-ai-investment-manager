@@ -10,6 +10,7 @@ from src.grid.long_term_v1.runtime import (
     GridRuntimeDataProvider,
     _load_latest_formal_run,
 )
+from src.grid.long_term_v1.risk_inputs import fetch_usd_cny
 
 
 NOW = datetime(2026, 7, 24, 15, 0, tzinfo=timezone.utc)
@@ -152,3 +153,67 @@ def test_grid_thresholds_remain_unchanged(tmp_path: Path) -> None:
     assert config["risk_gates"]["minimum_dqs"] == 85
     assert config["risk_gates"]["maximum_risk_score"] == 50
     assert config["risk_gates"]["maximum_vix"] == 40
+
+
+def test_usd_cny_primary_quote_has_current_day_metadata() -> None:
+    value, metadata, errors = fetch_usd_cny(
+        now=NOW,
+        settings={"fx_max_age_seconds": 900},
+        primary_fetch=lambda: {
+            "value": 7.2,
+            "source": "data_router",
+            "quote_timestamp": "2026-07-24T14:59:00+00:00",
+        },
+        fallback_fetch=lambda: (_ for _ in ()).throw(AssertionError("fallback not expected")),
+    )
+    assert value == 7.2
+    assert metadata["validity"] == "VALID"
+    assert metadata["source"] == "data_router"
+    assert metadata["age_minutes"] == 1.0
+    assert errors == ()
+
+
+def test_usd_cny_primary_failure_uses_independent_fallback() -> None:
+    value, metadata, errors = fetch_usd_cny(
+        now=NOW,
+        settings={"fx_max_age_seconds": 900},
+        primary_fetch=lambda: (_ for _ in ()).throw(RuntimeError("primary down")),
+        fallback_fetch=lambda: {
+            "value": 7.21,
+            "source": "fallback_fx",
+            "quote_timestamp": "2026-07-24T14:58:00+00:00",
+        },
+    )
+    assert value == 7.21
+    assert metadata["validity"] == "VALID"
+    assert metadata["fallback_used"] is True
+    assert metadata["fallback_source"] == "fallback_fx"
+    assert errors and errors[0].startswith("USD_CNY_PRIMARY_")
+
+
+def test_usd_cny_two_failures_remain_unavailable() -> None:
+    value, metadata, errors = fetch_usd_cny(
+        now=NOW,
+        settings={"fx_max_age_seconds": 900},
+        primary_fetch=lambda: (_ for _ in ()).throw(RuntimeError("primary down")),
+        fallback_fetch=lambda: (_ for _ in ()).throw(RuntimeError("fallback down")),
+    )
+    assert value is None
+    assert metadata["validity"] == "MISSING"
+    assert "USD_CNY_PRIMARY_RUNTIMEERROR" in errors
+    assert "USD_CNY_FALLBACK_RUNTIMEERROR" in errors
+
+
+def test_usd_cny_yesterday_is_not_silently_accepted() -> None:
+    value, metadata, _ = fetch_usd_cny(
+        now=NOW,
+        settings={"fx_max_age_seconds": 86400},
+        primary_fetch=lambda: {
+            "value": 7.2,
+            "source": "data_router",
+            "quote_timestamp": "2026-07-23T23:59:00+00:00",
+        },
+        fallback_fetch=lambda: (_ for _ in ()).throw(RuntimeError("no fallback")),
+    )
+    assert value is None
+    assert metadata["validity"] == "STALE"

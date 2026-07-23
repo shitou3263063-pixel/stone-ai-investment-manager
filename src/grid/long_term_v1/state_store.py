@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from .models import GridDecision, PositionType, STRATEGY_ID
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class LongTermGridStateStore:
@@ -154,6 +154,18 @@ class LongTermGridStateStore:
                         value TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     );
+                    CREATE TABLE IF NOT EXISTS runtime_inputs(
+                        name TEXT PRIMARY KEY,
+                        value REAL,
+                        source TEXT,
+                        as_of TEXT,
+                        age_minutes REAL,
+                        validity TEXT NOT NULL,
+                        unavailable_reason TEXT,
+                        fallback_used INTEGER NOT NULL DEFAULT 0,
+                        fallback_source TEXT,
+                        updated_at TEXT NOT NULL
+                    );
                     """
                 )
                 now = datetime.now(tz=timezone.utc).isoformat()
@@ -204,6 +216,65 @@ class LongTermGridStateStore:
                 """
             ).fetchall()
         return [json.loads(str(row["payload_json"])) for row in rows]
+
+    def record_runtime_inputs(
+        self,
+        metadata: Mapping[str, Any],
+        *,
+        observed_at: datetime,
+    ) -> None:
+        """Persist the latest risk-input metadata in the isolated grid DB."""
+        with self._connection() as connection:
+            for name in ("dqs", "risk_score", "usd_cny"):
+                detail = dict(metadata.get(name) or {})
+                connection.execute(
+                    """
+                    INSERT INTO runtime_inputs(
+                        name, value, source, as_of, age_minutes, validity,
+                        unavailable_reason, fallback_used, fallback_source, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET
+                        value=excluded.value,
+                        source=excluded.source,
+                        as_of=excluded.as_of,
+                        age_minutes=excluded.age_minutes,
+                        validity=excluded.validity,
+                        unavailable_reason=excluded.unavailable_reason,
+                        fallback_used=excluded.fallback_used,
+                        fallback_source=excluded.fallback_source,
+                        updated_at=excluded.updated_at
+                    """,
+                    (
+                        name,
+                        _optional_float(detail.get("value")),
+                        detail.get("source"),
+                        detail.get("as_of"),
+                        _optional_float(detail.get("age_minutes")),
+                        str(detail.get("validity") or "MISSING"),
+                        detail.get("unavailable_reason") or detail.get("reason"),
+                        1 if detail.get("fallback_used") else 0,
+                        detail.get("fallback_source"),
+                        _utc(observed_at).isoformat(),
+                    ),
+                )
+
+    def latest_runtime_inputs(self) -> dict[str, dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM runtime_inputs").fetchall()
+        return {
+            str(row["name"]): {
+                "value": row["value"],
+                "source": row["source"],
+                "as_of": row["as_of"],
+                "age_minutes": row["age_minutes"],
+                "validity": row["validity"],
+                "unavailable_reason": row["unavailable_reason"],
+                "fallback_used": bool(row["fallback_used"]),
+                "fallback_source": row["fallback_source"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        }
 
     def active_lot(self, symbol: str, grid_level: int) -> dict[str, Any] | None:
         with self._connection() as connection:
@@ -676,6 +747,7 @@ class LongTermGridStateStore:
             "notification_state",
             "benchmark_state",
             "equity_history",
+            "runtime_inputs",
         }
         if table not in allowed:
             raise ValueError("unsupported table")
@@ -694,6 +766,15 @@ def _parse_time(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("stored grid timestamp lacks timezone")
     return parsed.astimezone(timezone.utc)
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _max_drawdown(values: list[float]) -> float:
