@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 import json
 from pathlib import Path
 import tempfile
@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from src.reports.bundle_report import render_period_report
 from src.notifier.email_notifier import DAILY_EMAIL_SUBJECT, _send_email, send_daily_reports
+from src.report_session import get_report_session_context
 from src.reports.report_center import build_run_status, generate_today_action
 from tests.test_v12_5_freeze import _decision
 from tests.test_final_decision_bundle import _fixture_bundle
@@ -64,20 +65,22 @@ def test_email_subject_body_and_attachments_are_fixed() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         reports = _write_email_fixture(root)
-        with patch.dict("os.environ", {"REPORT_RUN_LABEL": ""}, clear=False):
-            with patch("src.notifier.email_notifier._send_email") as sender:
-                result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
+        context = get_report_session_context(
+            now=datetime.fromisoformat("2026-07-20T18:30:00+08:00"),
+            environ={"STONE_REPORT_SESSION": "REGULAR", "STONE_REPORT_TRIGGER": "SCHEDULED"},
+        )
+        with patch("src.notifier.email_notifier._send_email") as sender:
+            result = send_daily_reports(reports_dir=reports, env_path=root / ".env", session_context=context)
         assert result["sent"] is True
         args = sender.call_args.args
-        assert args[1] == "Stone AI CIO Daily - 10%-15% Target"
-        assert args[1] == DAILY_EMAIL_SUBJECT
+        assert args[1] == f"{DAILY_EMAIL_SUBJECT} | REGULAR 常规日报 | 2026-07-20 | 定时运行"
         assert [path.name for path in args[3]] == [
             "today_action.md",
             "daily_report.md",
             "weekly_report.md",
             "run_status.json",
         ]
-        for field in ["运行时段", "报告日期", "数据截止时间", "今日是否执行", "标的和金额", "可投资现金", "下一复核日期", "DQS", "是否存在警告或错误"]:
+        for field in ["session:", "scheduled_for:", "generated_at:", "timezone:", "delivery_delay_minutes:", "报告日期", "数据截止时间", "今日是否执行", "标的和金额", "可投资现金", "下一复核日期", "DQS", "是否存在警告或错误"]:
             assert field in args[2]
 
 
@@ -85,20 +88,26 @@ def test_dual_timezone_email_subject_identifies_us_market_run() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         reports = _write_email_fixture(root)
-        with patch.dict("os.environ", {"REPORT_RUN_LABEL": "美东时间 08:30"}, clear=False):
-            with patch("src.notifier.email_notifier._send_email") as sender:
-                result = send_daily_reports(reports_dir=reports, env_path=root / ".env")
+        context = get_report_session_context(
+            now=datetime.fromisoformat("2026-07-20T08:30:00-04:00"),
+            environ={"STONE_REPORT_SESSION": "US_PREOPEN", "STONE_REPORT_TRIGGER": "MANUAL"},
+        )
+        for stem in ("today_action", "daily_report", "weekly_report"):
+            (reports / f"{stem}_US_PREOPEN.md").write_text("test", encoding="utf-8")
+        with patch("src.notifier.email_notifier._send_email") as sender:
+            result = send_daily_reports(reports_dir=reports, env_path=root / ".env", session_context=context)
         assert result["sent"] is True
-        assert sender.call_args.args[1] == f"{DAILY_EMAIL_SUBJECT} | 美东时间 08:30"
-        assert "运行时段：美东时间 08:30" in sender.call_args.args[2]
+        assert sender.call_args.args[1] == f"{DAILY_EMAIL_SUBJECT} | US_PREOPEN 美股开盘前 | 2026-07-20 | 手动运行"
+        assert "session: US_PREOPEN" in sender.call_args.args[2]
+        assert "trigger: MANUAL" in sender.call_args.args[2]
 
 
-def test_github_daily_workflow_has_beijing_and_new_york_0830() -> None:
+def test_github_daily_workflow_has_one_unambiguous_regular_schedule() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "daily.yml").read_text(encoding="utf-8")
-    assert 'cron: "30 8 * * *"' in workflow
-    assert 'timezone: "Asia/Shanghai"' in workflow
-    assert 'cron: "30 8 * * 0-6"' in workflow
-    assert 'timezone: "America/New_York"' in workflow
+    assert workflow.count('cron: "30 10 * * *"') == 1
+    assert "timezone:" not in workflow
+    assert "STONE_REPORT_SESSION: REGULAR" in workflow
+    assert "REPORT_RUN_LABEL" not in workflow
     assert "Run Stone AI Investment Manager Pro V12.7.1 Final Freeze" in workflow
 
 

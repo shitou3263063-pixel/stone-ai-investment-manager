@@ -161,7 +161,7 @@ def test_workflow_has_single_entry_and_concurrency() -> None:
     workflow = Path(".github/workflows/daily.yml").read_text(encoding="utf-8")
     assert workflow.count("python main.py 2>&1 | tee logs/main.log") == 1
     assert "concurrency:" in workflow
-    assert 'cron: "30 8 * * *"' in workflow
-    assert 'timezone: "Asia/Shanghai"' in workflow
-    assert 'cron: "30 8 * * 0-6"' in workflow
-    assert 'timezone: "America/New_York"' in workflow
+    assert workflow.count('cron: "30 10 * * *"') == 1
+    assert "timezone:" not in workflow
+    assert "STONE_REPORT_SESSION: REGULAR" in workflow
+    assert "STONE_REPORT_TRIGGER:" in workflow

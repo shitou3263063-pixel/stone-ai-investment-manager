@@ -10,7 +10,6 @@ from src.decision.v12_1_decision import is_dca_execution_day, load_strategy
 from src.domain.final_decision_bundle import validate_final_decision_bundle
 from src.pipeline import unified_pipeline
 from src.report_session import get_report_session_context
-from src.reports.bundle_report import render_daily_report
 from src.reports.report_center import build_run_status
 from tests.test_final_decision_bundle import _fixture_bundle
 
@@ -108,8 +107,8 @@ def test_same_date_two_sessions_send_independently_and_have_distinct_subjects(tm
             session_context=us, dedupe_marker=tmp_path / "us.json",
         )
     assert sender.call_count == 2
-    assert cn_result["subject"] == "Stone AI CIO Daily - 10%-15% Target | A股开盘前 | 2026-07-20"
-    assert us_result["subject"] == "Stone AI CIO Daily - 10%-15% Target | 美股开盘前 | 2026-07-20"
+    assert cn_result["subject"] == "Stone AI CIO Daily - 10%-15% Target | CN_PREOPEN A股开盘前 | 2026-07-20 | 手动运行"
+    assert us_result["subject"] == "Stone AI CIO Daily - 10%-15% Target | US_PREOPEN 美股开盘前 | 2026-07-20 | 手动运行"
 
 
 def test_same_session_second_run_is_deduplicated(tmp_path: Path) -> None:
@@ -154,17 +153,12 @@ def test_mail_failure_makes_main_exit_nonzero(tmp_path: Path) -> None:
         assert unified_pipeline.main() == 1
 
 
-def test_weekday_market_holiday_renders_closed_report_instead_of_silence() -> None:
+def test_weekday_market_holiday_is_not_sent_as_preopen() -> None:
     context = _context("CN_PREOPEN", "2026-10-01T08:35:00+08:00")
     assert context.local_now.weekday() < 5
     assert context.market_is_trading_day is False
-    bundle = _fixture_bundle()
-    bundle["report_metadata"].update(context.as_dict())
-    report = render_daily_report(bundle)
-    assert "休市版日报" in report
-    assert "市场休市" in report
-    assert "下一交易日" in report
-    assert "不生成交易建议" in report
+    assert context.should_generate is False
+    assert context.schedule_status == "SKIPPED_NON_TRADING_DAY"
 
 
 def test_existing_holiday_policy_moves_scheduled_dca_to_next_open_day() -> None:

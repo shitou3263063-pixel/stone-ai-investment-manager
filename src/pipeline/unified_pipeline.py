@@ -16,11 +16,22 @@ from src.report_session import ReportSessionContext, get_report_session_context
 from src.reports.bundle_report import render_daily_report, render_diagnostic_report, render_period_report, render_portfolio_snapshot, render_today_action
 from src.system.health_check import format_health_report, run_health_check
 from utils.data_loader import project_root
+from utils.logger import write_log
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+
+def _record_schedule_skip(context: ReportSessionContext) -> str:
+    message = (
+        f"{context.schedule_status} session={context.report_session} "
+        f"trigger={context.trigger_type} scheduled_for={context.scheduled_for.isoformat()} "
+        f"generated_at={context.local_now.isoformat()} timezone={context.report_timezone}"
+    )
+    write_log(message, filename="report_schedule.log")
+    return message
 
 
 def build_bundle(
@@ -88,6 +99,8 @@ def run(
     session_context: ReportSessionContext | None = None,
 ) -> str:
     report_context = session_context or get_report_session_context()
+    if not report_context.should_generate:
+        return _record_schedule_skip(report_context)
     reports = report_context.output_dir(project_root())
     reports.mkdir(parents=True, exist_ok=True)
     bundle, validation = build_bundle(snapshot, session_context=report_context)
@@ -97,6 +110,7 @@ def run(
         "status": "success",
         "report_session": report_context.report_session,
         "report_label": report_context.report_label,
+        "schedule": report_context.as_dict(),
         "bundle_hash": bundle["bundle_hash"], "validation": validation,
         "email": {"sent": False, "skipped": not send_email, "message": "pending" if send_email else "email skipped"},
         "report_date": (bundle.get("report_metadata", {}) or {}).get("report_business_date"),
@@ -133,11 +147,20 @@ def run(
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    report_context = get_report_session_context()
+    if not report_context.should_generate:
+        print(_record_schedule_skip(report_context))
+        return 0
     health = run_health_check(auto_fix=True)
     print(format_health_report(health))
     if not health.get("can_run", False):
         return 1
+    # Refresh after health checks so generated_at and delay reflect report production,
+    # and re-apply the window if startup work crossed the deadline.
     report_context = get_report_session_context()
+    if not report_context.should_generate:
+        print(_record_schedule_skip(report_context))
+        return 0
     result = run(send_email=True, session_context=report_context)
     print(result)
     try:
