@@ -2,8 +2,10 @@ name: US Pre-open Report
 
 on:
   schedule:
-    - cron: "40 8 * * 1-5"
-      timezone: "America/New_York"
+    # GitHub Actions cron is UTC. The program admits only local 08:30-09:15,
+    # so 12:30 UTC covers EDT and 13:30 UTC covers EST without double sending.
+    - cron: "30 12 * * 1-5"
+    - cron: "30 13 * * 1-5"
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +20,7 @@ jobs:
       PYTHONIOENCODING: utf-8
       STONE_REPORT_SESSION: US_PREOPEN
       STONE_REPORT_TIMEZONE: America/New_York
-      STONE_REPORT_LABEL: 美股开盘前
+      STONE_REPORT_TRIGGER: ${{ github.event_name == 'workflow_dispatch' && 'MANUAL' || 'SCHEDULED' }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -43,7 +45,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: outputs/.mail_state/us_preopen
-          key: stone-ai-mail-us-preopen-${{ github.run_id }}
+          key: stone-ai-mail-us-preopen-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: stone-ai-mail-us-preopen-
 
       - name: Set up Python
@@ -100,7 +102,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: outputs/.mail_state/us_preopen
-          key: stone-ai-mail-us-preopen-${{ github.run_id }}
+          key: stone-ai-mail-us-preopen-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Finalize workflow status
         if: always()

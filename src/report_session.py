@@ -1,8 +1,8 @@
-"""Runtime context and market calendar for the two pre-open reports."""
+"""Authoritative runtime context, schedule and market calendar for reports."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 import os
 from pathlib import Path
 from typing import Mapping
@@ -12,21 +12,30 @@ from zoneinfo import ZoneInfo
 SESSION_SPECS = {
     "REGULAR": {
         "timezone": "Asia/Shanghai",
-        "label": "",
+        "label": "常规日报",
         "slug": "regular",
         "market": "CN",
+        "scheduled_time": "18:30",
+        "window_end_time": "19:15",
+        "requires_trading_day": False,
     },
     "CN_PREOPEN": {
         "timezone": "Asia/Shanghai",
         "label": "A股开盘前",
         "slug": "cn_preopen",
         "market": "CN",
+        "scheduled_time": "08:30",
+        "window_end_time": "09:15",
+        "requires_trading_day": True,
     },
     "US_PREOPEN": {
         "timezone": "America/New_York",
         "label": "美股开盘前",
         "slug": "us_preopen",
         "market": "US",
+        "scheduled_time": "08:30",
+        "window_end_time": "09:15",
+        "requires_trading_day": True,
     },
 }
 
@@ -137,6 +146,47 @@ class ReportSessionContext:
     report_timezone: str
     report_label: str
     local_now: datetime
+    trigger_type: str
+
+    @property
+    def scheduled_for(self) -> datetime:
+        value = time.fromisoformat(str(SESSION_SPECS[self.report_session]["scheduled_time"]))
+        return datetime.combine(self.local_report_date, value, tzinfo=ZoneInfo(self.report_timezone))
+
+    @property
+    def window_ends_at(self) -> datetime:
+        value = time.fromisoformat(str(SESSION_SPECS[self.report_session]["window_end_time"]))
+        return datetime.combine(self.local_report_date, value, tzinfo=ZoneInfo(self.report_timezone))
+
+    @property
+    def is_manual(self) -> bool:
+        return self.trigger_type == "MANUAL"
+
+    @property
+    def delivery_delay_minutes(self) -> float:
+        return round((self.local_now - self.scheduled_for).total_seconds() / 60, 2)
+
+    @property
+    def is_within_schedule_window(self) -> bool:
+        return self.scheduled_for <= self.local_now <= self.window_ends_at
+
+    @property
+    def requires_trading_day(self) -> bool:
+        return bool(SESSION_SPECS[self.report_session]["requires_trading_day"])
+
+    @property
+    def schedule_status(self) -> str:
+        if self.requires_trading_day and not self.market_is_trading_day:
+            return "SKIPPED_NON_TRADING_DAY"
+        if self.report_session == "REGULAR" and self.is_manual:
+            return "READY_MANUAL"
+        if not self.is_within_schedule_window:
+            return "SKIPPED_OUTSIDE_WINDOW"
+        return "READY_MANUAL" if self.is_manual else "READY_SCHEDULED"
+
+    @property
+    def should_generate(self) -> bool:
+        return self.schedule_status in {"READY_MANUAL", "READY_SCHEDULED"}
 
     @property
     def local_report_date(self) -> date:
@@ -197,6 +247,14 @@ class ReportSessionContext:
             "report_session": self.report_session,
             "report_timezone": self.report_timezone,
             "report_label": self.report_label,
+            "session": self.report_session,
+            "scheduled_for": self.scheduled_for.isoformat(),
+            "generated_at": self.local_now.isoformat(),
+            "timezone": self.report_timezone,
+            "delivery_delay_minutes": self.delivery_delay_minutes,
+            "trigger_type": self.trigger_type,
+            "manual_run": self.is_manual,
+            "schedule_status": self.schedule_status,
             "local_report_date": self.local_report_date.isoformat(),
             "dedupe_key": self.dedupe_key,
             "market_is_trading_day": self.market_is_trading_day,
@@ -216,8 +274,19 @@ def get_report_session_context(
     if session not in SESSION_SPECS:
         raise ValueError(f"Unsupported STONE_REPORT_SESSION: {session}")
     spec = SESSION_SPECS[session]
-    timezone_name = str(env.get("STONE_REPORT_TIMEZONE") or spec["timezone"]).strip()
-    label = str(env.get("STONE_REPORT_LABEL") or spec["label"]).strip()
+    timezone_name = str(spec["timezone"])
+    configured_timezone = str(env.get("STONE_REPORT_TIMEZONE") or timezone_name).strip()
+    if configured_timezone != timezone_name:
+        raise ValueError(
+            f"STONE_REPORT_TIMEZONE for {session} must be {timezone_name}, got {configured_timezone}"
+        )
+    label = str(spec["label"])
+    trigger_type = str(env.get("STONE_REPORT_TRIGGER") or "").strip().upper()
+    if not trigger_type:
+        github_event = str(env.get("GITHUB_EVENT_NAME") or "").strip().lower()
+        trigger_type = "SCHEDULED" if github_event == "schedule" else "MANUAL"
+    if trigger_type not in {"SCHEDULED", "MANUAL"}:
+        raise ValueError(f"Unsupported STONE_REPORT_TRIGGER: {trigger_type}")
     zone = ZoneInfo(timezone_name)
     if now is None:
         local_now = datetime.now(tz=zone)
@@ -225,7 +294,7 @@ def get_report_session_context(
         local_now = now.replace(tzinfo=zone)
     else:
         local_now = now.astimezone(zone)
-    return ReportSessionContext(session, timezone_name, label, local_now)
+    return ReportSessionContext(session, timezone_name, label, local_now, trigger_type)
 
 
 def current_report_date() -> date:

@@ -12,7 +12,7 @@ import ssl
 import time
 from typing import Any
 
-from src.report_session import ReportSessionContext
+from src.report_session import ReportSessionContext, get_report_session_context
 from utils.logger import write_log
 
 
@@ -500,6 +500,22 @@ def send_daily_reports(
     session_context: ReportSessionContext | None = None,
     dedupe_marker: Path | None = None,
 ) -> dict[str, Any]:
+    report_context = session_context or get_report_session_context()
+    if not report_context.should_generate:
+        message = (
+            f"{report_context.schedule_status}，跳过邮件："
+            f"session={report_context.report_session} generated_at={report_context.local_now.isoformat()}"
+        )
+        write_log(message, filename="email_notifier.log")
+        return {
+            "sent": False,
+            "skipped": True,
+            "attempted": False,
+            "deduplicated": False,
+            "schedule_status": report_context.schedule_status,
+            "message": message,
+            "error": "",
+        }
     config = _get_email_config(env_path)
     if not config:
         message = "邮件未配置，跳过发送"
@@ -533,20 +549,20 @@ def send_daily_reports(
 
     action = run_status.get("today_action", {}) or {}
     has_issue = bool(run_status.get("warnings") or run_status.get("errors"))
-    run_label = os.getenv("REPORT_RUN_LABEL", "").strip()
-    session = session_context.report_session if session_context is not None else "REGULAR"
-    if session_context is not None and session != "REGULAR":
-        email_subject = f"{DAILY_EMAIL_SUBJECT} | {session_context.report_label} | {(subject_date or session_context.local_report_date).isoformat()}"
-        run_label = session_context.report_label
-    else:
-        email_subject = f"{DAILY_EMAIL_SUBJECT} | {run_label}" if run_label else DAILY_EMAIL_SUBJECT
+    session = report_context.report_session
+    report_date = subject_date or report_context.local_report_date
+    trigger_label = "手动运行" if report_context.is_manual else "定时运行"
+    email_subject = (
+        f"{DAILY_EMAIL_SUBJECT} | {session} {report_context.report_label} | "
+        f"{report_date.isoformat()} | {trigger_label}"
+    )
 
-    if dedupe_marker is not None and session != "REGULAR" and dedupe_marker.exists():
+    if dedupe_marker is not None and dedupe_marker.exists():
         try:
             prior = json.loads(dedupe_marker.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             prior = {}
-        if prior.get("dedupe_key") == session_context.dedupe_key and prior.get("sent") is True:
+        if prior.get("dedupe_key") == report_context.dedupe_key and prior.get("sent") is True:
             message = f"邮件已在当前报告时段发送，跳过重复发送：{email_subject}"
             write_log(message, filename="email_notifier.log")
             return {
@@ -560,7 +576,13 @@ def send_daily_reports(
             }
     plain_body = "\n".join(
         [
-            f"运行时段：{run_label or '本地或未标记运行'}",
+            f"session: {session}",
+            f"session_label: {report_context.report_label}",
+            f"trigger: {report_context.trigger_type}",
+            f"scheduled_for: {report_context.scheduled_for.isoformat()}",
+            f"generated_at: {report_context.local_now.isoformat()}",
+            f"timezone: {report_context.report_timezone}",
+            f"delivery_delay_minutes: {report_context.delivery_delay_minutes:.2f}",
             f"报告日期：{run_status.get('report_date')}",
             f"数据截止时间：{run_status.get('data_cutoff_time')}",
             f"今日是否执行：{'是' if action.get('execute') else '否'}",
@@ -581,12 +603,18 @@ def send_daily_reports(
             _html_body(email_subject, plain_body),
             session,
         )
-        if dedupe_marker is not None and session_context is not None and session != "REGULAR":
+        if dedupe_marker is not None:
             try:
                 dedupe_marker.parent.mkdir(parents=True, exist_ok=True)
                 dedupe_marker.write_text(
                     json.dumps(
-                        {"dedupe_key": session_context.dedupe_key, "sent": True, "subject": email_subject},
+                        {
+                            "dedupe_key": report_context.dedupe_key,
+                            "sent": True,
+                            "subject": email_subject,
+                            "session": session,
+                            "generated_at": report_context.local_now.isoformat(),
+                        },
                         ensure_ascii=False,
                         indent=2,
                     ),

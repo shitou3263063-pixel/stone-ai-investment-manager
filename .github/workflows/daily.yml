@@ -2,13 +2,8 @@ name: Daily Stone AI Investment Report
 
 on:
   schedule:
-    # 中国资产与亚洲市场晨间复核：北京时间每天08:30。
-    - cron: "30 8 * * *"
-      timezone: "Asia/Shanghai"
-    # 美股市场晨间复核：纽约时间每天08:30；自动适配EST/EDT夏令时。
-    # 使用等价但不同的星期表达式，以便邮件主题识别触发来源。
-    - cron: "30 8 * * 0-6"
-      timezone: "America/New_York"
+    # GitHub Actions cron is UTC. 10:30 UTC = 18:30 Asia/Shanghai.
+    - cron: "30 10 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +17,9 @@ jobs:
 
     env:
       PYTHONIOENCODING: utf-8
+      STONE_REPORT_SESSION: REGULAR
+      STONE_REPORT_TIMEZONE: Asia/Shanghai
+      STONE_REPORT_TRIGGER: ${{ github.event_name == 'workflow_dispatch' && 'MANUAL' || 'SCHEDULED' }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -41,6 +39,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Restore regular mail dedup state
+        uses: actions/cache/restore@v4
+        with:
+          path: outputs/.mail_state/regular
+          key: stone-ai-mail-regular-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: stone-ai-mail-regular-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,8 +75,6 @@ jobs:
         if: always()
         continue-on-error: true
         shell: bash
-        env:
-          REPORT_RUN_LABEL: ${{ github.event.schedule == '30 8 * * 0-6' && '美东时间 08:30' || (github.event.schedule == '30 8 * * *' && '北京时间 08:30' || '手动运行') }}
         run: |
           mkdir -p logs
           set -o pipefail
@@ -93,6 +96,13 @@ jobs:
             outputs/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Save regular mail dedup state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: outputs/.mail_state/regular
+          key: stone-ai-mail-regular-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Finalize workflow status
         if: always()
