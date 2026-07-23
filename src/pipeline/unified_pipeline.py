@@ -12,6 +12,7 @@ from src.decision.v12_1_decision import VERSION_NAME
 from src.domain.final_decision_bundle import build_final_decision_bundle, validate_final_decision_bundle
 from src.domain.market_snapshot import build_market_snapshot
 from src.monitoring.report_summary import load_intraday_report_summary
+from src.grid.long_term_v1.report_summary import load_grid_strategy_summary
 from src.notifier.email_notifier import send_daily_reports
 from src.report_session import ReportSessionContext, get_report_session_context
 from src.reports.bundle_report import render_daily_report, render_diagnostic_report, render_period_report, render_portfolio_snapshot, render_today_action
@@ -57,6 +58,25 @@ def _load_intraday_summary_safely() -> dict[str, Any]:
         }
 
 
+def _load_grid_summary_safely() -> dict[str, Any]:
+    try:
+        return load_grid_strategy_summary(project_root())
+    except Exception as exc:  # noqa: BLE001 - simulation ledger must never block reports
+        write_log(
+            f"grid strategy report summary unavailable: {type(exc).__name__}",
+            filename="grid_strategy_report_summary.log",
+        )
+        return {
+            "status": "DATA_INSUFFICIENT",
+            "strategy_id": "LONG_TERM_GRID_V1",
+            "simulation_only": True,
+            "automatic_trading": False,
+            "items": [],
+            "metrics": {},
+            "notice": "网格数据不足",
+        }
+
+
 def build_bundle(
     snapshot: dict[str, Any] | None = None,
     *,
@@ -96,6 +116,7 @@ def write_report_artifacts(
     reports: Path | None = None,
     session_context: ReportSessionContext | None = None,
     intraday_summary: dict[str, Any] | None = None,
+    grid_strategy_summary: dict[str, Any] | None = None,
 ) -> bool:
     """Persist one validated bundle and render every report surface from it."""
     report_context = session_context or get_report_session_context(environ={})
@@ -110,7 +131,11 @@ def write_report_artifacts(
         return False
     report_context.report_path(target, "today_action", ".md").write_text(render_today_action(bundle), encoding="utf-8")
     report_context.report_path(target, "daily_report", ".md").write_text(
-        render_daily_report(bundle, intraday_summary=intraday_summary),
+        render_daily_report(
+            bundle,
+            intraday_summary=intraday_summary,
+            grid_strategy_summary=grid_strategy_summary,
+        ),
         encoding="utf-8",
     )
     report_context.report_path(target, "portfolio_snapshot", ".md").write_text(render_portfolio_snapshot(bundle), encoding="utf-8")
@@ -136,12 +161,18 @@ def run(
         if report_context.report_session == "REGULAR"
         else None
     )
+    grid_strategy_summary = (
+        _load_grid_summary_safely()
+        if report_context.report_session == "REGULAR"
+        else None
+    )
     if not write_report_artifacts(
         bundle,
         validation,
         reports=reports,
         session_context=report_context,
         intraday_summary=intraday_summary,
+        grid_strategy_summary=grid_strategy_summary,
     ):
         return "FinalDecisionBundle validation failed; formal report was not generated."
     status = {

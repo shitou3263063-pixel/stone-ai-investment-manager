@@ -566,6 +566,102 @@ def send_intraday_alert_email(
         return result
 
 
+def send_grid_alert_email(
+    event: dict[str, Any],
+    *,
+    dry_run: bool = True,
+    env_path: Path | None = None,
+) -> dict[str, Any]:
+    """Deliver one simulation-only grid event without exposing SMTP failures."""
+    event_type = str(event.get("event_type") or "GRID_BLOCKED")
+    symbol = str(event.get("symbol") or "-")
+    grid_level = event.get("grid_level")
+    level_text = "-" if grid_level is None else str(grid_level)
+    subject = (
+        f"Stone AI GRID | {event_type} | {symbol} | "
+        f"Level {level_text} | SIMULATION_ONLY"
+    )
+    fields = (
+        ("event_id", event.get("event_id")),
+        ("event_type", event_type),
+        ("symbol", symbol),
+        ("strategy", event.get("strategy_id") or "LONG_TERM_GRID_V1"),
+        ("grid_level", level_text),
+        ("price", event.get("price")),
+        ("reference_center", event.get("reference_center")),
+        ("suggested_amount_cny", event.get("suggested_amount_cny")),
+        ("estimated_quantity", event.get("estimated_quantity")),
+        ("take_profit_1", event.get("take_profit_1")),
+        ("take_profit_2", event.get("take_profit_2")),
+        ("quote_status", event.get("quote_status")),
+        ("quote_delay_seconds", event.get("quote_delay_seconds")),
+        ("source", event.get("source")),
+        ("dqs", event.get("dqs")),
+        ("risk_score", event.get("risk_score")),
+        ("vix", event.get("vix")),
+        ("remaining_grid_budget_cny", event.get("remaining_grid_budget_cny")),
+        ("automatic_trading", "false"),
+        ("simulation_only", "true"),
+        ("generated_at", event.get("generated_at")),
+        ("timezone", event.get("timezone") or "America/New_York"),
+    )
+    body = "\n".join(f"{name}={value if value is not None else '-'}" for name, value in fields)
+    if dry_run:
+        print(f"[EMAIL DRY-RUN] {subject}\n{body}")
+        write_log(
+            f"grid alert dry-run: {symbol} {event_type}",
+            filename="grid_strategy_email.log",
+        )
+        return {
+            "sent": False,
+            "skipped": True,
+            "dry_run": True,
+            "attempted": False,
+            "subject": subject,
+            "body": body,
+            "message": "dry-run: SMTP not contacted",
+            "error": "",
+        }
+
+    config = _get_email_config(env_path)
+    if not config:
+        message = "grid alert email is not configured; delivery skipped"
+        write_log(message, filename="grid_strategy_email.log")
+        return {
+            "sent": False,
+            "skipped": True,
+            "dry_run": False,
+            "attempted": False,
+            "subject": subject,
+            "body": body,
+            "message": message,
+            "error": "",
+        }
+    try:
+        _send_email(config, subject, body, [], _html_body(subject, body))
+        message = f"grid alert sent to {_mask_email(config['EMAIL_TO'])}"
+        write_log(message, filename="grid_strategy_email.log")
+        return {
+            "sent": True,
+            "skipped": False,
+            "dry_run": False,
+            "attempted": True,
+            "subject": subject,
+            "body": body,
+            "message": message,
+            "error": "",
+        }
+    except Exception as exc:  # noqa: BLE001 - grid evaluation must continue
+        result = _failure_result("grid alert delivery failed; strategy continued", exc)
+        result.update(
+            dry_run=False,
+            attempted=True,
+            subject=subject,
+            body=body,
+        )
+        return result
+
+
 def send_daily_reports(
     reports_dir: Path | None = None,
     subject_date: date | None = None,

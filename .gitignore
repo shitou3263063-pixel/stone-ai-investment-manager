@@ -22,6 +22,10 @@ logs/intraday_monitor/
 data/monitoring/*.sqlite3
 data/monitoring/*.sqlite3-*
 data/monitoring/*.lock
+data/grid_strategy/*.sqlite3
+data/grid_strategy/*.sqlite3-*
+data/grid_strategy/*.lock
+logs/grid_strategy/
 data/cache/*.json
 data/source_audit.json
 data/daily_snapshot.json

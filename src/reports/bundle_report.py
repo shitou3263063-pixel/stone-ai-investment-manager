@@ -448,6 +448,7 @@ def render_daily_report(
     bundle: dict[str, Any],
     *,
     intraday_summary: dict[str, Any] | None = None,
+    grid_strategy_summary: dict[str, Any] | None = None,
 ) -> str:
     """Pure renderer: every business result is read from one bundle."""
     _require_bundle(bundle)
@@ -570,6 +571,10 @@ def render_daily_report(
         from src.monitoring.report_summary import render_intraday_report_summary
 
         lines.extend(["", render_intraday_report_summary(intraday_summary)])
+    if grid_strategy_summary is not None:
+        from src.grid.long_term_v1.report_summary import render_grid_strategy_summary
+
+        lines.extend(["", render_grid_strategy_summary(grid_strategy_summary)])
     return "\n".join(lines) + "\n"
 
 
